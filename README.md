@@ -5,6 +5,7 @@ A lightweight macOS menu bar app that replaces the default `Shift+Command+4` scr
 ## Features
 
 - Intercepts `Shift+Command+4` globally to replace the system screenshot tool
+- Multi-monitor support — dims all screens, captures from the screen where the cursor is
 - macOS-style selection overlay with dimmed background and real-time dimensions display
 - Saves screenshots as PNG to `~/Screenshots/`
 - Automatically copies the screenshot to the clipboard
@@ -80,7 +81,6 @@ KuKa/
 
 ## Known Limitations
 
-- Single monitor only — captures from the display where the cursor is
 - You must disable or accept that the system `Shift+Command+4` is intercepted (the app suppresses the system shortcut when running)
 - Requires macOS 13+ for `SMAppService` (launch at login)
 - No preferences UI for changing the shortcut key (hardcoded to `Shift+Command+4`)

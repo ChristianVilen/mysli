@@ -5,6 +5,7 @@
 A lightweight macOS app to replace the default `Shift+Command+4` selected area screenshot functionality. The app will:
 
 - Capture a user-selected area of the screen.
+- Multi-monitor support — dims all screens, captures from the screen where the cursor is.
 - Save the screenshot to `~/Screenshots/`.
 - Copy the screenshot to the clipboard.
 
@@ -30,9 +31,9 @@ KuKa/
 
 | Class | Responsibility |
 |-------|---------------|
-| `AppDelegate` | Menu bar icon, launch-at-login toggle, orchestrates the capture flow |
+| `AppDelegate` | Menu bar icon, launch-at-login toggle, orchestrates the capture flow, multi-monitor overlay management |
 | `HotkeyManager` | `CGEvent.tapCreate` to intercept `Shift+Command+4`, fires callback |
-| `OverlayWindow` | Full-screen borderless `NSWindow` covering the active display |
+| `OverlayWindow` | Full-screen borderless `NSWindow` covering each display |
 | `SelectionView` | Mouse drag selection, dimmed background, real-time dimensions label |
 | `CaptureManager` | `CGWindowListCreateImage`, PNG save to `~/Screenshots/`, clipboard, shutter sound, `UNUserNotificationCenter` |
 
@@ -40,9 +41,9 @@ KuKa/
 
 ```
 Shift+Cmd+4 → HotkeyManager (suppresses event) → AppDelegate.startCapture()
-→ OverlayWindow shown → User drags selection → SelectionView reports CGRect
-→ Overlay dismissed → 50ms delay → CaptureManager.capture(rect, screen)
-→ Save PNG + Copy clipboard + Shutter sound + Notification
+→ OverlayWindows shown on all screens → User drags selection on cursor's screen
+→ SelectionView reports CGRect → All overlays dismissed → 50ms delay
+→ CaptureManager.capture(rect, screen) → Save PNG + Copy clipboard + Shutter sound + Notification
 ```
 
 ---

@@ -5,7 +5,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private let hotkeyManager = HotkeyManager()
     private let captureManager = CaptureManager()
-    private var overlayWindow: OverlayWindow?
+    private var overlayWindows: [OverlayWindow] = []
     private var launchAtLoginItem: NSMenuItem!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -45,21 +45,39 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Capture Flow
 
     private func startCapture() {
-        guard overlayWindow == nil, let screen = NSScreen.main else { return }
+        guard overlayWindows.isEmpty else { return }
 
-        let overlay = OverlayWindow(screen: screen)
-        overlayWindow = overlay
+        let mouseLocation = NSEvent.mouseLocation
+        var cursorScreenOverlay: OverlayWindow?
 
-        overlay.selectionView.onSelection = { [weak self] rect in
-            self?.finishCapture(rect: rect, screen: screen)
+        for screen in NSScreen.screens {
+            let overlay = OverlayWindow(screen: screen)
+
+            overlay.selectionView.onSelection = { [weak self] rect in
+                self?.finishCapture(rect: rect, screen: screen)
+            }
+            overlay.selectionView.onCancel = { [weak self] in
+                self?.dismissOverlay()
+            }
+
+            overlayWindows.append(overlay)
+
+            if screen.frame.contains(mouseLocation) {
+                cursorScreenOverlay = overlay
+            }
         }
-        overlay.selectionView.onCancel = { [weak self] in
-            self?.dismissOverlay()
-        }
 
-        overlay.makeKeyAndOrderFront(nil)
-        overlay.makeFirstResponder(overlay.selectionView)
-        NSCursor.crosshair.push()
+        // Activate the app so the overlay gets immediate focus and cursor changes
+        NSApp.activate(ignoringOtherApps: true)
+
+        for overlay in overlayWindows {
+            if overlay === cursorScreenOverlay {
+                overlay.makeKeyAndOrderFront(nil)
+                overlay.makeFirstResponder(overlay.selectionView)
+            } else {
+                overlay.orderFront(nil)
+            }
+        }
     }
 
     private func finishCapture(rect: CGRect, screen: NSScreen) {
@@ -72,8 +90,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func dismissOverlay() {
         NSCursor.pop()
-        overlayWindow?.orderOut(nil)
-        overlayWindow = nil
+        for overlay in overlayWindows {
+            overlay.orderOut(nil)
+        }
+        overlayWindows.removeAll()
     }
 
     // MARK: - Launch at Login
