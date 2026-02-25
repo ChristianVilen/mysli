@@ -6,6 +6,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private let hotkeyManager = HotkeyManager()
     private let captureManager = CaptureManager()
     private var overlayWindows: [OverlayWindow] = []
+    private var thumbnailPanel: ThumbnailPanel?
+    private var editorWindow: EditorWindow?
     private var launchAtLoginItem: NSMenuItem!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -67,7 +69,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
 
-        // Activate the app so the overlay gets immediate focus and cursor changes
         NSApp.activate(ignoringOtherApps: true)
 
         for overlay in overlayWindows {
@@ -82,9 +83,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func finishCapture(rect: CGRect, screen: NSScreen) {
         dismissOverlay()
-        // Small delay to let the overlay fully disappear before capturing
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-            self.captureManager.capture(rect: rect, screen: screen)
+            guard let result = self.captureManager.capture(rect: rect, screen: screen) else { return }
+            self.showThumbnail(result: result, screen: screen)
         }
     }
 
@@ -94,6 +95,37 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             overlay.orderOut(nil)
         }
         overlayWindows.removeAll()
+    }
+
+    // MARK: - Thumbnail & Editor
+
+    private func showThumbnail(result: CaptureResult, screen: NSScreen) {
+        let panel = ThumbnailPanel(image: result.image, screen: screen)
+        thumbnailPanel = panel
+
+        panel.onEdit = { [weak self] in
+            self?.thumbnailPanel = nil
+            self?.openEditor(result: result)
+        }
+        panel.onDismiss = { [weak self] in
+            self?.thumbnailPanel = nil
+        }
+
+        panel.orderFront(nil)
+    }
+
+    private func openEditor(result: CaptureResult) {
+        NSApp.activate(ignoringOtherApps: true)
+
+        let editor = EditorWindow(image: result.image)
+        editorWindow = editor
+
+        editor.onSave = { [weak self] annotatedImage in
+            self?.captureManager.saveAnnotated(image: annotatedImage, to: result.fileURL)
+            self?.editorWindow = nil
+        }
+
+        editor.makeKeyAndOrderFront(nil)
     }
 
     // MARK: - Launch at Login

@@ -2,9 +2,13 @@ import Cocoa
 import UniformTypeIdentifiers
 import UserNotifications
 
+struct CaptureResult {
+    let image: NSImage
+    let fileURL: URL
+}
+
 class CaptureManager {
-    func capture(rect: CGRect, screen: NSScreen) {
-        // Convert from NSView coordinates (bottom-left origin) to CGDisplay coordinates (top-left origin)
+    func capture(rect: CGRect, screen: NSScreen) -> CaptureResult? {
         let screenFrame = screen.frame
         let cgRect = CGRect(
             x: screenFrame.origin.x + rect.origin.x,
@@ -13,24 +17,29 @@ class CaptureManager {
             height: rect.height
         )
 
-        NSLog("Ku-Ka: selection rect=\(rect), cgRect=\(cgRect), screenFrame=\(screenFrame)")
-
         guard let cgImage = CGWindowListCreateImage(cgRect, .optionOnScreenOnly, kCGNullWindowID, .bestResolution) else {
             NSLog("Ku-Ka: CGWindowListCreateImage returned nil")
-            return
+            return nil
         }
 
-        NSLog("Ku-Ka: captured image \(cgImage.width)x\(cgImage.height)")
-
         let image = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
-
-        saveToDisk(cgImage: cgImage)
+        let fileURL = saveToDisk(cgImage: cgImage)
         copyToClipboard(image: image)
         playShutterSound()
         sendNotification()
+
+        return CaptureResult(image: image, fileURL: fileURL)
     }
 
-    private func saveToDisk(cgImage: CGImage) {
+    func saveAnnotated(image: NSImage, to url: URL) {
+        guard let tiff = image.tiffRepresentation,
+              let bitmap = NSBitmapImageRep(data: tiff),
+              let png = bitmap.representation(using: .png, properties: [:]) else { return }
+        try? png.write(to: url)
+        copyToClipboard(image: image)
+    }
+
+    private func saveToDisk(cgImage: CGImage) -> URL {
         let dir = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Screenshots")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
 
@@ -42,20 +51,17 @@ class CaptureManager {
         let dest = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil)!
         CGImageDestinationAddImage(dest, cgImage, nil)
         CGImageDestinationFinalize(dest)
+        return url
     }
 
-    private func copyToClipboard(image: NSImage) {
+    func copyToClipboard(image: NSImage) {
         guard let tiff = image.tiffRepresentation,
               let bitmap = NSBitmapImageRep(data: tiff),
-              let png = bitmap.representation(using: .png, properties: [:]) else {
-            NSLog("Ku-Ka: failed to create clipboard data")
-            return
-        }
+              let png = bitmap.representation(using: .png, properties: [:]) else { return }
         let pb = NSPasteboard.general
         pb.clearContents()
         pb.setData(tiff, forType: .tiff)
         pb.setData(png, forType: .png)
-        NSLog("Ku-Ka: copied to clipboard (tiff=\(tiff.count) bytes, png=\(png.count) bytes)")
     }
 
     private func playShutterSound() {

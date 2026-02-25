@@ -13,6 +13,9 @@
 		A10000004 /* OverlayWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000014 /* OverlayWindow.swift */; };
 		A10000005 /* SelectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000015 /* SelectionView.swift */; };
 		A10000006 /* CaptureManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000016 /* CaptureManager.swift */; };
+		A10000007 /* ThumbnailPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000019 /* ThumbnailPanel.swift */; };
+		A10000008 /* DrawingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001A /* DrawingView.swift */; };
+		A10000009 /* EditorWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001B /* EditorWindow.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -25,6 +28,9 @@
 		A10000016 /* CaptureManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureManager.swift; sourceTree = "<group>"; };
 		A10000017 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A10000018 /* KuKa.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = KuKa.entitlements; sourceTree = "<group>"; };
+		A10000019 /* ThumbnailPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThumbnailPanel.swift; sourceTree = "<group>"; };
+		A1000001A /* DrawingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrawingView.swift; sourceTree = "<group>"; };
+		A1000001B /* EditorWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorWindow.swift; sourceTree = "<group>"; };
 		E28DFEF72F4C8D93001B8D91 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -56,6 +62,9 @@
 				A10000014 /* OverlayWindow.swift */,
 				A10000015 /* SelectionView.swift */,
 				A10000016 /* CaptureManager.swift */,
+				A10000019 /* ThumbnailPanel.swift */,
+				A1000001A /* DrawingView.swift */,
+				A1000001B /* EditorWindow.swift */,
 				A10000017 /* Info.plist */,
 				A10000018 /* KuKa.entitlements */,
 				E28DFEF72F4C8D93001B8D91 /* Assets.xcassets */,
@@ -129,6 +138,9 @@
 				A10000004 /* OverlayWindow.swift in Sources */,
 				A10000005 /* SelectionView.swift in Sources */,
 				A10000006 /* CaptureManager.swift in Sources */,
+				A10000007 /* ThumbnailPanel.swift in Sources */,
+				A10000008 /* DrawingView.swift in Sources */,
+				A10000009 /* EditorWindow.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
