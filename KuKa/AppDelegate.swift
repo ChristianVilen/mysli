@@ -10,11 +10,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var thumbnailPanel: ThumbnailPanel?
     private var editorWindow: EditorWindow?
     private var launchAtLoginItem: NSMenuItem!
+    private var durationItems: [NSMenuItem] = []
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+        let isTesting = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+            || CommandLine.arguments.contains("--uitesting")
+        if !isTesting {
+            UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+            setupHotkey()
+        }
         setupMenuBar()
-        setupHotkey()
     }
 
     // MARK: - Menu Bar
@@ -31,6 +36,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         launchAtLoginItem.target = self
         launchAtLoginItem.state = UserDefaults.standard.bool(forKey: "launchAtLogin") ? .on : .off
         menu.addItem(launchAtLoginItem)
+
+        menu.addItem(.separator())
+
+        let durationLabel = NSMenuItem(title: "Thumbnail Duration", action: nil, keyEquivalent: "")
+        durationLabel.isEnabled = false
+        menu.addItem(durationLabel)
+
+        let currentDuration = UserDefaults.standard.object(forKey: "thumbnailDuration") as? Double ?? 5.0
+        for (title, tag) in [("3 Seconds", 3), ("5 Seconds", 5), ("Forever", 0)] {
+            let item = NSMenuItem(title: title, action: #selector(changeDuration(_:)), keyEquivalent: "")
+            item.target = self
+            item.tag = tag
+            item.state = Double(tag) == currentDuration ? .on : .off
+            menu.addItem(item)
+            durationItems.append(item)
+        }
 
         menu.addItem(.separator())
         let quitItem = NSMenuItem(title: "Quit Ku-Ka", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
@@ -102,7 +123,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Thumbnail & Editor
 
     private func showThumbnail(result: CaptureResult, screen: NSScreen) {
-        let panel = ThumbnailPanel(image: result.image, screen: screen)
+        let duration = UserDefaults.standard.object(forKey: "thumbnailDuration") as? Double ?? 5.0
+        let panel = ThumbnailPanel(image: result.image, screen: screen, duration: duration)
         thumbnailPanel = panel
 
         panel.onEdit = { [weak self] in
@@ -128,6 +150,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         editor.makeKeyAndOrderFront(nil)
+    }
+
+    // MARK: - Thumbnail Duration
+
+    @objc private func changeDuration(_ sender: NSMenuItem) {
+        UserDefaults.standard.set(Double(sender.tag), forKey: "thumbnailDuration")
+        for item in durationItems { item.state = .off }
+        sender.state = .on
     }
 
     // MARK: - Launch at Login

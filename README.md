@@ -67,6 +67,7 @@ The folder is created automatically if it doesn't exist.
 ## Menu Bar Options
 
 - **Launch at Login** — Toggle to start Ku-Ka automatically when you log in
+- **Thumbnail Duration** — Choose how long the floating thumbnail stays visible: 3 Seconds, 5 Seconds, or Forever (until dismissed)
 - **Quit Ku-Ka** — Exit the app
 
 ## File Structure
@@ -91,3 +92,32 @@ KuKa/
 - You must disable or accept that the system `Shift+Command+4` is intercepted (the app suppresses the system shortcut when running)
 - Requires macOS 13+ for `SMAppService` (launch at login)
 - No preferences UI for changing the shortcut key (hardcoded to `Shift+Command+4`)
+
+## Testing
+
+### Running Tests
+
+- **Xcode**: `Cmd+U` runs both unit and UI test suites
+- **CLI**: `xcodebuild -project KuKa.xcodeproj -scheme KuKa test`
+
+### Unit Tests (KuKaTests)
+
+`CaptureManager` uses protocol-based dependency injection (`FileManaging`, `ClipboardManaging`, `ScreenCapturing`) so all external dependencies are mocked in tests — no real disk writes, clipboard access, or screen capture needed.
+
+Tests cover:
+- Capture success/failure paths
+- File saving and clipboard operations
+- Coordinate conversion (NSView → CGDisplay)
+- Screenshot file naming format
+- Annotated image save
+
+### UI Tests (KuKaUITests)
+
+XCUITest suite verifying menu bar interactions:
+- Status item exists
+- Menu contains all expected items (Launch at Login, Thumbnail Duration options, Quit)
+- Duration selection persists across menu re-open
+
+### Test-Mode Guard
+
+When running under XCTest, the app skips hotkey registration and notification authorization to avoid permission prompts. Detection uses `XCTestConfigurationFilePath` (unit tests) and `--uitesting` launch argument (UI tests).

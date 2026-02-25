@@ -5,7 +5,7 @@ class ThumbnailPanel: NSPanel {
     var onDismiss: (() -> Void)?
     private var dismissTimer: Timer?
 
-    init(image: NSImage, screen: NSScreen) {
+    init(image: NSImage, screen: NSScreen, duration: TimeInterval = 5.0) {
         let thumbWidth: CGFloat = 200
         let aspect = image.size.height / image.size.width
         let thumbHeight = thumbWidth * aspect
@@ -48,8 +48,10 @@ class ThumbnailPanel: NSPanel {
         let clickGesture = NSClickGestureRecognizer(target: self, action: #selector(thumbnailClicked))
         imageView.addGestureRecognizer(clickGesture)
 
-        dismissTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: false) { [weak self] _ in
-            self?.dismissThumbnail()
+        if duration > 0 {
+            dismissTimer = Timer.scheduledTimer(withTimeInterval: duration, repeats: false) { [weak self] _ in
+                self?.dismissThumbnail()
+            }
         }
     }
 

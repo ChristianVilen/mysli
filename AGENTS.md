@@ -35,12 +35,12 @@ KuKa/
 
 | Class | Responsibility |
 |-------|---------------|
-| `AppDelegate` | Menu bar icon, launch-at-login toggle, orchestrates the capture flow, multi-monitor overlay management |
+| `AppDelegate` | Menu bar icon, launch-at-login toggle, thumbnail duration setting, orchestrates the capture flow, multi-monitor overlay management |
 | `HotkeyManager` | `CGEvent.tapCreate` to intercept `Shift+Command+4`, fires callback |
 | `OverlayWindow` | Full-screen borderless `NSWindow` covering each display |
 | `SelectionView` | Mouse drag selection, dimmed background, real-time dimensions label |
-| `CaptureManager` | `CGWindowListCreateImage`, PNG save to `~/Screenshots/`, clipboard, shutter sound, `UNUserNotificationCenter` |
-| `ThumbnailPanel` | Floating preview in bottom-right corner, 5s auto-dismiss, click to open editor |
+| `CaptureManager` | Protocol-based DI (`FileManaging`, `ClipboardManaging`, `ScreenCapturing`), PNG save to `~/Screenshots/`, clipboard, shutter sound, `UNUserNotificationCenter` |
+| `ThumbnailPanel` | Floating preview in bottom-right corner, configurable auto-dismiss (3s/5s/forever), click to open editor |
 | `DrawingView` | Freehand red drawing on screenshot, undo support, composites final image |
 | `EditorWindow` | Centered modal for annotation with Undo and Done buttons |
 
@@ -94,3 +94,54 @@ Shift+Cmd+4 → HotkeyManager (suppresses event) → AppDelegate.startCapture()
 - `SelectionView` draws dimmed background (30% black), clears selected rect, white border, monospaced dimensions label.
 - Escape key cancels selection.
 - Zero-size selections are ignored.
+
+---
+
+## Testing
+
+### Architecture
+
+`CaptureManager` uses protocol-based dependency injection for testability:
+
+| Protocol | Real Implementation | Responsibility |
+|----------|-------------------|----------------|
+| `FileManaging` | `FileManager` | Directory creation, file writing |
+| `ClipboardManaging` | `SystemClipboard` | Pasteboard operations |
+| `ScreenCapturing` | `SystemScreenCapture` | `CGWindowListCreateImage` wrapper |
+
+### Test Targets
+
+```
+KuKaTests/                    # Unit tests (XCTest, macOS 14.0+)
+├── CaptureManagerTests.swift # Tests for capture, save, clipboard, coordinate conversion, file naming
+└── Mocks.swift               # MockFileManager, MockClipboard, MockScreenCapture
+
+KuKaUITests/                  # UI tests (XCUITest, macOS 14.0+)
+└── MenuBarTests.swift        # Menu bar icon, menu items, thumbnail duration selection
+```
+
+### Test-Mode Guard
+
+When running under XCTest, `AppDelegate` skips hotkey registration and notification authorization to avoid permission prompts:
+- Unit tests: detected via `XCTestConfigurationFilePath` environment variable
+- UI tests: detected via `--uitesting` launch argument passed by `MenuBarTests.setUp()`
+
+### Running Tests
+
+- **Xcode**: `Cmd+U` runs both unit and UI test suites
+- **CLI**: `xcodebuild -project KuKa.xcodeproj -scheme KuKa test`
+
+### Unit Test Coverage
+
+- `capture()` returns result on success, nil on screen capture failure
+- Screenshots directory is created via `FileManaging` protocol
+- Clipboard copy is called on successful capture, skipped on failure
+- Coordinate conversion from NSView (bottom-left) to CGDisplay (top-left)
+- File naming format: `Screenshot_YYYY-MM-DD_at_HH-MM-SS.png`
+- `saveAnnotated()` writes file and updates clipboard
+
+### UI Test Coverage
+
+- Menu bar status item exists
+- Menu contains Launch at Login, Thumbnail Duration label, 3s/5s/Forever options, Quit
+- Selecting a duration option persists across menu re-open

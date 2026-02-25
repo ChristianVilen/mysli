@@ -2,12 +2,67 @@ import Cocoa
 import UniformTypeIdentifiers
 import UserNotifications
 
+// MARK: - Protocols
+
+protocol FileManaging {
+    var homeDirectoryForCurrentUser: URL { get }
+    func createDirectory(at url: URL, withIntermediateDirectories createIntermediates: Bool, attributes: [FileAttributeKey: Any]?) throws
+    func writeImageData(_ data: Data, to url: URL) throws
+}
+
+protocol ClipboardManaging {
+    func copyImage(tiffData: Data, pngData: Data)
+}
+
+protocol ScreenCapturing {
+    func captureScreen(rect: CGRect) -> CGImage?
+}
+
+// MARK: - Real Implementations
+
+extension FileManager: FileManaging {
+    func writeImageData(_ data: Data, to url: URL) throws {
+        try data.write(to: url)
+    }
+}
+
+class SystemClipboard: ClipboardManaging {
+    func copyImage(tiffData: Data, pngData: Data) {
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        pb.setData(tiffData, forType: .tiff)
+        pb.setData(pngData, forType: .png)
+    }
+}
+
+class SystemScreenCapture: ScreenCapturing {
+    func captureScreen(rect: CGRect) -> CGImage? {
+        CGWindowListCreateImage(rect, .optionOnScreenOnly, kCGNullWindowID, .bestResolution)
+    }
+}
+
+// MARK: - CaptureResult
+
 struct CaptureResult {
     let image: NSImage
     let fileURL: URL
 }
 
+// MARK: - CaptureManager
+
 class CaptureManager {
+    let fileManager: FileManaging
+    let clipboard: ClipboardManaging
+    let screenCapture: ScreenCapturing
+
+    init(fileManager: FileManaging = FileManager.default,
+         clipboard: ClipboardManaging = SystemClipboard(),
+         screenCapture: ScreenCapturing = SystemScreenCapture()) {
+        self.fileManager = fileManager
+        self.clipboard = clipboard
+        self.screenCapture = screenCapture
+    }
+
     func capture(rect: CGRect, screen: NSScreen) -> CaptureResult? {
         let screenFrame = screen.frame
         let cgRect = CGRect(
@@ -17,8 +72,8 @@ class CaptureManager {
             height: rect.height
         )
 
-        guard let cgImage = CGWindowListCreateImage(cgRect, .optionOnScreenOnly, kCGNullWindowID, .bestResolution) else {
-            NSLog("Ku-Ka: CGWindowListCreateImage returned nil")
+        guard let cgImage = screenCapture.captureScreen(rect: cgRect) else {
+            NSLog("Ku-Ka: Screen capture returned nil")
             return nil
         }
 
@@ -35,33 +90,38 @@ class CaptureManager {
         guard let tiff = image.tiffRepresentation,
               let bitmap = NSBitmapImageRep(data: tiff),
               let png = bitmap.representation(using: .png, properties: [:]) else { return }
-        try? png.write(to: url)
+        try? fileManager.writeImageData(png, to: url)
         copyToClipboard(image: image)
-    }
-
-    private func saveToDisk(cgImage: CGImage) -> URL {
-        let dir = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Screenshots")
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd'_at_'HH-mm-ss"
-        let name = "Screenshot_\(formatter.string(from: Date())).png"
-        let url = dir.appendingPathComponent(name)
-
-        let dest = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil)!
-        CGImageDestinationAddImage(dest, cgImage, nil)
-        CGImageDestinationFinalize(dest)
-        return url
     }
 
     func copyToClipboard(image: NSImage) {
         guard let tiff = image.tiffRepresentation,
               let bitmap = NSBitmapImageRep(data: tiff),
               let png = bitmap.representation(using: .png, properties: [:]) else { return }
-        let pb = NSPasteboard.general
-        pb.clearContents()
-        pb.setData(tiff, forType: .tiff)
-        pb.setData(png, forType: .png)
+        clipboard.copyImage(tiffData: tiff, pngData: png)
+    }
+
+    func screenshotsDirectory() -> URL {
+        fileManager.homeDirectoryForCurrentUser.appendingPathComponent("Screenshots")
+    }
+
+    func generateFileName(for date: Date = Date()) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd'_at_'HH-mm-ss"
+        return "Screenshot_\(formatter.string(from: date)).png"
+    }
+
+    private func saveToDisk(cgImage: CGImage) -> URL {
+        let dir = screenshotsDirectory()
+        try? fileManager.createDirectory(at: dir, withIntermediateDirectories: true, attributes: nil)
+
+        let url = dir.appendingPathComponent(generateFileName())
+
+        let bitmapRep = NSBitmapImageRep(cgImage: cgImage)
+        if let pngData = bitmapRep.representation(using: .png, properties: [:]) {
+            try? fileManager.writeImageData(pngData, to: url)
+        }
+        return url
     }
 
     private func playShutterSound() {

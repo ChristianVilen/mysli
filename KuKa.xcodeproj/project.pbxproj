@@ -16,7 +16,27 @@
 		A10000007 /* ThumbnailPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000019 /* ThumbnailPanel.swift */; };
 		A10000008 /* DrawingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001A /* DrawingView.swift */; };
 		A10000009 /* EditorWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001B /* EditorWindow.swift */; };
+		B20000001 /* CaptureManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000011 /* CaptureManagerTests.swift */; };
+		B20000002 /* Mocks.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000012 /* Mocks.swift */; };
+		C30000001 /* MenuBarTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000011 /* MenuBarTests.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		B20000020 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A10000050 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A10000040;
+			remoteInfo = KuKa;
+		};
+		C30000020 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A10000050 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A10000040;
+			remoteInfo = KuKa;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		A10000010 /* KuKa.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = KuKa.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -31,11 +51,30 @@
 		A10000019 /* ThumbnailPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThumbnailPanel.swift; sourceTree = "<group>"; };
 		A1000001A /* DrawingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrawingView.swift; sourceTree = "<group>"; };
 		A1000001B /* EditorWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorWindow.swift; sourceTree = "<group>"; };
+		B20000010 /* KuKaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KuKaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		B20000011 /* CaptureManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureManagerTests.swift; sourceTree = "<group>"; };
+		B20000012 /* Mocks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Mocks.swift; sourceTree = "<group>"; };
+		C30000010 /* KuKaUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KuKaUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		C30000011 /* MenuBarTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarTests.swift; sourceTree = "<group>"; };
 		E28DFEF72F4C8D93001B8D91 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		A10000020 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B20000030 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C30000030 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -49,6 +88,8 @@
 			isa = PBXGroup;
 			children = (
 				A10000031 /* KuKa */,
+				B20000031 /* KuKaTests */,
+				C30000031 /* KuKaUITests */,
 				A10000032 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -76,8 +117,27 @@
 			isa = PBXGroup;
 			children = (
 				A10000010 /* KuKa.app */,
+				B20000010 /* KuKaTests.xctest */,
+				C30000010 /* KuKaUITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		B20000031 /* KuKaTests */ = {
+			isa = PBXGroup;
+			children = (
+				B20000011 /* CaptureManagerTests.swift */,
+				B20000012 /* Mocks.swift */,
+			);
+			path = KuKaTests;
+			sourceTree = "<group>";
+		};
+		C30000031 /* KuKaUITests */ = {
+			isa = PBXGroup;
+			children = (
+				C30000011 /* MenuBarTests.swift */,
+			);
+			path = KuKaUITests;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -98,6 +158,40 @@
 			productName = KuKa;
 			productReference = A10000010 /* KuKa.app */;
 			productType = "com.apple.product-type.application";
+		};
+		B20000040 /* KuKaTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B20000060 /* Build configuration list for PBXNativeTarget "KuKaTests" */;
+			buildPhases = (
+				B20000041 /* Sources */,
+				B20000030 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				B20000021 /* PBXTargetDependency */,
+			);
+			name = KuKaTests;
+			productName = KuKaTests;
+			productReference = B20000010 /* KuKaTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		C30000040 /* KuKaUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C30000060 /* Build configuration list for PBXNativeTarget "KuKaUITests" */;
+			buildPhases = (
+				C30000041 /* Sources */,
+				C30000030 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				C30000021 /* PBXTargetDependency */,
+			);
+			name = KuKaUITests;
+			productName = KuKaUITests;
+			productReference = C30000010 /* KuKaUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 /* End PBXNativeTarget section */
 
@@ -123,6 +217,8 @@
 			projectRoot = "";
 			targets = (
 				A10000040 /* KuKa */,
+				B20000040 /* KuKaTests */,
+				C30000040 /* KuKaUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -144,7 +240,37 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B20000041 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B20000001 /* CaptureManagerTests.swift in Sources */,
+				B20000002 /* Mocks.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C30000041 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C30000001 /* MenuBarTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		B20000021 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A10000040 /* KuKa */;
+			targetProxy = B20000020 /* PBXContainerItemProxy */;
+		};
+		C30000021 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A10000040 /* KuKa */;
+			targetProxy = C30000020 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		A10000061 /* Debug */ = {
@@ -154,6 +280,9 @@
 				CODE_SIGN_ENTITLEMENTS = KuKa/KuKa.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
+				DEFINES_MODULE = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_TESTING_SEARCH_PATHS = YES;
 				INFOPLIST_FILE = KuKa/Info.plist;
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.kuka.screenshot;
@@ -169,11 +298,67 @@
 				CODE_SIGN_ENTITLEMENTS = KuKa/KuKa.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
+				DEFINES_MODULE = YES;
+				ENABLE_TESTING_SEARCH_PATHS = YES;
 				INFOPLIST_FILE = KuKa/Info.plist;
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.kuka.screenshot;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		B20000061 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kuka.screenshot.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/KuKa.app/Contents/MacOS/KuKa";
+			};
+			name = Debug;
+		};
+		B20000062 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kuka.screenshot.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/KuKa.app/Contents/MacOS/KuKa";
+			};
+			name = Release;
+		};
+		C30000061 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kuka.screenshot.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = KuKa;
+			};
+			name = Debug;
+		};
+		C30000062 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kuka.screenshot.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = KuKa;
 			};
 			name = Release;
 		};
@@ -217,6 +402,24 @@
 			buildConfigurations = (
 				A10000061 /* Debug */,
 				A10000062 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B20000060 /* Build configuration list for PBXNativeTarget "KuKaTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B20000061 /* Debug */,
+				B20000062 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C30000060 /* Build configuration list for PBXNativeTarget "KuKaUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C30000061 /* Debug */,
+				C30000062 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
