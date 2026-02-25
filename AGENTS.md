@@ -8,6 +8,7 @@ A lightweight macOS app to replace the default `Shift+Command+4` selected area s
 - Multi-monitor support — dims all screens, captures from the screen where the cursor is.
 - Save the screenshot to `~/Screenshots/`.
 - Copy the screenshot to the clipboard.
+- Floating thumbnail preview after capture — click to annotate with freehand drawing.
 
 ---
 
@@ -18,11 +19,14 @@ A lightweight macOS app to replace the default `Shift+Command+4` selected area s
 ```
 KuKa/
 ├── main.swift           # App entry point (NSApplication.shared.run())
-├── AppDelegate.swift    # NSStatusItem menu bar, wires hotkey → overlay → capture pipeline
+├── AppDelegate.swift    # NSStatusItem menu bar, wires hotkey → overlay → capture → thumbnail → editor pipeline
 ├── HotkeyManager.swift  # CGEvent tap intercepting Shift+Command+4 globally
 ├── OverlayWindow.swift  # Borderless transparent NSWindow at screenSaver level
 ├── SelectionView.swift  # NSView handling mouseDown/Dragged/Up, draws dimmed overlay + selection rect + dimensions
 ├── CaptureManager.swift # CGWindowListCreateImage capture, PNG save, clipboard copy, sound + notification
+├── ThumbnailPanel.swift # Floating preview panel in bottom-right corner after capture
+├── DrawingView.swift    # NSView for freehand red drawing on screenshot image
+├── EditorWindow.swift   # Centered modal window for annotating screenshots
 ├── Info.plist           # LSUIElement=true, NSScreenCaptureUsageDescription
 └── KuKa.entitlements    # Sandbox disabled (required for CGEvent tap + screen capture)
 ```
@@ -36,6 +40,9 @@ KuKa/
 | `OverlayWindow` | Full-screen borderless `NSWindow` covering each display |
 | `SelectionView` | Mouse drag selection, dimmed background, real-time dimensions label |
 | `CaptureManager` | `CGWindowListCreateImage`, PNG save to `~/Screenshots/`, clipboard, shutter sound, `UNUserNotificationCenter` |
+| `ThumbnailPanel` | Floating preview in bottom-right corner, 5s auto-dismiss, click to open editor |
+| `DrawingView` | Freehand red drawing on screenshot, undo support, composites final image |
+| `EditorWindow` | Centered modal for annotation with Undo and Done buttons |
 
 ### Flow
 
@@ -44,6 +51,8 @@ Shift+Cmd+4 → HotkeyManager (suppresses event) → AppDelegate.startCapture()
 → OverlayWindows shown on all screens → User drags selection on cursor's screen
 → SelectionView reports CGRect → All overlays dismissed → 50ms delay
 → CaptureManager.capture(rect, screen) → Save PNG + Copy clipboard + Shutter sound + Notification
+→ ThumbnailPanel shown (bottom-right, 5s timeout) → Click thumbnail → EditorWindow opens
+→ Freehand drawing → Done → Overwrite PNG + Update clipboard
 ```
 
 ---

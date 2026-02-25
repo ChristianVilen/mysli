@@ -69,13 +69,10 @@ class CaptureManager {
     }
 
     private func sendNotification() {
-        let center = UNUserNotificationCenter.current()
-        center.requestAuthorization(options: [.alert, .sound]) { _, _ in }
-
         let content = UNMutableNotificationContent()
         content.title = "Ku-Ka"
         content.body = "Screenshot saved and copied!"
         let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
-        center.add(request)
+        UNUserNotificationCenter.current().add(request)
     }
 }

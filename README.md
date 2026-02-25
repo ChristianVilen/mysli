@@ -10,6 +10,7 @@ A lightweight macOS menu bar app that replaces the default `Shift+Command+4` scr
 - Saves screenshots as PNG to `~/Screenshots/`
 - Automatically copies the screenshot to the clipboard
 - Shutter sound + system notification on capture
+- Floating thumbnail preview after capture — click to annotate with freehand drawing
 - Launch at Login toggle
 - Runs as a menu bar agent (no Dock icon)
 
@@ -48,7 +49,10 @@ macOS will prompt you automatically on the first capture attempt.
 2. Press `Shift+Command+4` anywhere
 3. Click and drag to select the area you want to capture
 4. Release the mouse — the screenshot is saved and copied
-5. Press `Escape` to cancel a selection
+5. A thumbnail preview appears in the bottom-right corner for 5 seconds
+6. Click the thumbnail to open the annotation editor — draw on the screenshot with freehand red lines
+7. Click **Done** to save the annotated version (overwrites the file and updates the clipboard)
+8. Press `Escape` to cancel a selection
 
 ## Screenshots Location
 
@@ -70,11 +74,14 @@ The folder is created automatically if it doesn't exist.
 ```
 KuKa/
 ├── main.swift           # App entry point
-├── AppDelegate.swift    # Menu bar setup, wires hotkey → overlay → capture
+├── AppDelegate.swift    # Menu bar setup, wires hotkey → overlay → capture → thumbnail → editor
 ├── HotkeyManager.swift  # CGEvent tap for Shift+Command+4 interception
 ├── OverlayWindow.swift  # Full-screen transparent overlay window
 ├── SelectionView.swift  # Mouse drag selection with dimmed background + dimensions
 ├── CaptureManager.swift # Screen capture, save to disk, clipboard, notifications
+├── ThumbnailPanel.swift # Floating preview panel after capture
+├── DrawingView.swift    # Freehand red drawing on screenshot image
+├── EditorWindow.swift   # Centered modal for annotating screenshots
 ├── Info.plist           # App config (LSUIElement, screen capture usage)
 └── KuKa.entitlements    # Entitlements (sandbox disabled)
 ```
