@@ -34,3 +34,18 @@ package: clean release
     APP_PATH=$(xcodebuild -project KuKa.xcodeproj -scheme KuKa -configuration Release -showBuildSettings 2>/dev/null | grep -m1 "BUILT_PRODUCTS_DIR" | awk '{print $3}')
     cd "$APP_PATH" && zip -r -y "{{justfile_directory()}}/KuKa.zip" KuKa.app
     echo "Packaged: KuKa.zip"
+
+# Build, package, and publish a GitHub release (usage: just publish v1.0.0)
+publish version: package
+    git tag {{version}}
+    git push origin {{version}}
+    gh release create {{version}} KuKa.zip --title "Ku-Ka {{version}}" --generate-notes
+
+# Build release and install to /Applications (replaces existing)
+install: package
+    #!/bin/bash
+    osascript -e 'tell application "KuKa" to quit' 2>/dev/null || true
+    rm -rf /Applications/KuKa.app
+    unzip -o KuKa.zip -d /Applications
+    echo "Installed to /Applications/KuKa.app"
+    open /Applications/KuKa.app
