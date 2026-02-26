@@ -1,6 +1,5 @@
 import Cocoa
 import UniformTypeIdentifiers
-import UserNotifications
 
 // MARK: - Protocols
 
@@ -80,8 +79,6 @@ class CaptureManager {
         let image = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
         let fileURL = saveToDisk(cgImage: cgImage)
         copyToClipboard(image: image)
-        playShutterSound()
-        sendNotification()
 
         return CaptureResult(image: image, fileURL: fileURL)
     }
@@ -155,15 +152,4 @@ class CaptureManager {
         return url
     }
 
-    private func playShutterSound() {
-        NSSound(named: "Tink")?.play()
-    }
-
-    private func sendNotification() {
-        let content = UNMutableNotificationContent()
-        content.title = "Ku-Ka"
-        content.body = "Screenshot saved and copied!"
-        let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
-        UNUserNotificationCenter.current().add(request)
-    }
 }

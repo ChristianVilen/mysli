@@ -9,7 +9,6 @@ A lightweight macOS menu bar app that replaces the default `Shift+Command+4` scr
 - macOS-style selection overlay with dimmed background and real-time dimensions display
 - Saves screenshots as PNG to `~/Screenshots/`
 - Automatically copies the screenshot to the clipboard
-- Shutter sound + system notification on capture
 - Floating thumbnail preview after capture — click to annotate with freehand drawing
 - Launch at Login toggle
 - Runs as a menu bar agent (no Dock icon)
@@ -79,7 +78,7 @@ KuKa/
 ├── HotkeyManager.swift  # CGEvent tap for Shift+Command+4 interception
 ├── OverlayWindow.swift  # Full-screen transparent overlay window
 ├── SelectionView.swift  # Mouse drag selection with dimmed background + dimensions
-├── CaptureManager.swift # Screen capture, save to disk, clipboard, notifications
+├── CaptureManager.swift # Screen capture, save to disk, clipboard
 ├── ThumbnailPanel.swift # Floating preview panel after capture
 ├── ThumbnailStackManager.swift # Manages stacking of multiple thumbnail panels
 ├── CombineButton.swift  # Floating "Combine" button between adjacent thumbnails
@@ -122,4 +121,4 @@ XCUITest suite verifying menu bar interactions:
 
 ### Test-Mode Guard
 
-When running under XCTest, the app skips hotkey registration and notification authorization to avoid permission prompts. Detection uses `XCTestConfigurationFilePath` (unit tests) and `--uitesting` launch argument (UI tests).
+When running under XCTest, the app skips hotkey registration to avoid permission prompts. Detection uses `XCTestConfigurationFilePath` (unit tests) and `--uitesting` launch argument (UI tests).
