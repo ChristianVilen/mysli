@@ -1,6 +1,5 @@
 import Cocoa
 import ServiceManagement
-import UserNotifications
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
@@ -16,7 +15,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let isTesting = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
             || CommandLine.arguments.contains("--uitesting")
         if !isTesting {
-            UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
             setupHotkey()
         }
         setupMenuBar()
