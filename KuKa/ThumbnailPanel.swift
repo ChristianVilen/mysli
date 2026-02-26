@@ -5,26 +5,28 @@ class ThumbnailPanel: NSPanel {
     var onDismiss: (() -> Void)?
     private var dismissTimer: Timer?
 
-    init(image: NSImage, screen: NSScreen, duration: TimeInterval = 5.0) {
-        let thumbWidth: CGFloat = 200
+    static let thumbWidth: CGFloat = 200
+    static let padding: CGFloat = 16
+    static let gap: CGFloat = 36
+
+    static func thumbSize(for image: NSImage) -> NSSize {
         let aspect = image.size.height / image.size.width
-        let thumbHeight = thumbWidth * aspect
-        let padding: CGFloat = 16
+        return NSSize(width: thumbWidth, height: thumbWidth * aspect)
+    }
 
-        let frame = NSRect(
-            x: screen.visibleFrame.maxX - thumbWidth - padding,
-            y: screen.visibleFrame.minY + padding,
-            width: thumbWidth,
-            height: thumbHeight
-        )
-
+    /// Frame-based init for use by ThumbnailStackManager
+    init(image: NSImage, frame: NSRect) {
         super.init(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        setupPanel(image: image, size: frame.size)
+    }
+
+    private func setupPanel(image: NSImage, size: NSSize) {
         level = .floating
         isOpaque = false
         backgroundColor = .clear
         hasShadow = true
 
-        let container = NSView(frame: NSRect(origin: .zero, size: frame.size))
+        let container = NSView(frame: NSRect(origin: .zero, size: size))
 
         let imageView = NSImageView(frame: container.bounds)
         imageView.image = image
@@ -35,7 +37,7 @@ class ThumbnailPanel: NSPanel {
         container.addSubview(imageView)
 
         let closeSize: CGFloat = 20
-        let closeButton = NSButton(frame: NSRect(x: frame.width - closeSize - 4, y: frame.height - closeSize - 4, width: closeSize, height: closeSize))
+        let closeButton = NSButton(frame: NSRect(x: size.width - closeSize - 4, y: size.height - closeSize - 4, width: closeSize, height: closeSize))
         closeButton.bezelStyle = .circular
         closeButton.image = NSImage(systemSymbolName: "xmark.circle.fill", accessibilityDescription: "Close")
         closeButton.isBordered = false
@@ -47,22 +49,28 @@ class ThumbnailPanel: NSPanel {
 
         let clickGesture = NSClickGestureRecognizer(target: self, action: #selector(thumbnailClicked))
         imageView.addGestureRecognizer(clickGesture)
+    }
 
-        if duration > 0 {
-            dismissTimer = Timer.scheduledTimer(withTimeInterval: duration, repeats: false) { [weak self] _ in
-                self?.dismissThumbnail()
-            }
+    func startDismissTimer(duration: TimeInterval) {
+        dismissTimer?.invalidate()
+        dismissTimer = Timer.scheduledTimer(withTimeInterval: duration, repeats: false) { [weak self] _ in
+            self?.dismissThumbnail()
         }
     }
 
-    @objc private func thumbnailClicked() {
+    func cancelDismissTimer() {
         dismissTimer?.invalidate()
+        dismissTimer = nil
+    }
+
+    @objc private func thumbnailClicked() {
+        cancelDismissTimer()
         orderOut(nil)
         onEdit?()
     }
 
     @objc private func dismissThumbnail() {
-        dismissTimer?.invalidate()
+        cancelDismissTimer()
         orderOut(nil)
         onDismiss?()
     }

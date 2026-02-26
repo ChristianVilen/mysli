@@ -81,6 +81,8 @@ KuKa/
 ├── SelectionView.swift  # Mouse drag selection with dimmed background + dimensions
 ├── CaptureManager.swift # Screen capture, save to disk, clipboard, notifications
 ├── ThumbnailPanel.swift # Floating preview panel after capture
+├── ThumbnailStackManager.swift # Manages stacking of multiple thumbnail panels
+├── CombineButton.swift  # Floating "Combine" button between adjacent thumbnails
 ├── DrawingView.swift    # Freehand red drawing on screenshot image
 ├── EditorWindow.swift   # Centered modal for annotating screenshots
 ├── Info.plist           # App config (LSUIElement, screen capture usage)

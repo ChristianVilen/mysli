@@ -105,10 +105,41 @@ class CaptureManager {
         fileManager.homeDirectoryForCurrentUser.appendingPathComponent("Screenshots")
     }
 
-    func generateFileName(for date: Date = Date()) -> String {
+    private func dateString(for date: Date = Date()) -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd'_at_'HH-mm-ss"
-        return "Screenshot_\(formatter.string(from: date)).png"
+        return formatter.string(from: date)
+    }
+
+    func generateFileName(for date: Date = Date()) -> String {
+        "Screenshot_\(dateString(for: date)).png"
+    }
+
+    func generateCombinedFileName(for date: Date = Date()) -> String {
+        "Screenshot_\(dateString(for: date))_combined.png"
+    }
+
+    func saveCombined(topImage: NSImage, bottomImage: NSImage) -> CaptureResult? {
+        let width = max(topImage.size.width, bottomImage.size.width)
+        let height = topImage.size.height + bottomImage.size.height
+        let combined = NSImage(size: NSSize(width: width, height: height))
+
+        combined.lockFocus()
+        topImage.draw(in: NSRect(x: 0, y: bottomImage.size.height, width: topImage.size.width, height: topImage.size.height))
+        bottomImage.draw(in: NSRect(x: 0, y: 0, width: bottomImage.size.width, height: bottomImage.size.height))
+        combined.unlockFocus()
+
+        guard let tiff = combined.tiffRepresentation,
+              let bitmap = NSBitmapImageRep(data: tiff),
+              let pngData = bitmap.representation(using: .png, properties: [:]) else { return nil }
+
+        let dir = screenshotsDirectory()
+        try? fileManager.createDirectory(at: dir, withIntermediateDirectories: true, attributes: nil)
+        let url = dir.appendingPathComponent(generateCombinedFileName())
+        try? fileManager.writeImageData(pngData, to: url)
+        copyToClipboard(image: combined)
+
+        return CaptureResult(image: combined, fileURL: url)
     }
 
     private func saveToDisk(cgImage: CGImage) -> URL {

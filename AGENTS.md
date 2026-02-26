@@ -25,6 +25,8 @@ KuKa/
 ├── SelectionView.swift  # NSView handling mouseDown/Dragged/Up, draws dimmed overlay + selection rect + dimensions
 ├── CaptureManager.swift # CGWindowListCreateImage capture, PNG save, clipboard copy, sound + notification
 ├── ThumbnailPanel.swift # Floating preview panel in bottom-right corner after capture
+├── ThumbnailStackManager.swift # Manages stacking of multiple thumbnail panels
+├── CombineButton.swift  # Floating "Combine" button between adjacent thumbnails
 ├── DrawingView.swift    # NSView for freehand red drawing on screenshot image
 ├── EditorWindow.swift   # Centered modal window for annotating screenshots
 ├── Info.plist           # LSUIElement=true, NSScreenCaptureUsageDescription
@@ -41,6 +43,8 @@ KuKa/
 | `SelectionView` | Mouse drag selection, dimmed background, real-time dimensions label |
 | `CaptureManager` | Protocol-based DI (`FileManaging`, `ClipboardManaging`, `ScreenCapturing`), PNG save to `~/Screenshots/`, clipboard, shutter sound, `UNUserNotificationCenter` |
 | `ThumbnailPanel` | Floating preview in bottom-right corner, configurable auto-dismiss (3s/5s/forever), click to open editor |
+| `ThumbnailStackManager` | Manages multiple thumbnail panels: stacking (max 5), positioning, timer logic (solo=timed, multi=persist), animated repositioning on dismiss |
+| `CombineButton` | Floating "Combine" button with liquid glass visual, appears between adjacent thumbnails for merging two screenshots into one |
 | `DrawingView` | Freehand red drawing on screenshot, undo support, composites final image |
 | `EditorWindow` | Centered modal for annotation with Undo and Done buttons |
 

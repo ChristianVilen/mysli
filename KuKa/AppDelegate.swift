@@ -7,7 +7,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private let hotkeyManager = HotkeyManager()
     private let captureManager = CaptureManager()
     private var overlayWindows: [OverlayWindow] = []
-    private var thumbnailPanel: ThumbnailPanel?
+    private let thumbnailStack = ThumbnailStackManager()
     private var editorWindow: EditorWindow?
     private var launchAtLoginItem: NSMenuItem!
     private var durationItems: [NSMenuItem] = []
@@ -20,6 +20,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             setupHotkey()
         }
         setupMenuBar()
+        setupThumbnailStack()
     }
 
     // MARK: - Menu Bar
@@ -122,20 +123,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Thumbnail & Editor
 
-    private func showThumbnail(result: CaptureResult, screen: NSScreen) {
-        let duration = UserDefaults.standard.object(forKey: "thumbnailDuration") as? Double ?? 5.0
-        let panel = ThumbnailPanel(image: result.image, screen: screen, duration: duration)
-        thumbnailPanel = panel
-
-        panel.onEdit = { [weak self] in
-            self?.thumbnailPanel = nil
+    private func setupThumbnailStack() {
+        thumbnailStack.onEdit = { [weak self] result in
             self?.openEditor(result: result)
         }
-        panel.onDismiss = { [weak self] in
-            self?.thumbnailPanel = nil
+        thumbnailStack.onCombine = { [weak self] topImage, bottomImage in
+            self?.captureManager.saveCombined(topImage: topImage, bottomImage: bottomImage)
         }
+    }
 
-        panel.orderFront(nil)
+    private func showThumbnail(result: CaptureResult, screen: NSScreen) {
+        let duration = UserDefaults.standard.object(forKey: "thumbnailDuration") as? Double ?? 5.0
+        thumbnailStack.add(image: result.image, result: result, screen: screen, duration: duration)
     }
 
     private func openEditor(result: CaptureResult) {

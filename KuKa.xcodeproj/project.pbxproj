@@ -16,6 +16,8 @@
 		A10000007 /* ThumbnailPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000019 /* ThumbnailPanel.swift */; };
 		A10000008 /* DrawingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001A /* DrawingView.swift */; };
 		A10000009 /* EditorWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001B /* EditorWindow.swift */; };
+		A100000A /* ThumbnailStackManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001C /* ThumbnailStackManager.swift */; };
+		A100000B /* CombineButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001D /* CombineButton.swift */; };
 		B20000001 /* CaptureManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000011 /* CaptureManagerTests.swift */; };
 		B20000002 /* Mocks.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000012 /* Mocks.swift */; };
 		C30000001 /* MenuBarTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000011 /* MenuBarTests.swift */; };
@@ -51,6 +53,8 @@
 		A10000019 /* ThumbnailPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThumbnailPanel.swift; sourceTree = "<group>"; };
 		A1000001A /* DrawingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrawingView.swift; sourceTree = "<group>"; };
 		A1000001B /* EditorWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorWindow.swift; sourceTree = "<group>"; };
+		A1000001C /* ThumbnailStackManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThumbnailStackManager.swift; sourceTree = "<group>"; };
+		A1000001D /* CombineButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CombineButton.swift; sourceTree = "<group>"; };
 		B20000010 /* KuKaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KuKaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B20000011 /* CaptureManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureManagerTests.swift; sourceTree = "<group>"; };
 		B20000012 /* Mocks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Mocks.swift; sourceTree = "<group>"; };
@@ -104,6 +108,8 @@
 				A10000015 /* SelectionView.swift */,
 				A10000016 /* CaptureManager.swift */,
 				A10000019 /* ThumbnailPanel.swift */,
+				A1000001C /* ThumbnailStackManager.swift */,
+				A1000001D /* CombineButton.swift */,
 				A1000001A /* DrawingView.swift */,
 				A1000001B /* EditorWindow.swift */,
 				A10000017 /* Info.plist */,
@@ -237,6 +243,8 @@
 				A10000007 /* ThumbnailPanel.swift in Sources */,
 				A10000008 /* DrawingView.swift in Sources */,
 				A10000009 /* EditorWindow.swift in Sources */,
+				A100000A /* ThumbnailStackManager.swift in Sources */,
+				A100000B /* CombineButton.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
