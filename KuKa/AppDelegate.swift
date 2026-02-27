@@ -26,7 +26,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupMenuBar() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let button = statusItem.button {
-            button.image = NSImage(systemSymbolName: "camera.viewfinder", accessibilityDescription: "Ku-Ka")
+            if let icon = NSImage(named: "MenuBarIcon") {
+                icon.size = NSSize(width: 18, height: 18)
+                button.image = icon
+            } else {
+                button.image = NSImage(systemSymbolName: "camera.viewfinder", accessibilityDescription: "Ku-Ka")
+            }
         }
 
         let menu = NSMenu()
