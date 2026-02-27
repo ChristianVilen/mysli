@@ -56,7 +56,6 @@ jobs:
         run: |
           git clone https://x-access-token:${TAP_GITHUB_TOKEN}@github.com/${{ github.repository_owner }}/homebrew-ku-ka.git tap
           VERSION="${{ steps.version.outputs.tag }}"
-          VERSION="${VERSION#v}"
           sed -i '' "s/version \".*\"/version \"${VERSION}\"/" tap/Casks/kuka.rb
           sed -i '' "s/sha256 \".*\"/sha256 \"${{ steps.sha.outputs.sha256 }}\"/" tap/Casks/kuka.rb
           cd tap
