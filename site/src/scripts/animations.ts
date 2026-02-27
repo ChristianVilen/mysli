@@ -6,6 +6,11 @@ heroItems.forEach((el, i) => {
   animate(el, { opacity: [0, 1], transform: ['translateY(30px)', 'translateY(0)'] }, { delay: 0.15 * i, duration: 0.6, easing: 'ease-out' });
 });
 
+// Install: fade in on scroll
+inView('[data-animate="install"]', (info) => {
+  animate(info.target as HTMLElement, { opacity: [0, 1], transform: ['translateY(30px)', 'translateY(0)'] }, { duration: 0.6, easing: 'ease-out' });
+}, { amount: 0.3 });
+
 // Features: cards stagger in on scroll
 inView('[data-animate="features"]', () => {
   const cards = document.querySelectorAll<HTMLElement>('[data-animate="feature-card"]');
