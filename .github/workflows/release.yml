@@ -18,10 +18,11 @@ jobs:
       - name: Get next version
         id: version
         run: |
-          LAST=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-          PATCH=$(echo "$LAST" | awk -F. '{print $3}')
+          LAST=$(git tag --list 'V*' --sort=-version:refname | head -1)
+          LAST=${LAST:-V0.0.0}
           MAJOR=$(echo "$LAST" | awk -F. '{print $1}')
           MINOR=$(echo "$LAST" | awk -F. '{print $2}')
+          PATCH=$(echo "$LAST" | awk -F. '{print $3}')
           NEXT="${MAJOR}.${MINOR}.$((PATCH + 1))"
           echo "tag=$NEXT" >> "$GITHUB_OUTPUT"
 
