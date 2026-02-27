@@ -1,0 +1,51 @@
+---
+const features = [
+  {
+    title: 'Area Selection',
+    description: 'Click and drag to capture exactly what you need. Real-time dimensions display as you select.',
+    icon: `<rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="2" fill="none" stroke-dasharray="4 2"/>`,
+  },
+  {
+    title: 'Multi-Monitor',
+    description: 'All screens dim simultaneously. Capture from whichever display your cursor is on.',
+    icon: `<rect x="1" y="4" width="9" height="7" rx="1" stroke="currentColor" stroke-width="2" fill="none"/><rect x="14" y="4" width="9" height="7" rx="1" stroke="currentColor" stroke-width="2" fill="none"/><line x1="5.5" y1="11" x2="5.5" y2="14" stroke="currentColor" stroke-width="2"/><line x1="18.5" y1="11" x2="18.5" y2="14" stroke="currentColor" stroke-width="2"/>`,
+  },
+  {
+    title: 'Auto-Save',
+    description: 'Screenshots saved as PNG to ~/Screenshots/ with timestamped filenames. Folder created automatically.',
+    icon: `<path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z" stroke="currentColor" stroke-width="2" fill="none"/><polyline points="17 21 17 13 7 13 7 21" stroke="currentColor" stroke-width="2" fill="none"/>`,
+  },
+  {
+    title: 'Clipboard Copy',
+    description: 'Every capture is instantly copied to your clipboard. Paste anywhere, no extra steps.',
+    icon: `<rect x="8" y="2" width="8" height="4" rx="1" stroke="currentColor" stroke-width="2" fill="none"/><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2" stroke="currentColor" stroke-width="2" fill="none"/>`,
+  },
+  {
+    title: 'Thumbnail Preview',
+    description: 'Floating preview appears after capture. Stack up to 5 thumbnails. Click any to annotate.',
+    icon: `<rect x="2" y="2" width="20" height="20" rx="3" stroke="currentColor" stroke-width="2" fill="none"/><circle cx="8.5" cy="8.5" r="2.5" stroke="currentColor" stroke-width="2" fill="none"/><path d="M21 15l-5-5L5 21" stroke="currentColor" stroke-width="2" fill="none"/>`,
+  },
+  {
+    title: 'Freehand Annotation',
+    description: 'Draw directly on your screenshots. Undo support included. Saves over the original file.',
+    icon: `<path d="M12 19l7-7 3 3-7 7-3-3z" stroke="currentColor" stroke-width="2" fill="none"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" stroke="currentColor" stroke-width="2" fill="none"/><path d="M2 2l7.586 7.586" stroke="currentColor" stroke-width="2"/><circle cx="11" cy="11" r="2" stroke="currentColor" stroke-width="2" fill="none"/>`,
+  },
+];
+---
+<section class="py-24 px-6" data-animate="features">
+  <div class="max-w-6xl mx-auto">
+    <h2 class="text-3xl md:text-4xl font-bold text-center mb-4 text-gray-100">Everything you need</h2>
+    <p class="text-gray-400 text-center mb-16 max-w-xl mx-auto">One shortcut. Zero friction. All the features the default tool is missing.</p>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {features.map((f) => (
+        <div class="p-6 rounded-2xl bg-surface-50 border border-surface-200 hover:border-accent/30 transition-colors opacity-0" data-animate="feature-card">
+          <div class="w-12 h-12 rounded-xl bg-accent/10 flex items-center justify-center mb-4 text-accent-light">
+            <svg class="w-6 h-6" viewBox="0 0 24 24" set:html={f.icon} />
+          </div>
+          <h3 class="text-lg font-semibold text-gray-100 mb-2">{f.title}</h3>
+          <p class="text-sm text-gray-400 leading-relaxed">{f.description}</p>
+        </div>
+      ))}
+    </div>
+  </div>
+</section>
