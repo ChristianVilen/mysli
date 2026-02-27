@@ -1,0 +1,42 @@
+---
+const rows = [
+  { feature: 'Same ⇧⌘4 shortcut', macos: true, kuka: true },
+  { feature: 'Auto clipboard copy', macos: false, kuka: true },
+  { feature: 'Floating thumbnail preview', macos: false, kuka: true },
+  { feature: 'Freehand annotation', macos: false, kuka: true },
+  { feature: 'Multi-monitor dimming', macos: false, kuka: true },
+  { feature: 'Thumbnail stacking (up to 5)', macos: false, kuka: true },
+  { feature: 'Auto-save to ~/Screenshots/', macos: false, kuka: true },
+  { feature: 'Combine screenshots', macos: false, kuka: true },
+];
+---
+<section class="py-24 px-6" data-animate="comparison">
+  <div class="max-w-3xl mx-auto">
+    <h2 class="text-3xl md:text-4xl font-bold text-center mb-4 text-gray-100">Why Ku-Ka?</h2>
+    <p class="text-gray-400 text-center mb-16 max-w-xl mx-auto">Same shortcut you already know. Everything else is better.</p>
+
+    <div class="rounded-2xl border border-surface-200 overflow-hidden">
+      <!-- Header -->
+      <div class="grid grid-cols-3 bg-surface-100 text-sm font-semibold">
+        <div class="p-4 text-gray-400">Feature</div>
+        <div class="p-4 text-center text-gray-400">Default macOS</div>
+        <div class="p-4 text-center text-accent-light">Ku-Ka</div>
+      </div>
+      <!-- Rows -->
+      {rows.map((r, i) => (
+        <div class={`grid grid-cols-3 text-sm opacity-0 ${i % 2 === 0 ? 'bg-surface/50' : 'bg-surface-50/50'}`} data-animate="comparison-row">
+          <div class="p-4 text-gray-300">{r.feature}</div>
+          <div class="p-4 text-center">
+            {r.macos
+              ? <span class="text-green-400">✓</span>
+              : <span class="text-gray-600">✗</span>
+            }
+          </div>
+          <div class="p-4 text-center">
+            <span class="text-green-400">✓</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+</section>

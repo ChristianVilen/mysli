@@ -10,3 +10,8 @@ DerivedData/
 # App export
 *.app
 *.zip
+
+# Node
+node_modules/
+site/dist/
+site/.astro/

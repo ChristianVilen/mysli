@@ -1,0 +1,49 @@
+---
+const steps = [
+  {
+    num: '1',
+    title: 'Press ⇧⌘4',
+    description: 'The familiar shortcut — Ku-Ka intercepts it and takes over.',
+  },
+  {
+    num: '2',
+    title: 'Select Area',
+    description: 'Drag to select. All screens dim, dimensions shown in real time.',
+  },
+  {
+    num: '3',
+    title: 'Captured & Copied',
+    description: 'PNG saved to ~/Screenshots/ and copied to clipboard instantly.',
+  },
+  {
+    num: '4',
+    title: 'Annotate',
+    description: 'Click the floating thumbnail to draw on your screenshot.',
+  },
+];
+---
+<section class="py-24 px-6" data-animate="steps">
+  <div class="max-w-6xl mx-auto">
+    <h2 class="text-3xl md:text-4xl font-bold text-center mb-4 text-gray-100">How it works</h2>
+    <p class="text-gray-400 text-center mb-16 max-w-xl mx-auto">Four steps. Under two seconds. That's it.</p>
+
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-8 relative">
+      <!-- Connecting line (desktop only) -->
+      <div class="hidden md:block absolute top-12 left-[12.5%] right-[12.5%] h-px bg-gradient-to-r from-accent/0 via-accent/40 to-accent/0"></div>
+
+      {steps.map((s) => (
+        <div class="flex flex-col items-center text-center opacity-0" data-animate="step-item">
+          <div class="w-14 h-14 rounded-full bg-accent/15 border border-accent/30 flex items-center justify-center text-accent-light font-bold text-lg mb-6 relative z-10">
+            {s.num}
+          </div>
+          <h3 class="text-lg font-semibold text-gray-100 mb-2">{s.title}</h3>
+          <p class="text-sm text-gray-400 leading-relaxed max-w-[200px]">{s.description}</p>
+          <!-- Placeholder image area -->
+          <div class="mt-6 w-full aspect-[4/3] rounded-xl bg-surface-50 border border-surface-200 flex items-center justify-center">
+            <span class="text-xs text-gray-600 font-mono">screenshot</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+</section>
