@@ -36,6 +36,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         let menu = NSMenu()
 
+        // --- Settings ---
+        let settingsLabel = NSMenuItem(title: "Settings", action: nil, keyEquivalent: "")
+        settingsLabel.isEnabled = false
+        menu.addItem(settingsLabel)
+
         launchAtLoginItem = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
         launchAtLoginItem.target = self
         launchAtLoginItem.state = UserDefaults.standard.bool(forKey: "launchAtLogin") ? .on : .off
@@ -48,7 +53,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(durationLabel)
 
         let currentDuration = UserDefaults.standard.object(forKey: "thumbnailDuration") as? Double ?? 5.0
-        for (title, tag) in [("3 Seconds", 3), ("5 Seconds", 5), ("Forever", 0)] {
+        for (title, tag) in [("3 Seconds", 3), ("5 Seconds", 5), ("15 Seconds", 15), ("Forever", 0)] {
             let item = NSMenuItem(title: title, action: #selector(changeDuration(_:)), keyEquivalent: "")
             item.target = self
             item.tag = tag
@@ -58,6 +63,38 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         menu.addItem(.separator())
+
+        // --- Features ---
+        let featuresLabel = NSMenuItem(title: "Features", action: nil, keyEquivalent: "")
+        featuresLabel.isEnabled = false
+        menu.addItem(featuresLabel)
+
+        for feature in [
+            "⌘⇧4 to capture selected area",
+            "Multi-monitor support",
+            "Auto-save to ~/Screenshots/",
+            "Copy to clipboard",
+            "Thumbnail preview & annotation"
+        ] {
+            let item = NSMenuItem(title: feature, action: nil, keyEquivalent: "")
+            item.isEnabled = false
+            item.indentationLevel = 1
+            menu.addItem(item)
+        }
+
+        menu.addItem(.separator())
+
+        // --- Links ---
+        let reportBug = NSMenuItem(title: "Report a Bug…", action: #selector(openReportBug), keyEquivalent: "")
+        reportBug.target = self
+        menu.addItem(reportBug)
+
+        let suggestFeature = NSMenuItem(title: "Suggest a Feature…", action: #selector(openSuggestFeature), keyEquivalent: "")
+        suggestFeature.target = self
+        menu.addItem(suggestFeature)
+
+        menu.addItem(.separator())
+
         let quitItem = NSMenuItem(title: "Quit Ku-Ka", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         menu.addItem(quitItem)
 
@@ -160,6 +197,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         UserDefaults.standard.set(Double(sender.tag), forKey: "thumbnailDuration")
         for item in durationItems { item.state = .off }
         sender.state = .on
+    }
+
+    @objc private func openReportBug() {
+        NSWorkspace.shared.open(URL(string: "https://github.com/ChristianVilen/ku-ka/issues/new?labels=bug")!)
+    }
+
+    @objc private func openSuggestFeature() {
+        NSWorkspace.shared.open(URL(string: "https://github.com/ChristianVilen/ku-ka/issues/new?labels=enhancement")!)
     }
 
     // MARK: - Launch at Login
