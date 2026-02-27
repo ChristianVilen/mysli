@@ -1,0 +1,39 @@
+name: Update Homebrew Tap
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  update-tap:
+    runs-on: macos-latest
+    steps:
+      - name: Download release asset
+        run: curl -L -o KuKa.zip "https://github.com/${{ github.repository }}/releases/download/${{ github.event.release.tag_name }}/KuKa.zip"
+
+      - name: Get SHA256
+        id: sha
+        run: echo "sha256=$(shasum -a 256 KuKa.zip | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
+      - name: Update tap
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/homebrew-kuka
+          token: ${{ secrets.TAP_GITHUB_TOKEN }}
+          path: tap
+
+      - name: Update cask
+        run: |
+          VERSION="${{ github.event.release.tag_name }}"
+          VERSION="${VERSION#v}"
+          sed -i '' "s/version \".*\"/version \"${VERSION}\"/" tap/Casks/kuka.rb
+          sed -i '' "s/sha256 \".*\"/sha256 \"${{ steps.sha.outputs.sha256 }}\"/" tap/Casks/kuka.rb
+
+      - name: Push
+        working-directory: tap
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add Casks/kuka.rb
+          git commit -m "Update KuKa to ${{ github.event.release.tag_name }}"
+          git push
