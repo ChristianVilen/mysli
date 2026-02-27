@@ -18,7 +18,7 @@ jobs:
       - name: Update tap
         uses: actions/checkout@v4
         with:
-          repository: ${{ github.repository_owner }}/homebrew-kuka
+          repository: ${{ github.repository_owner }}/homebrew-ku-ka
           token: ${{ secrets.TAP_GITHUB_TOKEN }}
           path: tap
 
