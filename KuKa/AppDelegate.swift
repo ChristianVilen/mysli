@@ -6,6 +6,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private let hotkeyManager = HotkeyManager()
     private let captureManager = CaptureManager()
     private var overlayWindows: [OverlayWindow] = []
+    private var escapeMonitor: Any?
+    private var mouseTap: CFMachPort?
+    private var mouseTapSource: CFRunLoopSource?
     private let thumbnailStack = ThumbnailStackManager()
     private var editorWindow: EditorWindow?
     private var launchAtLoginItem: NSMenuItem!
@@ -113,36 +116,92 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func startCapture() {
         guard overlayWindows.isEmpty else { return }
 
-        let mouseLocation = NSEvent.mouseLocation
         var cursorScreenOverlay: OverlayWindow?
+        let mouseLocation = NSEvent.mouseLocation
 
         for screen in NSScreen.screens {
             let overlay = OverlayWindow(screen: screen)
-
             overlay.selectionView.onSelection = { [weak self] rect in
                 self?.finishCapture(rect: rect, screen: screen)
             }
             overlay.selectionView.onCancel = { [weak self] in
                 self?.dismissOverlay()
             }
-
             overlayWindows.append(overlay)
-
             if screen.frame.contains(mouseLocation) {
                 cursorScreenOverlay = overlay
             }
         }
 
-        NSApp.activate(ignoringOtherApps: true)
-
         for overlay in overlayWindows {
-            if overlay === cursorScreenOverlay {
-                overlay.makeKeyAndOrderFront(nil)
-                overlay.makeFirstResponder(overlay.selectionView)
-            } else {
-                overlay.orderFront(nil)
-            }
+            overlay.orderFrontRegardless()
         }
+
+        escapeMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            if event.keyCode == 53 { self?.dismissOverlay() }
+        }
+
+        startMouseTap(cursorOverlay: cursorScreenOverlay)
+    }
+
+    private func startMouseTap(cursorOverlay: OverlayWindow?) {
+        let refcon = Unmanaged.passUnretained(self).toOpaque()
+
+        guard let tap = CGEvent.tapCreate(
+            tap: .cgSessionEventTap,
+            place: .headInsertEventTap,
+            options: .defaultTap,
+            eventsOfInterest: CGEventMask(
+                (1 << CGEventType.leftMouseDown.rawValue) |
+                (1 << CGEventType.leftMouseDragged.rawValue) |
+                (1 << CGEventType.leftMouseUp.rawValue)
+            ),
+            callback: { _, type, event, refcon -> Unmanaged<CGEvent>? in
+                guard let refcon else { return Unmanaged.passUnretained(event) }
+                let appDelegate = Unmanaged<AppDelegate>.fromOpaque(refcon).takeUnretainedValue()
+                return appDelegate.handleMouseEvent(type: type, event: event)
+            },
+            userInfo: refcon
+        ) else { return }
+
+        mouseTap = tap
+        _cursorOverlay = cursorOverlay
+        let source = CFMachPortCreateRunLoopSource(nil, tap, 0)
+        mouseTapSource = source
+        CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
+    }
+
+    private weak var _cursorOverlay: OverlayWindow?
+
+    private func handleMouseEvent(type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
+        guard let cursorOverlay = _cursorOverlay else {
+            return Unmanaged.passUnretained(event)
+        }
+
+        // CGEvent uses top-left origin; convert to view coordinates (bottom-left origin)
+        let cgPoint = event.location
+        let screenFrame = cursorOverlay.frame
+        let mainHeight = NSScreen.screens.first?.frame.height ?? screenFrame.height
+        let viewPoint = NSPoint(
+            x: cgPoint.x - screenFrame.origin.x,
+            y: (mainHeight - cgPoint.y) - screenFrame.origin.y
+        )
+
+        switch type {
+        case .leftMouseDown:
+            cursorOverlay.selectionView.beginSelection(at: viewPoint)
+            cursorOverlay.selectionView.needsDisplay = true
+        case .leftMouseDragged:
+            cursorOverlay.selectionView.updateDrag(to: viewPoint)
+        case .leftMouseUp:
+            DispatchQueue.main.async {
+                cursorOverlay.selectionView.endSelection()
+            }
+        default:
+            break
+        }
+
+        return nil
     }
 
     private func finishCapture(rect: CGRect, screen: NSScreen) {
@@ -154,11 +213,25 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func dismissOverlay() {
+        removeEventMonitors()
         NSCursor.pop()
         for overlay in overlayWindows {
             overlay.orderOut(nil)
         }
         overlayWindows.removeAll()
+        _cursorOverlay = nil
+    }
+
+    private func removeEventMonitors() {
+        if let monitor = escapeMonitor { NSEvent.removeMonitor(monitor); escapeMonitor = nil }
+        if let source = mouseTapSource {
+            CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes)
+            mouseTapSource = nil
+        }
+        if let tap = mouseTap {
+            CGEvent.tapEnable(tap: tap, enable: false)
+            mouseTap = nil
+        }
     }
 
     // MARK: - Thumbnail & Editor

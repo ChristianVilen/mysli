@@ -23,10 +23,33 @@ class SelectionView: NSView {
         if event.keyCode == 53 { onCancel?() } // Escape
     }
 
-    override func mouseDown(with event: NSEvent) {
-        origin = convert(event.locationInWindow, from: nil)
+    func beginSelection(at point: NSPoint) {
+        origin = point
         selectionRect = .zero
         isDragging = true
+    }
+
+    func updateDrag(to point: NSPoint) {
+        selectionRect = NSRect(
+            x: min(origin.x, point.x),
+            y: min(origin.y, point.y),
+            width: abs(point.x - origin.x),
+            height: abs(point.y - origin.y)
+        )
+        needsDisplay = true
+    }
+
+    func endSelection() {
+        isDragging = false
+        guard selectionRect.width > 1, selectionRect.height > 1 else {
+            onCancel?()
+            return
+        }
+        onSelection?(selectionRect)
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        beginSelection(at: convert(event.locationInWindow, from: nil))
     }
 
     override func mouseDragged(with event: NSEvent) {
@@ -50,13 +73,11 @@ class SelectionView: NSView {
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        // Dimmed background
         NSColor.black.withAlphaComponent(0.3).setFill()
         bounds.fill()
 
         guard isDragging, selectionRect.width > 0 else { return }
 
-        // Clear the selected area
         NSColor.clear.setFill()
         selectionRect.fill(using: .copy)
 

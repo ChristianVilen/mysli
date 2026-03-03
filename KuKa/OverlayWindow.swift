@@ -1,12 +1,12 @@
 import Cocoa
 
-class OverlayWindow: NSWindow {
+class OverlayWindow: NSPanel {
     let selectionView = SelectionView()
 
     init(screen: NSScreen) {
         super.init(
             contentRect: screen.frame,
-            styleMask: .borderless,
+            styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
         )
@@ -14,7 +14,8 @@ class OverlayWindow: NSWindow {
         isOpaque = false
         backgroundColor = .clear
         hasShadow = false
-        ignoresMouseEvents = false
+        ignoresMouseEvents = true
+        hidesOnDeactivate = false
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
 
         selectionView.frame = NSRect(origin: .zero, size: screen.frame.size)
@@ -22,5 +23,5 @@ class OverlayWindow: NSWindow {
     }
 
     override var canBecomeKey: Bool { true }
-    override var canBecomeMain: Bool { true }
+    override var canBecomeMain: Bool { false }
 }
