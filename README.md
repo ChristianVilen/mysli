@@ -2,6 +2,8 @@
 
 A lightweight macOS menu bar app that replaces the default `Shift+Command+4` screenshot functionality. Select an area, save it as PNG, and copy it to your clipboard — all in one step.
 
+🌐 **Website**: [https://christianvilen.github.io/ku-ka](https://christianvilen.github.io/ku-ka)
+
 ## Features
 
 - Intercepts `Shift+Command+4` globally to replace the system screenshot tool
@@ -17,6 +19,36 @@ A lightweight macOS menu bar app that replaces the default `Shift+Command+4` scr
 
 - macOS 13.0 (Ventura) or later
 - Xcode 15+ (to build)
+
+## Installation
+
+### Homebrew (Recommended)
+
+```bash
+# Tap the repository
+brew tap ChristianVilen/ku-ka
+
+# Install the app
+brew install --cask kuka
+```
+
+**Important**: Since this is an unsigned app from an untrusted developer, you'll need to trust it:
+
+```bash
+# Remove the quarantine attribute (replace with actual path if different)
+sudo xattr -d com.apple.quarantine /Applications/Ku-Ka.app
+```
+
+Alternatively, you can use the GUI method:
+1. Try to open Ku-Ka from Applications
+2. When blocked, go to **System Settings → Privacy & Security**
+3. Click **"Open Anyway"** next to the Ku-Ka warning
+
+### Manual Installation
+
+1. Download the latest `.zip` from [GitHub Releases](https://github.com/ChristianVilen/ku-ka/releases/latest)
+2. Unzip and move Ku-Ka.app to your Applications folder
+3. Run the same trust command above
 
 ## Build & Run
 

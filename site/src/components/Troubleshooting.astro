@@ -1,0 +1,108 @@
+<!--
+---
+-->
+
+<section class="py-24 px-6 opacity-0" data-animate="troubleshooting">
+  <div class="max-w-4xl mx-auto">
+    <div class="text-center mb-12">
+      <h2 class="text-3xl md:text-4xl font-bold mb-4 text-gray-100">Troubleshooting</h2>
+      <p class="text-gray-400">Common issues and solutions</p>
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-8">
+      <div class="bg-surface-100 border border-surface-300 rounded-xl p-6">
+        <h3 class="font-semibold text-gray-200 mb-3">🔒 App won't open / blocked by macOS</h3>
+        <p class="text-gray-400 text-sm mb-4">
+          Ku-Ka is unsigned, so macOS blocks it by default.
+        </p>
+        <div class="bg-surface-50 border border-surface-200 rounded-lg p-3 font-mono text-sm mb-3">
+          <code class="text-accent-light">sudo xattr -d com.apple.quarantine /Applications/Ku-Ka.app</code>
+        </div>
+        <p class="text-gray-500 text-sm">
+          Or go to <strong>System Settings → Privacy & Security</strong> and click <strong>"Open Anyway"</strong>.
+        </p>
+      </div>
+
+      <div class="bg-surface-100 border border-surface-300 rounded-xl p-6">
+        <h3 class="font-semibold text-gray-200 mb-3">🚫 Shortcut doesn't work</h3>
+        <p class="text-gray-400 text-sm mb-4">
+          Ku-Ka needs Accessibility permission to intercept <code class="bg-surface-200 px-1 rounded">Shift+Command+4</code>.
+        </p>
+        <ol class="text-gray-500 text-sm space-y-2">
+          <li>1. Go to <strong>System Settings → Privacy & Security → Accessibility</strong></li>
+          <li>2. Enable Ku-Ka in the list</li>
+          <li>3. Restart Ku-Ka from the menu bar</li>
+        </ol>
+      </div>
+
+      <div class="bg-surface-100 border border-surface-300 rounded-xl p-6">
+        <h3 class="font-semibold text-gray-200 mb-3">📸 Black screenshot or capture fails</h3>
+        <p class="text-gray-400 text-sm mb-4">
+          Screen Recording permission is required.
+        </p>
+        <ol class="text-gray-500 text-sm space-y-2">
+          <li>1. Go to <strong>System Settings → Privacy & Security → Screen Recording</strong></li>
+          <li>2. Enable Ku-Ka</li>
+          <li>3. Try capturing again</li>
+        </ol>
+      </div>
+
+      <div class="bg-surface-100 border border-surface-300 rounded-xl p-6">
+        <h3 class="font-semibold text-gray-200 mb-3">🖼️ Screenshots not saving</h3>
+        <p class="text-gray-400 text-sm mb-4">
+          Check if the Screenshots folder exists and is writable.
+        </p>
+        <div class="bg-surface-50 border border-surface-200 rounded-lg p-3 font-mono text-sm mb-3">
+          <code class="text-accent-light">mkdir -p ~/Screenshots</code>
+          <code class="text-accent-light">chmod 755 ~/Screenshots</code>
+        </div>
+        <p class="text-gray-500 text-sm">
+          Files are saved as <code class="bg-surface-200 px-1 rounded">Screenshot_YYYY-MM-DD_at_HH-MM-SS.png</code>
+        </p>
+      </div>
+
+      <div class="bg-surface-100 border border-surface-300 rounded-xl p-6 md:col-span-2">
+        <h3 class="font-semibold text-gray-200 mb-3">🔧 Both Accessibility AND Screen Recording Required</h3>
+        <p class="text-gray-400 text-sm mb-4">
+          Ku-Ka needs <strong>two separate permissions</strong> to work properly. Missing either will cause partial functionality.
+        </p>
+
+        <div class="grid md:grid-cols-2 gap-4 mb-4">
+          <div class="bg-surface-50 border border-surface-200 rounded-lg p-3">
+            <h4 class="font-medium text-gray-200 mb-2">✅ Accessibility Permission</h4>
+            <p class="text-gray-500 text-sm mb-2">Required for keyboard shortcut interception</p>
+            <ol class="text-gray-500 text-sm space-y-1">
+              <li>1. <strong>System Settings → Privacy & Security</strong></li>
+              <li>2. Click <strong>Accessibility</strong></li>
+              <li>3. Enable <strong>Ku-Ka</strong> in the app list</li>
+              <li>4. Restart Ku-Ka from menu bar</li>
+            </ol>
+          </div>
+
+          <div class="bg-surface-50 border border-surface-200 rounded-lg p-3">
+            <h4 class="font-medium text-gray-200 mb-2">📸 Screen Recording Permission</h4>
+            <p class="text-gray-500 text-sm mb-2">Required for actual screen capture</p>
+            <ol class="text-gray-500 text-sm space-y-1">
+              <li>1. <strong>System Settings → Privacy & Security</strong></li>
+              <li>2. Click <strong>Screen Recording</strong></li>
+              <li>3. Enable <strong>Ku-Ka</strong> in the app list</li>
+              <li>4. Try capturing again</li>
+            </ol>
+          </div>
+        </div>
+
+        <div class="bg-surface-50 border border-surface-200 rounded-lg p-3">
+          <h4 class="font-medium text-gray-200 mb-2">🔍 Quick Permission Check</h4>
+          <p class="text-gray-500 text-sm mb-2">Run these commands in Terminal to check current status:</p>
+          <div class="font-mono text-sm space-y-1">
+            <code class="block text-accent-light">tccutil reset Accessibility com.christianvilen.Ku-Ka</code>
+            <code class="block text-accent-light">tccutil reset ScreenCapture com.christianvilen.Ku-Ka</code>
+          </div>
+          <p class="text-gray-500 text-sm mt-2">
+            Then re-enable both permissions in System Settings. Replace <code class="bg-surface-200 px-1 rounded">com.christianvilen.Ku-Ka</code> with your actual bundle ID if different.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

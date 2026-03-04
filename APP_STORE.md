@@ -4,6 +4,8 @@
 
 Ku-Ka is distributed outside the App Store via Developer ID notarization. This is required because the app uses `CGEvent` taps (Accessibility) and `CGWindowListCreateImage` (Screen Recording), which are incompatible with App Sandbox.
 
+🌐 **Website**: [https://christianvilen.github.io/ku-ka](https://christianvilen.github.io/ku-ka)
+
 ## Prerequisites
 
 - [ ] Apple Developer Program membership ($99/year)
