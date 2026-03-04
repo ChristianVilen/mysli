@@ -6,7 +6,7 @@
 		"useIgnoreFile": false
 	},
 	"files": {
-		"includes": ["src/**/*.ts", "src/**/*.astro", "*.json", "!**/*.min.js"]
+		"includes": ["src/**/*.ts", "src/**/*.astro", "*.json", "!**/*.min.js", "!package-lock.json"]
 	},
 	"formatter": {
 		"enabled": true,
@@ -17,6 +17,14 @@
 		"enabled": true,
 		"rules": {
 			"recommended": true,
+			"correctness": {
+				"noUnusedImports": {
+					"level": "off"
+				},
+				"noUnusedVariables": {
+					"level": "off"
+				}
+			},
 			"suspicious": {
 				"noUnknownAtRules": {
 					"level": "off"
