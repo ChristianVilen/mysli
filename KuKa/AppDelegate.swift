@@ -170,6 +170,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         thumbnailStack.onCombine = { [weak self] topImage, bottomImage in
             self?.captureManager.saveCombined(topImage: topImage, bottomImage: bottomImage)
         }
+        thumbnailStack.onDelete = { [weak self] result in
+            self?.captureManager.deleteScreenshot(at: result.fileURL)
+        }
     }
 
     private func showThumbnail(result: CaptureResult, screen: NSScreen) {
@@ -185,6 +188,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         editor.onSave = { [weak self] annotatedImage in
             self?.captureManager.saveAnnotated(image: annotatedImage, to: result.fileURL)
+            self?.editorWindow = nil
+        }
+
+        editor.onDelete = { [weak self] in
+            self?.captureManager.deleteScreenshot(at: result.fileURL)
             self?.editorWindow = nil
         }
 

@@ -3,6 +3,7 @@ import Cocoa
 class ThumbnailPanel: NSPanel {
     var onEdit: (() -> Void)?
     var onDismiss: (() -> Void)?
+    var onDelete: (() -> Void)?
     private var dismissTimer: Timer?
 
     static let thumbWidth: CGFloat = 200
@@ -45,6 +46,14 @@ class ThumbnailPanel: NSPanel {
         closeButton.action = #selector(dismissThumbnail)
         container.addSubview(closeButton)
 
+        let deleteButton = NSButton(frame: NSRect(x: 4, y: size.height - closeSize - 4, width: closeSize, height: closeSize))
+        deleteButton.bezelStyle = .circular
+        deleteButton.image = NSImage(systemSymbolName: "trash.circle.fill", accessibilityDescription: "Delete")
+        deleteButton.isBordered = false
+        deleteButton.target = self
+        deleteButton.action = #selector(deleteThumbnail)
+        container.addSubview(deleteButton)
+
         contentView = container
 
         let clickGesture = NSClickGestureRecognizer(target: self, action: #selector(thumbnailClicked))
@@ -73,5 +82,11 @@ class ThumbnailPanel: NSPanel {
         cancelDismissTimer()
         orderOut(nil)
         onDismiss?()
+    }
+
+    @objc private func deleteThumbnail() {
+        cancelDismissTimer()
+        orderOut(nil)
+        onDelete?()
     }
 }

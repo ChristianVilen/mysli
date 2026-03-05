@@ -4,6 +4,7 @@ class ThumbnailStackManager {
     private(set) var entries: [(panel: ThumbnailPanel, result: CaptureResult)] = []
     var onEdit: ((CaptureResult) -> Void)?
     var onCombine: ((NSImage, NSImage) -> CaptureResult?)?
+    var onDelete: ((CaptureResult) -> Void)?
     private var combineButtons: [CombineButton] = []
     private var currentDuration: TimeInterval = 5.0
     private var currentScreen: NSScreen?
@@ -100,6 +101,13 @@ class ThumbnailStackManager {
             let result = self.entries.first(where: { $0.panel === panel })?.result
             self.remove(panel: panel)
             if let result { self.onEdit?(result) }
+        }
+
+        panel.onDelete = { [weak self, weak panel] in
+            guard let self, let panel else { return }
+            let result = self.entries.first(where: { $0.panel === panel })?.result
+            self.remove(panel: panel)
+            if let result { self.onDelete?(result) }
         }
 
         return panel

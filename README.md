@@ -12,6 +12,7 @@ A lightweight macOS menu bar app that replaces the default `Shift+Command+4` scr
 - Saves screenshots as PNG to `~/Screenshots/`
 - Automatically copies the screenshot to the clipboard
 - Floating thumbnail preview after capture — click to annotate with freehand drawing
+- Delete screenshots from thumbnail or editor — removes file and clears clipboard
 - Launch at Login toggle
 - Runs as a menu bar agent (no Dock icon)
 
@@ -83,7 +84,8 @@ macOS will prompt you automatically on the first capture attempt.
 5. A thumbnail preview appears in the bottom-right corner for 5 seconds
 6. Click the thumbnail to open the annotation editor — draw on the screenshot with freehand red lines
 7. Click **Done** to save the annotated version (overwrites the file and updates the clipboard)
-8. Press `Escape` to cancel a selection
+8. Click the **trash icon** on a thumbnail or **Delete** in the editor to delete the screenshot file and clear the clipboard
+9. Press `Escape` to cancel a selection
 
 ## Screenshots Location
 
@@ -110,8 +112,8 @@ KuKa/
 ├── HotkeyManager.swift  # CGEvent tap for Shift+Command+4 interception
 ├── OverlayWindow.swift  # Full-screen transparent overlay window
 ├── SelectionView.swift  # Mouse drag selection with dimmed background + dimensions
-├── CaptureManager.swift # Screen capture, save to disk, clipboard
-├── ThumbnailPanel.swift # Floating preview panel after capture
+├── CaptureManager.swift # Screen capture, save to disk, clipboard, delete
+├── ThumbnailPanel.swift # Floating preview panel after capture (with delete)
 ├── ThumbnailStackManager.swift # Manages stacking of multiple thumbnail panels
 ├── CombineButton.swift  # Floating "Combine" button between adjacent thumbnails
 ├── DrawingView.swift    # Freehand red drawing on screenshot image
@@ -143,6 +145,7 @@ Tests cover:
 - Coordinate conversion (NSView → CGDisplay)
 - Screenshot file naming format
 - Annotated image save
+- Screenshot deletion (file removal + clipboard clear)
 
 ### UI Tests (KuKaUITests)
 

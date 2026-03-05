@@ -9,6 +9,7 @@ A lightweight macOS app to replace the default `Shift+Command+4` selected area s
 - Save the screenshot to `~/Screenshots/`.
 - Copy the screenshot to the clipboard.
 - Floating thumbnail preview after capture — click to annotate with freehand drawing.
+- Delete screenshots from thumbnail or editor — removes file and clears clipboard.
 
 ---
 
@@ -41,12 +42,12 @@ KuKa/
 | `HotkeyManager` | `CGEvent.tapCreate` to intercept `Shift+Command+4`, fires callback |
 | `OverlayWindow` | Full-screen borderless `NSWindow` covering each display |
 | `SelectionView` | Mouse drag selection, dimmed background, real-time dimensions label |
-| `CaptureManager` | Protocol-based DI (`FileManaging`, `ClipboardManaging`, `ScreenCapturing`), PNG save to `~/Screenshots/`, clipboard copy |
-| `ThumbnailPanel` | Floating preview in bottom-right corner, configurable auto-dismiss (3s/5s/forever), click to open editor |
+| `CaptureManager` | Protocol-based DI (`FileManaging`, `ClipboardManaging`, `ScreenCapturing`), PNG save to `~/Screenshots/`, clipboard copy, screenshot deletion |
+| `ThumbnailPanel` | Floating preview in bottom-right corner, configurable auto-dismiss (3s/5s/forever), click to open editor, delete button to remove screenshot |
 | `ThumbnailStackManager` | Manages multiple thumbnail panels: stacking (max 5), positioning, timer logic (solo=timed, multi=persist), animated repositioning on dismiss |
 | `CombineButton` | Floating "Combine" button with liquid glass visual, appears between adjacent thumbnails for merging two screenshots into one |
 | `DrawingView` | Freehand red drawing on screenshot, undo support, composites final image |
-| `EditorWindow` | Centered modal for annotation with Undo and Done buttons |
+| `EditorWindow` | Centered modal for annotation with Undo, Delete, and Done buttons |
 
 ### Flow
 
@@ -109,8 +110,8 @@ Shift+Cmd+4 → HotkeyManager (suppresses event) → AppDelegate.startCapture()
 
 | Protocol | Real Implementation | Responsibility |
 |----------|-------------------|----------------|
-| `FileManaging` | `FileManager` | Directory creation, file writing |
-| `ClipboardManaging` | `SystemClipboard` | Pasteboard operations |
+| `FileManaging` | `FileManager` | Directory creation, file writing, file deletion |
+| `ClipboardManaging` | `SystemClipboard` | Pasteboard operations, clipboard clearing |
 | `ScreenCapturing` | `SystemScreenCapture` | `CGWindowListCreateImage` wrapper |
 
 ### Test Targets
@@ -143,6 +144,7 @@ When running under XCTest, `AppDelegate` skips hotkey registration and notificat
 - Coordinate conversion from NSView (bottom-left) to CGDisplay (top-left)
 - File naming format: `Screenshot_YYYY-MM-DD_at_HH-MM-SS.png`
 - `saveAnnotated()` writes file and updates clipboard
+- `deleteScreenshot()` removes file and clears clipboard
 
 ### UI Test Coverage
 

@@ -2,6 +2,7 @@ import Cocoa
 
 class EditorWindow: NSPanel, NSWindowDelegate {
     var onSave: ((NSImage) -> Void)?
+    var onDelete: (() -> Void)?
     private let drawingView: DrawingView
 
     init(image: NSImage) {
@@ -37,6 +38,13 @@ class EditorWindow: NSPanel, NSWindowDelegate {
         undoButton.frame = NSRect(x: 12, y: 8, width: 80, height: 28)
         toolbar.addSubview(undoButton)
 
+        let deleteButton = NSButton(frame: NSRect(x: (w - 80) / 2, y: 8, width: 80, height: 28))
+        deleteButton.bezelStyle = .rounded
+        deleteButton.image = NSImage(systemSymbolName: "trash", accessibilityDescription: "Delete")
+        deleteButton.target = self
+        deleteButton.action = #selector(deleteTapped)
+        toolbar.addSubview(deleteButton)
+
         let doneButton = NSButton(title: "Done", target: self, action: #selector(doneTapped))
         doneButton.bezelStyle = .rounded
         doneButton.keyEquivalent = "\r"
@@ -60,6 +68,11 @@ class EditorWindow: NSPanel, NSWindowDelegate {
         let composited = drawingView.compositeImage()
         orderOut(nil)
         onSave?(composited)
+    }
+
+    @objc private func deleteTapped() {
+        orderOut(nil)
+        onDelete?()
     }
 
     override func cancelOperation(_ sender: Any?) {

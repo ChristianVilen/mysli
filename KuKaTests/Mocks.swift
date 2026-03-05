@@ -7,6 +7,7 @@ class MockFileManager: FileManaging {
     var homeDirectoryForCurrentUser: URL = URL(fileURLWithPath: "/tmp/kuka-test")
     var createdDirectories: [URL] = []
     var writtenFiles: [(data: Data, url: URL)] = []
+    var removedItems: [URL] = []
 
     func createDirectory(at url: URL, withIntermediateDirectories createIntermediates: Bool, attributes: [FileAttributeKey: Any]?) throws {
         createdDirectories.append(url)
@@ -15,12 +16,17 @@ class MockFileManager: FileManaging {
     func writeImageData(_ data: Data, to url: URL) throws {
         writtenFiles.append((data, url))
     }
+
+    func removeItem(at url: URL) throws {
+        removedItems.append(url)
+    }
 }
 
 // MARK: - Mock Clipboard
 
 class MockClipboard: ClipboardManaging {
     var copiedCount = 0
+    var clearedCount = 0
     var lastTiffData: Data?
     var lastPngData: Data?
 
@@ -28,6 +34,10 @@ class MockClipboard: ClipboardManaging {
         copiedCount += 1
         lastTiffData = tiffData
         lastPngData = pngData
+    }
+
+    func clearClipboard() {
+        clearedCount += 1
     }
 }
 

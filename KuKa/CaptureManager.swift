@@ -7,10 +7,12 @@ protocol FileManaging {
     var homeDirectoryForCurrentUser: URL { get }
     func createDirectory(at url: URL, withIntermediateDirectories createIntermediates: Bool, attributes: [FileAttributeKey: Any]?) throws
     func writeImageData(_ data: Data, to url: URL) throws
+    func removeItem(at url: URL) throws
 }
 
 protocol ClipboardManaging {
     func copyImage(tiffData: Data, pngData: Data)
+    func clearClipboard()
 }
 
 protocol ScreenCapturing {
@@ -31,6 +33,10 @@ class SystemClipboard: ClipboardManaging {
         pb.clearContents()
         pb.setData(tiffData, forType: .tiff)
         pb.setData(pngData, forType: .png)
+    }
+
+    func clearClipboard() {
+        NSPasteboard.general.clearContents()
     }
 }
 
@@ -137,6 +143,11 @@ class CaptureManager {
         copyToClipboard(image: combined)
 
         return CaptureResult(image: combined, fileURL: url)
+    }
+
+    func deleteScreenshot(at url: URL) {
+        try? fileManager.removeItem(at: url)
+        clipboard.clearClipboard()
     }
 
     private func saveToDisk(cgImage: CGImage) -> URL {

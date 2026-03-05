@@ -120,4 +120,18 @@ final class CaptureManagerTests: XCTestCase {
         XCTAssertEqual(mockFileManager.writtenFiles[0].url, url)
         XCTAssertEqual(mockClipboard.copiedCount, 1)
     }
+
+    // MARK: - deleteScreenshot()
+
+    func testDeleteScreenshotRemovesFile() {
+        let url = URL(fileURLWithPath: "/tmp/kuka-test/Screenshots/test.png")
+        sut.deleteScreenshot(at: url)
+        XCTAssertEqual(mockFileManager.removedItems, [url])
+    }
+
+    func testDeleteScreenshotClearsClipboard() {
+        let url = URL(fileURLWithPath: "/tmp/kuka-test/Screenshots/test.png")
+        sut.deleteScreenshot(at: url)
+        XCTAssertEqual(mockClipboard.clearedCount, 1)
+    }
 }
