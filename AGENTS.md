@@ -5,6 +5,7 @@
 A lightweight macOS app to replace the default `Shift+Command+4` selected area screenshot functionality. The app will:
 
 - Capture a user-selected area of the screen.
+- Capture the full screen instantly with `Shift+Command+3` (captures the screen where the cursor is, with flash animation).
 - Multi-monitor support — dims all screens, captures from the screen where the cursor is.
 - Save the screenshot to `~/Screenshots/`.
 - Copy the screenshot to the clipboard.
@@ -25,6 +26,7 @@ KuKa/
 ├── OverlayWindow.swift  # Borderless transparent NSWindow at screenSaver level
 ├── SelectionView.swift  # NSView handling mouseDown/Dragged/Up, draws dimmed overlay + selection rect + dimensions
 ├── CaptureManager.swift # CGWindowListCreateImage capture, PNG save, clipboard copy
+├── FlashView.swift      # White flash animation on screen after full-screen capture
 ├── ThumbnailPanel.swift # Floating preview panel in bottom-right corner after capture
 ├── ThumbnailStackManager.swift # Manages stacking of multiple thumbnail panels
 ├── CombineButton.swift  # Floating "Combine" button between adjacent thumbnails
@@ -39,10 +41,11 @@ KuKa/
 | Class | Responsibility |
 |-------|---------------|
 | `AppDelegate` | Menu bar icon, launch-at-login toggle, thumbnail duration setting, orchestrates the capture flow, multi-monitor overlay management |
-| `HotkeyManager` | `CGEvent.tapCreate` to intercept `Shift+Command+4`, fires callback |
+| `HotkeyManager` | `CGEvent.tapCreate` to intercept `Shift+Command+3` and `Shift+Command+4`, fires callbacks |
 | `OverlayWindow` | Full-screen borderless `NSWindow` covering each display |
 | `SelectionView` | Mouse drag selection, dimmed background, real-time dimensions label |
 | `CaptureManager` | Protocol-based DI (`FileManaging`, `ClipboardManaging`, `ScreenCapturing`), PNG save to `~/Screenshots/`, clipboard copy, screenshot deletion |
+| `FlashView` | White flash animation overlay on screen after full-screen capture |
 | `ThumbnailPanel` | Floating preview in bottom-right corner, configurable auto-dismiss (3s/5s/forever), click to open editor, delete button to remove screenshot |
 | `ThumbnailStackManager` | Manages multiple thumbnail panels: stacking (max 5), positioning, timer logic (solo=timed, multi=persist), animated repositioning on dismiss |
 | `CombineButton` | Floating "Combine" button with liquid glass visual, appears between adjacent thumbnails for merging two screenshots into one |
@@ -52,6 +55,10 @@ KuKa/
 ### Flow
 
 ```
+Shift+Cmd+3 → HotkeyManager (suppresses event) → AppDelegate.startFullScreenCapture()
+→ Detect cursor screen → CaptureManager.captureFullScreen(screen) → Save PNG + Copy clipboard
+→ FlashView.flash(on: screen) → ThumbnailPanel shown (bottom-right)
+
 Shift+Cmd+4 → HotkeyManager (suppresses event) → AppDelegate.startCapture()
 → OverlayWindows shown on all screens → User drags selection on cursor's screen
 → SelectionView reports CGRect → All overlays dismissed → 50ms delay
@@ -67,6 +74,7 @@ Shift+Cmd+4 → HotkeyManager (suppresses event) → AppDelegate.startCapture()
 ### Functional Requirements
 
 1. **Selected Area Capture** — Triggered by `Shift+Command+4`, user selects rectangular area with visual feedback (crosshair, dimensions).
+2. **Full Screen Capture** — Triggered by `Shift+Command+3`, instantly captures the screen where the cursor is with a flash animation.
 2. **Save to Screenshots Folder** — PNG saved to `~/Screenshots/` as `Screenshot_YYYY-MM-DD_at_HH-MM-SS.png`.
 3. **Copy to Clipboard** — Captured image automatically copied to clipboard.
 4. **User Experience** — No persistent window, menu bar agent only. Floating thumbnail preview after capture.
@@ -80,11 +88,18 @@ Shift+Cmd+4 → HotkeyManager (suppresses event) → AppDelegate.startCapture()
 
 ---
 
+## Future Features
+
+- **Window Capture** (`Shift+Cmd+4` then `Space`) — click a window to capture just that window
+- **Screen Recording** — capture video of a selected area or full screen
+
+---
+
 ## Implementation Notes
 
 ### Keyboard Shortcut
 - Uses `CGEvent.tapCreate` at `.cgSessionEventTap` to intercept key-down events globally.
-- Filters for keyCode `0x15` (4 key) with `.maskShift` + `.maskCommand`.
+- Filters for keyCode `0x14` (3 key) and `0x15` (4 key) with `.maskShift` + `.maskCommand`.
 - Returns `nil` to suppress the system screenshot tool.
 - Requires Accessibility permission; prompts user if missing.
 

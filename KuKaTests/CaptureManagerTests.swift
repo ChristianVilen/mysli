@@ -15,6 +15,33 @@ final class CaptureManagerTests: XCTestCase {
         sut = CaptureManager(fileManager: mockFileManager, clipboard: mockClipboard, screenCapture: mockScreenCapture)
     }
 
+    // MARK: - captureFullScreen()
+
+    func testCaptureFullScreenReturnsResultOnSuccess() {
+        mockScreenCapture.imageToReturn = MockScreenCapture.make1x1Image()
+        let result = sut.captureFullScreen(screen: NSScreen.main!)
+        XCTAssertNotNil(result)
+    }
+
+    func testCaptureFullScreenReturnsNilOnFailure() {
+        mockScreenCapture.imageToReturn = nil
+        let result = sut.captureFullScreen(screen: NSScreen.main!)
+        XCTAssertNil(result)
+    }
+
+    func testCaptureFullScreenCopiesClipboard() {
+        mockScreenCapture.imageToReturn = MockScreenCapture.make1x1Image()
+        _ = sut.captureFullScreen(screen: NSScreen.main!)
+        XCTAssertEqual(mockClipboard.copiedCount, 1)
+    }
+
+    func testCaptureFullScreenCreatesDirectory() {
+        mockScreenCapture.imageToReturn = MockScreenCapture.make1x1Image()
+        _ = sut.captureFullScreen(screen: NSScreen.main!)
+        XCTAssertEqual(mockFileManager.createdDirectories.count, 1)
+        XCTAssertTrue(mockFileManager.createdDirectories[0].path.hasSuffix("Screenshots"))
+    }
+
     // MARK: - capture()
 
     func testCaptureReturnsNilWhenScreenCaptureReturnsNil() {

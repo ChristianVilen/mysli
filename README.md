@@ -6,7 +6,8 @@ A lightweight macOS menu bar app that replaces the default `Shift+Command+4` scr
 
 ## Features
 
-- Intercepts `Shift+Command+4` globally to replace the system screenshot tool
+- Intercepts `Shift+Command+3` and `Shift+Command+4` globally to replace the system screenshot tools
+- Full screen capture with `Shift+Command+3` — captures the screen where the cursor is, with flash animation
 - Multi-monitor support — dims all screens, captures from the screen where the cursor is
 - macOS-style selection overlay with dimmed background and real-time dimensions display
 - Saves screenshots as PNG to `~/Screenshots/`
@@ -78,7 +79,8 @@ macOS will prompt you automatically on the first capture attempt.
 ## Usage
 
 1. Launch Ku-Ka — it appears as a camera icon in the menu bar
-2. Press `Shift+Command+4` anywhere
+2. Press `Shift+Command+3` to capture the full screen (the screen where your cursor is) — a flash animation confirms the capture
+3. Press `Shift+Command+4` anywhere
 3. Click and drag to select the area you want to capture
 4. Release the mouse — the screenshot is saved and copied
 5. A thumbnail preview appears in the bottom-right corner for 5 seconds
@@ -113,6 +115,7 @@ KuKa/
 ├── OverlayWindow.swift  # Full-screen transparent overlay window
 ├── SelectionView.swift  # Mouse drag selection with dimmed background + dimensions
 ├── CaptureManager.swift # Screen capture, save to disk, clipboard, delete
+├── FlashView.swift      # White flash animation on screen after full-screen capture
 ├── ThumbnailPanel.swift # Floating preview panel after capture (with delete)
 ├── ThumbnailStackManager.swift # Manages stacking of multiple thumbnail panels
 ├── CombineButton.swift  # Floating "Combine" button between adjacent thumbnails
@@ -124,9 +127,9 @@ KuKa/
 
 ## Known Limitations
 
-- You must disable or accept that the system `Shift+Command+4` is intercepted (the app suppresses the system shortcut when running)
+- You must disable or accept that the system `Shift+Command+3` and `Shift+Command+4` are intercepted (the app suppresses the system shortcuts when running)
 - Requires macOS 13+ for `SMAppService` (launch at login)
-- No preferences UI for changing the shortcut key (hardcoded to `Shift+Command+4`)
+- No preferences UI for changing the shortcut keys
 
 ## Testing
 

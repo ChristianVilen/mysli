@@ -4,6 +4,7 @@ class HotkeyManager {
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     var onHotkey: (() -> Void)?
+    var onFullScreenHotkey: (() -> Void)?
 
     func start() {
         // This both checks AND prompts the system dialog if not trusted
@@ -46,12 +47,17 @@ class HotkeyManager {
         let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
         let flags = event.flags
 
-        // keyCode 0x15 = "4", check Shift+Command
-        if keyCode == 0x15,
-           flags.contains(.maskShift),
-           flags.contains(.maskCommand) {
+        guard flags.contains(.maskShift), flags.contains(.maskCommand) else {
+            return Unmanaged.passUnretained(event)
+        }
+
+        if keyCode == 0x14 { // "3" — full screen capture
+            DispatchQueue.main.async { self.onFullScreenHotkey?() }
+            return nil
+        }
+        if keyCode == 0x15 { // "4" — area capture
             DispatchQueue.main.async { self.onHotkey?() }
-            return nil // suppress the event
+            return nil
         }
         return Unmanaged.passUnretained(event)
     }

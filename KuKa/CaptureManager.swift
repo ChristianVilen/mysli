@@ -68,6 +68,28 @@ class CaptureManager {
         self.screenCapture = screenCapture
     }
 
+    func captureFullScreen(screen: NSScreen) -> CaptureResult? {
+        let screenFrame = screen.frame
+        let primaryHeight = NSScreen.screens[0].frame.height
+        let cgRect = CGRect(
+            x: screenFrame.origin.x,
+            y: primaryHeight - screenFrame.origin.y - screenFrame.height,
+            width: screenFrame.width,
+            height: screenFrame.height
+        )
+
+        guard let cgImage = screenCapture.captureScreen(rect: cgRect) else {
+            NSLog("Ku-Ka: Full screen capture returned nil")
+            return nil
+        }
+
+        let image = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
+        let fileURL = saveToDisk(cgImage: cgImage)
+        copyToClipboard(image: image)
+
+        return CaptureResult(image: image, fileURL: fileURL)
+    }
+
     func capture(rect: CGRect, screen: NSScreen) -> CaptureResult? {
         let screenFrame = screen.frame
         let cgRect = CGRect(

@@ -32,6 +32,7 @@ rebuild: clean build
 package: clean release
     #!/bin/bash
     APP_PATH=$(xcodebuild -project KuKa.xcodeproj -scheme KuKa -configuration Release -showBuildSettings 2>/dev/null | grep -m1 "BUILT_PRODUCTS_DIR" | awk '{print $3}')
+    codesign --force --deep --sign "KuKa Signing" "$APP_PATH/KuKa.app"
     cd "$APP_PATH" && zip -r -y "{{justfile_directory()}}/KuKa.zip" KuKa.app
     echo "Packaged: KuKa.zip"
 

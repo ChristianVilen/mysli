@@ -70,6 +70,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(featuresLabel)
 
         for feature in [
+            "⌘⇧3 to capture full screen",
             "⌘⇧4 to capture selected area",
             "Multi-monitor support",
             "Auto-save to ~/Screenshots/",
@@ -105,6 +106,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func setupHotkey() {
         hotkeyManager.onHotkey = { [weak self] in self?.startCapture() }
+        hotkeyManager.onFullScreenHotkey = { [weak self] in self?.startFullScreenCapture() }
         hotkeyManager.start()
     }
 
@@ -143,6 +145,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 overlay.orderFront(nil)
             }
         }
+    }
+
+    private func startFullScreenCapture() {
+        let mouseLocation = NSEvent.mouseLocation
+        guard let screen = NSScreen.screens.first(where: { $0.frame.contains(mouseLocation) }) ?? NSScreen.main else { return }
+        guard let result = captureManager.captureFullScreen(screen: screen) else { return }
+        FlashView.flash(on: screen)
+        showThumbnail(result: result, screen: screen)
     }
 
     private func finishCapture(rect: CGRect, screen: NSScreen) {
