@@ -43,7 +43,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         launchAtLoginItem = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
         launchAtLoginItem.target = self
-        launchAtLoginItem.state = UserDefaults.standard.bool(forKey: "launchAtLogin") ? .on : .off
+        launchAtLoginItem.state = SMAppService.mainApp.status == .enabled ? .on : .off
         menu.addItem(launchAtLoginItem)
 
         menu.addItem(.separator())
@@ -228,15 +228,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Launch at Login
 
     @objc private func toggleLaunchAtLogin() {
-        let enabled = !UserDefaults.standard.bool(forKey: "launchAtLogin")
+        let isCurrentlyEnabled = SMAppService.mainApp.status == .enabled
         do {
-            if enabled {
-                try SMAppService.mainApp.register()
-            } else {
+            if isCurrentlyEnabled {
                 try SMAppService.mainApp.unregister()
+            } else {
+                try SMAppService.mainApp.register()
             }
-            UserDefaults.standard.set(enabled, forKey: "launchAtLogin")
-            launchAtLoginItem.state = enabled ? .on : .off
+            launchAtLoginItem.state = SMAppService.mainApp.status == .enabled ? .on : .off
         } catch {
             NSLog("Launch at login toggle failed: \(error)")
         }
