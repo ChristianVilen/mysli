@@ -42,6 +42,27 @@ final class CaptureManagerTests: XCTestCase {
         XCTAssertTrue(mockFileManager.createdDirectories[0].path.hasSuffix("Screenshots"))
     }
 
+    // MARK: - captureWindow()
+
+    func testCaptureWindowReturnsResultOnSuccess() {
+        mockScreenCapture.imageToReturn = MockScreenCapture.make1x1Image()
+        let result = sut.captureWindow(windowID: 42, screen: NSScreen.main!)
+        XCTAssertNotNil(result)
+    }
+
+    func testCaptureWindowReturnsNilOnFailure() {
+        mockScreenCapture.imageToReturn = nil
+        let result = sut.captureWindow(windowID: 42, screen: NSScreen.main!)
+        XCTAssertNil(result)
+    }
+
+    func testCaptureWindowSavesFileAndCopiesClipboard() {
+        mockScreenCapture.imageToReturn = MockScreenCapture.make1x1Image()
+        _ = sut.captureWindow(windowID: 42, screen: NSScreen.main!)
+        XCTAssertEqual(mockFileManager.createdDirectories.count, 1)
+        XCTAssertEqual(mockClipboard.copiedCount, 1)
+    }
+
     // MARK: - capture()
 
     func testCaptureReturnsNilWhenScreenCaptureReturnsNil() {
@@ -100,6 +121,7 @@ final class CaptureManagerTests: XCTestCase {
                 onCapture?(rect)
                 return MockScreenCapture.make1x1Image()
             }
+            func captureWindow(windowID: CGWindowID) -> CGImage? { nil }
         }
         let spy = SpyScreenCapture()
         spy.onCapture = { capturedRect = $0 }

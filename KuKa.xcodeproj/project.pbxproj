@@ -19,7 +19,9 @@
 		A100000A /* ThumbnailStackManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001C /* ThumbnailStackManager.swift */; };
 		A100000B /* CombineButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001D /* CombineButton.swift */; };
 		A100000C /* FlashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001E /* FlashView.swift */; };
+		A100000D /* WindowListProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001F /* WindowListProvider.swift */; };
 		B20000001 /* CaptureManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000011 /* CaptureManagerTests.swift */; };
+		B20000003 /* WindowListProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000013 /* WindowListProviderTests.swift */; };
 		B20000002 /* Mocks.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000012 /* Mocks.swift */; };
 		C30000001 /* MenuBarTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000011 /* MenuBarTests.swift */; };
 		E227F2EA2F51CF630032905B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E28DFEF72F4C8D93001B8D91 /* Assets.xcassets */; };
@@ -58,9 +60,11 @@
 		A1000001C /* ThumbnailStackManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThumbnailStackManager.swift; sourceTree = "<group>"; };
 		A1000001D /* CombineButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CombineButton.swift; sourceTree = "<group>"; };
 		A1000001E /* FlashView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlashView.swift; sourceTree = "<group>"; };
+		A1000001F /* WindowListProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowListProvider.swift; sourceTree = "<group>"; };
 		B20000010 /* KuKaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KuKaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B20000011 /* CaptureManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureManagerTests.swift; sourceTree = "<group>"; };
 		B20000012 /* Mocks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Mocks.swift; sourceTree = "<group>"; };
+		B20000013 /* WindowListProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowListProviderTests.swift; sourceTree = "<group>"; };
 		C30000010 /* KuKaUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KuKaUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		C30000011 /* MenuBarTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarTests.swift; sourceTree = "<group>"; };
 		E28DFEF72F4C8D93001B8D91 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -114,6 +118,7 @@
 				A1000001C /* ThumbnailStackManager.swift */,
 				A1000001D /* CombineButton.swift */,
 				A1000001E /* FlashView.swift */,
+				A1000001F /* WindowListProvider.swift */,
 				A1000001A /* DrawingView.swift */,
 				A1000001B /* EditorWindow.swift */,
 				A10000017 /* Info.plist */,
@@ -137,6 +142,7 @@
 			isa = PBXGroup;
 			children = (
 				B20000011 /* CaptureManagerTests.swift */,
+				B20000013 /* WindowListProviderTests.swift */,
 				B20000012 /* Mocks.swift */,
 			);
 			path = KuKaTests;
@@ -262,6 +268,7 @@
 				A100000A /* ThumbnailStackManager.swift in Sources */,
 				A100000B /* CombineButton.swift in Sources */,
 				A100000C /* FlashView.swift in Sources */,
+				A100000D /* WindowListProvider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -270,6 +277,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				B20000001 /* CaptureManagerTests.swift in Sources */,
+				B20000003 /* WindowListProviderTests.swift in Sources */,
 				B20000002 /* Mocks.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

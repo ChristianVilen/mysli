@@ -45,9 +45,14 @@ class MockClipboard: ClipboardManaging {
 
 class MockScreenCapture: ScreenCapturing {
     var imageToReturn: CGImage?
+    var windowImageToReturn: CGImage?
 
     func captureScreen(rect: CGRect) -> CGImage? {
         imageToReturn
+    }
+
+    func captureWindow(windowID: CGWindowID) -> CGImage? {
+        windowImageToReturn ?? imageToReturn
     }
 
     /// Creates a 1x1 red CGImage for testing
@@ -57,5 +62,15 @@ class MockScreenCapture: ScreenCapturing {
         context.setFillColor(red: 1, green: 0, blue: 0, alpha: 1)
         context.fill(CGRect(x: 0, y: 0, width: 1, height: 1))
         return context.makeImage()!
+    }
+}
+
+// MARK: - Mock WindowListProvider
+
+class MockWindowListProvider: WindowListProvider {
+    var windows: [WindowInfo] = []
+
+    func windowsOnScreen() -> [WindowInfo] {
+        windows
     }
 }

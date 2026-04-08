@@ -127,6 +127,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             overlay.selectionView.onCancel = { [weak self] in
                 self?.dismissOverlay()
             }
+            overlay.selectionView.onWindowSelection = { [weak self] windowID in
+                self?.finishWindowCapture(windowID: windowID, screen: screen)
+            }
 
             overlayWindows.append(overlay)
 
@@ -159,6 +162,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         dismissOverlay()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
             guard let result = self.captureManager.capture(rect: rect, screen: screen) else { return }
+            self.showThumbnail(result: result, screen: screen)
+        }
+    }
+
+    private func finishWindowCapture(windowID: CGWindowID, screen: NSScreen) {
+        dismissOverlay()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            guard let result = self.captureManager.captureWindow(windowID: windowID, screen: screen) else { return }
             self.showThumbnail(result: result, screen: screen)
         }
     }

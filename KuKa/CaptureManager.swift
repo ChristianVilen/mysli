@@ -17,6 +17,7 @@ protocol ClipboardManaging {
 
 protocol ScreenCapturing {
     func captureScreen(rect: CGRect) -> CGImage?
+    func captureWindow(windowID: CGWindowID) -> CGImage?
 }
 
 // MARK: - Real Implementations
@@ -43,6 +44,10 @@ class SystemClipboard: ClipboardManaging {
 class SystemScreenCapture: ScreenCapturing {
     func captureScreen(rect: CGRect) -> CGImage? {
         CGWindowListCreateImage(rect, .optionOnScreenOnly, kCGNullWindowID, .bestResolution)
+    }
+
+    func captureWindow(windowID: CGWindowID) -> CGImage? {
+        CGWindowListCreateImage(.null, .optionIncludingWindow, windowID, .bestResolution)
     }
 }
 
@@ -87,6 +92,17 @@ class CaptureManager {
         let fileURL = saveToDisk(cgImage: cgImage)
         copyToClipboard(image: image)
 
+        return CaptureResult(image: image, fileURL: fileURL)
+    }
+
+    func captureWindow(windowID: CGWindowID, screen: NSScreen) -> CaptureResult? {
+        guard let cgImage = screenCapture.captureWindow(windowID: windowID) else {
+            NSLog("Ku-Ka: Window capture returned nil")
+            return nil
+        }
+        let image = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
+        let fileURL = saveToDisk(cgImage: cgImage)
+        copyToClipboard(image: image)
         return CaptureResult(image: image, fileURL: fileURL)
     }
 
