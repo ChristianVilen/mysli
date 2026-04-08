@@ -3,11 +3,11 @@ import Cocoa
 class HotkeyManager {
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
+    private var watchdogTimer: Timer?
     var onHotkey: (() -> Void)?
     var onFullScreenHotkey: (() -> Void)?
 
     func start() {
-        // This both checks AND prompts the system dialog if not trusted
         let trusted = AXIsProcessTrustedWithOptions(
             [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
         )
@@ -19,8 +19,27 @@ class HotkeyManager {
             return
         }
 
+        createTap()
+    }
+
+    func stop() {
+        watchdogTimer?.invalidate()
+        watchdogTimer = nil
+        if let tap = eventTap {
+            CGEvent.tapEnable(tap: tap, enable: false)
+        }
+        if let source = runLoopSource {
+            CFRunLoopRemoveSource(CFRunLoopGetCurrent(), source, .commonModes)
+        }
+        eventTap = nil
+        runLoopSource = nil
+    }
+
+    private func createTap() {
+        stop()
+
         let mask: CGEventMask = (1 << CGEventType.keyDown.rawValue)
-        
+
         guard let tap = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
             place: .headInsertEventTap,
@@ -41,6 +60,18 @@ class HotkeyManager {
         runLoopSource = CFMachPortCreateRunLoopSource(nil, tap, 0)
         CFRunLoopAddSource(CFRunLoopGetCurrent(), runLoopSource, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
+
+        watchdogTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
+            self?.checkTapState()
+        }
+    }
+
+    private func checkTapState() {
+        guard let tap = eventTap else { return }
+        if !CGEvent.tapIsEnabled(tap: tap) {
+            NSLog("Ku-Ka: Event tap was disabled by the system, re-enabling")
+            CGEvent.tapEnable(tap: tap, enable: true)
+        }
     }
 
     private func handleEvent(_ event: CGEvent) -> Unmanaged<CGEvent>? {
@@ -51,12 +82,12 @@ class HotkeyManager {
             return Unmanaged.passUnretained(event)
         }
 
-        if keyCode == 0x14 { // "3" — full screen capture
-            DispatchQueue.main.async { self.onFullScreenHotkey?() }
+        if keyCode == 0x14 {
+            DispatchQueue.main.async { [weak self] in self?.onFullScreenHotkey?() }
             return nil
         }
-        if keyCode == 0x15 { // "4" — area capture
-            DispatchQueue.main.async { self.onHotkey?() }
+        if keyCode == 0x15 {
+            DispatchQueue.main.async { [weak self] in self?.onHotkey?() }
             return nil
         }
         return Unmanaged.passUnretained(event)
