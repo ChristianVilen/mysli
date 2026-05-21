@@ -5,20 +5,52 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private let hotkeyManager = HotkeyManager()
     private let captureManager = CaptureManager()
+    private let scrollWheelManager = ScrollWheelManager()
     private var overlayWindows: [OverlayWindow] = []
     private let thumbnailStack = ThumbnailStackManager()
     private var editorWindow: EditorWindow?
     private var launchAtLoginItem: NSMenuItem!
     private var durationItems: [NSMenuItem] = []
+    private var scrollInvertItem: NSMenuItem!
+    private var scrollAccelItem: NSMenuItem!
+    private var linesPerTickItems: [NSMenuItem] = []
+
+    private let scrollInvertKey = "scrollInversionEnabled"
+    private let scrollAccelKey = "scrollDisableAcceleration"
+    private let scrollLinesKey = "scrollLinesPerTick"
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let isTesting = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
             || CommandLine.arguments.contains("--uitesting")
         if !isTesting {
             setupHotkey()
+            setupScrollWheel()
         }
         setupMenuBar()
         setupThumbnailStack()
+    }
+
+    private func setupScrollWheel() {
+        let defaults = UserDefaults.standard
+        scrollWheelManager.settings = ScrollTransformSettings(
+            invert: defaults.bool(forKey: scrollInvertKey),
+            disableAcceleration: defaults.bool(forKey: scrollAccelKey),
+            linesPerTick: (defaults.object(forKey: scrollLinesKey) as? Int) ?? 3
+        )
+        if scrollWheelManager.settings.invert || scrollWheelManager.settings.disableAcceleration {
+            scrollWheelManager.start()
+        }
+    }
+
+    private func updateScrollManagerRunning() {
+        let needed = scrollWheelManager.settings.invert || scrollWheelManager.settings.disableAcceleration
+        if needed && !scrollWheelManager.isRunning {
+            scrollWheelManager.start()
+        } else if !needed && scrollWheelManager.isRunning {
+            scrollWheelManager.stop()
+        } else {
+            scrollWheelManager.reload()
+        }
     }
 
     // MARK: - Menu Bar
@@ -61,6 +93,38 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             menu.addItem(item)
             durationItems.append(item)
         }
+
+        menu.addItem(.separator())
+
+        // --- Scroll Wheel ---
+        let scrollLabel = NSMenuItem(title: "Scroll Wheel", action: nil, keyEquivalent: "")
+        scrollLabel.isEnabled = false
+        menu.addItem(scrollLabel)
+
+        let defaults = UserDefaults.standard
+        scrollInvertItem = NSMenuItem(title: "Invert Mouse Scroll Direction", action: #selector(toggleScrollInvert), keyEquivalent: "")
+        scrollInvertItem.target = self
+        scrollInvertItem.state = defaults.bool(forKey: scrollInvertKey) ? .on : .off
+        menu.addItem(scrollInvertItem)
+
+        scrollAccelItem = NSMenuItem(title: "Disable Scroll Acceleration", action: #selector(toggleScrollAcceleration), keyEquivalent: "")
+        scrollAccelItem.target = self
+        scrollAccelItem.state = defaults.bool(forKey: scrollAccelKey) ? .on : .off
+        menu.addItem(scrollAccelItem)
+
+        let linesItem = NSMenuItem(title: "Lines Per Tick", action: nil, keyEquivalent: "")
+        let linesMenu = NSMenu()
+        let currentLines = (defaults.object(forKey: scrollLinesKey) as? Int) ?? 3
+        for tag in [1, 3, 5, 7, 10] {
+            let item = NSMenuItem(title: "\(tag)", action: #selector(changeLinesPerTick(_:)), keyEquivalent: "")
+            item.target = self
+            item.tag = tag
+            item.state = tag == currentLines ? .on : .off
+            linesMenu.addItem(item)
+            linesPerTickItems.append(item)
+        }
+        linesItem.submenu = linesMenu
+        menu.addItem(linesItem)
 
         menu.addItem(.separator())
 
@@ -226,6 +290,32 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         UserDefaults.standard.set(Double(sender.tag), forKey: "thumbnailDuration")
         for item in durationItems { item.state = .off }
         sender.state = .on
+    }
+
+    // MARK: - Scroll Wheel
+
+    @objc private func toggleScrollInvert() {
+        let new = !UserDefaults.standard.bool(forKey: scrollInvertKey)
+        UserDefaults.standard.set(new, forKey: scrollInvertKey)
+        scrollInvertItem.state = new ? .on : .off
+        scrollWheelManager.settings.invert = new
+        updateScrollManagerRunning()
+    }
+
+    @objc private func toggleScrollAcceleration() {
+        let new = !UserDefaults.standard.bool(forKey: scrollAccelKey)
+        UserDefaults.standard.set(new, forKey: scrollAccelKey)
+        scrollAccelItem.state = new ? .on : .off
+        scrollWheelManager.settings.disableAcceleration = new
+        updateScrollManagerRunning()
+    }
+
+    @objc private func changeLinesPerTick(_ sender: NSMenuItem) {
+        UserDefaults.standard.set(sender.tag, forKey: scrollLinesKey)
+        for item in linesPerTickItems { item.state = .off }
+        sender.state = .on
+        scrollWheelManager.settings.linesPerTick = sender.tag
+        if scrollWheelManager.isRunning { scrollWheelManager.reload() }
     }
 
     @objc private func openReportBug() {

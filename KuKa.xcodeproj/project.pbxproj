@@ -20,8 +20,10 @@
 		A100000B /* CombineButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001D /* CombineButton.swift */; };
 		A100000C /* FlashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001E /* FlashView.swift */; };
 		A100000D /* WindowListProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001F /* WindowListProvider.swift */; };
+		A100000E /* ScrollWheelManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000021 /* ScrollWheelManager.swift */; };
 		B20000001 /* CaptureManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000011 /* CaptureManagerTests.swift */; };
 		B20000003 /* WindowListProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000013 /* WindowListProviderTests.swift */; };
+		B20000004 /* ScrollTransformTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000014 /* ScrollTransformTests.swift */; };
 		B20000002 /* Mocks.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000012 /* Mocks.swift */; };
 		C30000001 /* MenuBarTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000011 /* MenuBarTests.swift */; };
 		E227F2EA2F51CF630032905B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E28DFEF72F4C8D93001B8D91 /* Assets.xcassets */; };
@@ -61,6 +63,8 @@
 		A1000001D /* CombineButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CombineButton.swift; sourceTree = "<group>"; };
 		A1000001E /* FlashView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlashView.swift; sourceTree = "<group>"; };
 		A1000001F /* WindowListProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowListProvider.swift; sourceTree = "<group>"; };
+		A10000021 /* ScrollWheelManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScrollWheelManager.swift; sourceTree = "<group>"; };
+		B20000014 /* ScrollTransformTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScrollTransformTests.swift; sourceTree = "<group>"; };
 		B20000010 /* KuKaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KuKaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B20000011 /* CaptureManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureManagerTests.swift; sourceTree = "<group>"; };
 		B20000012 /* Mocks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Mocks.swift; sourceTree = "<group>"; };
@@ -119,6 +123,7 @@
 				A1000001D /* CombineButton.swift */,
 				A1000001E /* FlashView.swift */,
 				A1000001F /* WindowListProvider.swift */,
+				A10000021 /* ScrollWheelManager.swift */,
 				A1000001A /* DrawingView.swift */,
 				A1000001B /* EditorWindow.swift */,
 				A10000017 /* Info.plist */,
@@ -143,6 +148,7 @@
 			children = (
 				B20000011 /* CaptureManagerTests.swift */,
 				B20000013 /* WindowListProviderTests.swift */,
+				B20000014 /* ScrollTransformTests.swift */,
 				B20000012 /* Mocks.swift */,
 			);
 			path = KuKaTests;
@@ -269,6 +275,7 @@
 				A100000B /* CombineButton.swift in Sources */,
 				A100000C /* FlashView.swift in Sources */,
 				A100000D /* WindowListProvider.swift in Sources */,
+				A100000E /* ScrollWheelManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -278,6 +285,7 @@
 			files = (
 				B20000001 /* CaptureManagerTests.swift in Sources */,
 				B20000003 /* WindowListProviderTests.swift in Sources */,
+				B20000004 /* ScrollTransformTests.swift in Sources */,
 				B20000002 /* Mocks.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
