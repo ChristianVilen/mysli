@@ -5,5 +5,3 @@ panes:
     focus: true
   - split: horizontal
 
-pre_merge:
-  - just test
