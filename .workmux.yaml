@@ -1,0 +1,9 @@
+main_branch: main
+
+panes:
+  - command: <agent>
+    focus: true
+  - split: horizontal
+
+pre_merge:
+  - just test
