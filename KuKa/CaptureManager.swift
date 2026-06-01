@@ -88,11 +88,7 @@ class CaptureManager {
             return nil
         }
 
-        let image = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
-        let fileURL = saveToDisk(cgImage: cgImage)
-        copyToClipboard(image: image)
-
-        return CaptureResult(image: image, fileURL: fileURL)
+        return finalize(cgImage: cgImage)
     }
 
     func captureWindow(windowID: CGWindowID, screen: NSScreen) -> CaptureResult? {
@@ -100,10 +96,7 @@ class CaptureManager {
             NSLog("Ku-Ka: Window capture returned nil")
             return nil
         }
-        let image = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
-        let fileURL = saveToDisk(cgImage: cgImage)
-        copyToClipboard(image: image)
-        return CaptureResult(image: image, fileURL: fileURL)
+        return finalize(cgImage: cgImage)
     }
 
     func capture(rect: CGRect, screen: NSScreen) -> CaptureResult? {
@@ -120,26 +113,45 @@ class CaptureManager {
             return nil
         }
 
+        return finalize(cgImage: cgImage)
+    }
+
+    /// Build the NSImage, persist, and copy to clipboard for a freshly captured
+    /// CGImage. Clipboard data is generated from the CGImage in an autorelease
+    /// pool so the long-lived NSImage never caches an uncompressed TIFF rep.
+    private func finalize(cgImage: CGImage) -> CaptureResult {
         let image = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
         let fileURL = saveToDisk(cgImage: cgImage)
-        copyToClipboard(image: image)
-
+        copyToClipboard(cgImage: cgImage)
         return CaptureResult(image: image, fileURL: fileURL)
     }
 
     func saveAnnotated(image: NSImage, to url: URL) {
-        guard let tiff = image.tiffRepresentation,
-              let bitmap = NSBitmapImageRep(data: tiff),
-              let png = bitmap.representation(using: .png, properties: [:]) else { return }
-        try? fileManager.writeImageData(png, to: url)
+        autoreleasepool {
+            guard let tiff = image.tiffRepresentation,
+                  let bitmap = NSBitmapImageRep(data: tiff),
+                  let png = bitmap.representation(using: .png, properties: [:]) else { return }
+            try? fileManager.writeImageData(png, to: url)
+        }
         copyToClipboard(image: image)
     }
 
     func copyToClipboard(image: NSImage) {
-        guard let tiff = image.tiffRepresentation,
-              let bitmap = NSBitmapImageRep(data: tiff),
-              let png = bitmap.representation(using: .png, properties: [:]) else { return }
-        clipboard.copyImage(tiffData: tiff, pngData: png)
+        autoreleasepool {
+            guard let tiff = image.tiffRepresentation,
+                  let bitmap = NSBitmapImageRep(data: tiff),
+                  let png = bitmap.representation(using: .png, properties: [:]) else { return }
+            clipboard.copyImage(tiffData: tiff, pngData: png)
+        }
+    }
+
+    func copyToClipboard(cgImage: CGImage) {
+        autoreleasepool {
+            let bitmap = NSBitmapImageRep(cgImage: cgImage)
+            guard let tiff = bitmap.representation(using: .tiff, properties: [:]),
+                  let png = bitmap.representation(using: .png, properties: [:]) else { return }
+            clipboard.copyImage(tiffData: tiff, pngData: png)
+        }
     }
 
     func screenshotsDirectory() -> URL {
@@ -170,14 +182,18 @@ class CaptureManager {
         bottomImage.draw(in: NSRect(x: 0, y: 0, width: bottomImage.size.width, height: bottomImage.size.height))
         combined.unlockFocus()
 
-        guard let tiff = combined.tiffRepresentation,
-              let bitmap = NSBitmapImageRep(data: tiff),
-              let pngData = bitmap.representation(using: .png, properties: [:]) else { return nil }
-
         let dir = screenshotsDirectory()
         try? fileManager.createDirectory(at: dir, withIntermediateDirectories: true, attributes: nil)
         let url = dir.appendingPathComponent(generateCombinedFileName())
-        try? fileManager.writeImageData(pngData, to: url)
+
+        let written: Bool = autoreleasepool {
+            guard let tiff = combined.tiffRepresentation,
+                  let bitmap = NSBitmapImageRep(data: tiff),
+                  let pngData = bitmap.representation(using: .png, properties: [:]) else { return false }
+            try? fileManager.writeImageData(pngData, to: url)
+            return true
+        }
+        guard written else { return nil }
         copyToClipboard(image: combined)
 
         return CaptureResult(image: combined, fileURL: url)
@@ -194,9 +210,11 @@ class CaptureManager {
 
         let url = dir.appendingPathComponent(generateFileName())
 
-        let bitmapRep = NSBitmapImageRep(cgImage: cgImage)
-        if let pngData = bitmapRep.representation(using: .png, properties: [:]) {
-            try? fileManager.writeImageData(pngData, to: url)
+        autoreleasepool {
+            let bitmapRep = NSBitmapImageRep(cgImage: cgImage)
+            if let pngData = bitmapRep.representation(using: .png, properties: [:]) {
+                try? fileManager.writeImageData(pngData, to: url)
+            }
         }
         return url
     }

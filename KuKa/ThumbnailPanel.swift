@@ -1,6 +1,6 @@
 import Cocoa
 
-class ThumbnailPanel: NSPanel {
+class ThumbnailPanel: FloatingPanel {
     var onEdit: (() -> Void)?
     var onDismiss: (() -> Void)?
     var onDelete: (() -> Void)?
@@ -15,22 +15,46 @@ class ThumbnailPanel: NSPanel {
         return NSSize(width: thumbWidth, height: thumbWidth * aspect)
     }
 
+    /// Produce a small bitmap-backed copy of `image` at `size` (rendered at 2×
+    /// for Retina crispness) so the panel doesn't hold the full capture.
+    static func downscaled(_ image: NSImage, to size: NSSize) -> NSImage {
+        let scale: CGFloat = 2
+        let pixelsWide = Int((size.width * scale).rounded())
+        let pixelsHigh = Int((size.height * scale).rounded())
+        guard pixelsWide > 0, pixelsHigh > 0,
+              let rep = NSBitmapImageRep(
+                bitmapDataPlanes: nil, pixelsWide: pixelsWide, pixelsHigh: pixelsHigh,
+                bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) else {
+            return image
+        }
+        rep.size = size
+
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+        NSGraphicsContext.current?.imageInterpolation = .high
+        image.draw(in: NSRect(origin: .zero, size: size),
+                   from: .zero, operation: .copy, fraction: 1.0)
+        NSGraphicsContext.restoreGraphicsState()
+
+        let thumb = NSImage(size: size)
+        thumb.addRepresentation(rep)
+        return thumb
+    }
+
     /// Frame-based init for use by ThumbnailStackManager
     init(image: NSImage, frame: NSRect) {
-        super.init(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        super.init(contentRect: frame)
         setupPanel(image: image, size: frame.size)
     }
 
     private func setupPanel(image: NSImage, size: NSSize) {
-        level = .floating
-        isOpaque = false
-        backgroundColor = .clear
-        hasShadow = true
-
         let container = NSView(frame: NSRect(origin: .zero, size: size))
 
         let imageView = NSImageView(frame: container.bounds)
-        imageView.image = image
+        // Render a small bitmap for display so the panel doesn't retain the
+        // full-resolution capture (those are kept by the thumbnail stack only).
+        imageView.image = Self.downscaled(image, to: size)
         imageView.imageScaling = .scaleProportionallyUpOrDown
         imageView.wantsLayer = true
         imageView.layer?.cornerRadius = 8
@@ -72,21 +96,9 @@ class ThumbnailPanel: NSPanel {
         dismissTimer = nil
     }
 
-    @objc private func thumbnailClicked() {
-        cancelDismissTimer()
-        orderOut(nil)
-        onEdit?()
-    }
-
-    @objc private func dismissThumbnail() {
-        cancelDismissTimer()
-        orderOut(nil)
-        onDismiss?()
-    }
-
-    @objc private func deleteThumbnail() {
-        cancelDismissTimer()
-        orderOut(nil)
-        onDelete?()
-    }
+    // Notify only — ThumbnailStackManager.remove(panel:) owns timer cancellation,
+    // closing, and removal from the stack.
+    @objc private func thumbnailClicked() { onEdit?() }
+    @objc private func dismissThumbnail() { onDismiss?() }
+    @objc private func deleteThumbnail() { onDelete?() }
 }

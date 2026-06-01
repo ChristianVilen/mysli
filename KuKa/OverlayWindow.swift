@@ -10,6 +10,7 @@ class OverlayWindow: NSWindow {
             backing: .buffered,
             defer: false
         )
+        isReleasedWhenClosed = false
         level = .screenSaver
         isOpaque = false
         backgroundColor = .clear

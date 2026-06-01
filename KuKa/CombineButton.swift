@@ -1,17 +1,13 @@
 import Cocoa
 
-class CombineButton: NSPanel {
+class CombineButton: FloatingPanel {
     var onCombine: (() -> Void)?
 
     static let buttonHeight: CGFloat = 28
     static let buttonWidth: CGFloat = 100
 
     init(frame: NSRect) {
-        super.init(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
-        level = .floating
-        isOpaque = false
-        backgroundColor = .clear
-        hasShadow = true
+        super.init(contentRect: frame)
 
         let effect = NSVisualEffectView(frame: NSRect(origin: .zero, size: frame.size))
         effect.material = .hudWindow

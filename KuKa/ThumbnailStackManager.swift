@@ -21,7 +21,7 @@ class ThumbnailStackManager {
         if entries.count > Self.maxCount {
             let oldest = entries.removeLast()
             oldest.panel.cancelDismissTimer()
-            oldest.panel.orderOut(nil)
+            oldest.panel.close()
         }
 
         // Timer logic
@@ -37,7 +37,7 @@ class ThumbnailStackManager {
 
     func remove(panel: ThumbnailPanel) {
         panel.cancelDismissTimer()
-        panel.orderOut(nil)
+        panel.close()
         entries.removeAll(where: { $0.panel === panel })
 
         // If back to 1, restart timer
@@ -61,7 +61,7 @@ class ThumbnailStackManager {
         // Remove both source panels
         for p in [olderEntry.panel, newerEntry.panel] {
             p.cancelDismissTimer()
-            p.orderOut(nil)
+            p.close()
         }
         entries.removeAll(where: { e in e.panel === olderEntry.panel || e.panel === newerEntry.panel })
 
@@ -117,7 +117,7 @@ class ThumbnailStackManager {
         guard let screen = currentScreen else { return }
 
         // Remove old combine buttons
-        for btn in combineButtons { btn.orderOut(nil) }
+        for btn in combineButtons { btn.close() }
         combineButtons.removeAll()
 
         let baseX = screen.visibleFrame.maxX - ThumbnailPanel.thumbWidth - ThumbnailPanel.padding

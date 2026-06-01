@@ -3,6 +3,7 @@ import Cocoa
 class EditorWindow: NSPanel, NSWindowDelegate {
     var onSave: ((NSImage) -> Void)?
     var onDelete: (() -> Void)?
+    var onClose: (() -> Void)?
     private let drawingView: DrawingView
 
     init(image: NSImage) {
@@ -66,20 +67,23 @@ class EditorWindow: NSPanel, NSWindowDelegate {
 
     @objc private func doneTapped() {
         let composited = drawingView.compositeImage()
-        orderOut(nil)
         onSave?(composited)
+        close()
     }
 
     @objc private func deleteTapped() {
-        orderOut(nil)
         onDelete?()
+        close()
     }
 
     override func cancelOperation(_ sender: Any?) {
-        orderOut(nil)
+        close()
     }
 
     func windowWillClose(_ notification: Notification) {
-        // Cancel without saving
+        // Fires for Done/Delete, the title-bar close button, and Escape —
+        // the single place the owner drops its reference so the window
+        // (and its full-resolution image) can deallocate.
+        onClose?()
     }
 }

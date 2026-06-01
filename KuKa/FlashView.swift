@@ -8,6 +8,7 @@ class FlashView: NSWindow {
             backing: .buffered,
             defer: false
         )
+        window.isReleasedWhenClosed = false
         window.level = .screenSaver
         window.isOpaque = false
         window.backgroundColor = .white
@@ -19,7 +20,7 @@ class FlashView: NSWindow {
             ctx.duration = 0.2
             window.animator().alphaValue = 0
         }, completionHandler: {
-            window.orderOut(nil)
+            window.close()
         })
     }
 }
