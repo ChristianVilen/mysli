@@ -20,14 +20,12 @@
 		A100000B /* CombineButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001D /* CombineButton.swift */; };
 		A100000C /* FlashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001E /* FlashView.swift */; };
 		A100000D /* WindowListProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001F /* WindowListProvider.swift */; };
-		A100000E /* ScrollWheelManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000021 /* ScrollWheelManager.swift */; };
 		A100000F /* WakeSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000022 /* WakeSession.swift */; };
 		A10000100 /* WakeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000023 /* WakeManager.swift */; };
 		A10000101 /* KeepAwakeController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000024 /* KeepAwakeController.swift */; };
 		A10000102 /* FloatingPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000025 /* FloatingPanel.swift */; };
 		B20000001 /* CaptureManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000011 /* CaptureManagerTests.swift */; };
 		B20000003 /* WindowListProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000013 /* WindowListProviderTests.swift */; };
-		B20000004 /* ScrollTransformTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000014 /* ScrollTransformTests.swift */; };
 		B20000005 /* WakeSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000015 /* WakeSessionTests.swift */; };
 		B20000002 /* Mocks.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000012 /* Mocks.swift */; };
 		B20000006 /* WakeManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000016 /* WakeManagerTests.swift */; };
@@ -62,12 +60,10 @@
 		A1000001D /* CombineButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CombineButton.swift; sourceTree = "<group>"; };
 		A1000001E /* FlashView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlashView.swift; sourceTree = "<group>"; };
 		A1000001F /* WindowListProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowListProvider.swift; sourceTree = "<group>"; };
-		A10000021 /* ScrollWheelManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScrollWheelManager.swift; sourceTree = "<group>"; };
 		A10000022 /* WakeSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WakeSession.swift; sourceTree = "<group>"; };
 		A10000023 /* WakeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WakeManager.swift; sourceTree = "<group>"; };
 		A10000024 /* KeepAwakeController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeepAwakeController.swift; sourceTree = "<group>"; };
 		A10000025 /* FloatingPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingPanel.swift; sourceTree = "<group>"; };
-		B20000014 /* ScrollTransformTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScrollTransformTests.swift; sourceTree = "<group>"; };
 		B20000015 /* WakeSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WakeSessionTests.swift; sourceTree = "<group>"; };
 		B20000010 /* KuKaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KuKaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B20000011 /* CaptureManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureManagerTests.swift; sourceTree = "<group>"; };
@@ -119,7 +115,6 @@
 				A1000001D /* CombineButton.swift */,
 				A1000001E /* FlashView.swift */,
 				A1000001F /* WindowListProvider.swift */,
-				A10000021 /* ScrollWheelManager.swift */,
 				A10000022 /* WakeSession.swift */,
 				A10000023 /* WakeManager.swift */,
 				A10000024 /* KeepAwakeController.swift */,
@@ -147,7 +142,6 @@
 			children = (
 				B20000011 /* CaptureManagerTests.swift */,
 				B20000013 /* WindowListProviderTests.swift */,
-				B20000014 /* ScrollTransformTests.swift */,
 				B20000015 /* WakeSessionTests.swift */,
 				B20000016 /* WakeManagerTests.swift */,
 				B20000017 /* KeepAwakeControllerTests.swift */,
@@ -251,7 +245,6 @@
 				A100000B /* CombineButton.swift in Sources */,
 				A100000C /* FlashView.swift in Sources */,
 				A100000D /* WindowListProvider.swift in Sources */,
-				A100000E /* ScrollWheelManager.swift in Sources */,
 				A100000F /* WakeSession.swift in Sources */,
 				A10000100 /* WakeManager.swift in Sources */,
 				A10000101 /* KeepAwakeController.swift in Sources */,
@@ -265,7 +258,6 @@
 			files = (
 				B20000001 /* CaptureManagerTests.swift in Sources */,
 				B20000003 /* WindowListProviderTests.swift in Sources */,
-				B20000004 /* ScrollTransformTests.swift in Sources */,
 				B20000005 /* WakeSessionTests.swift in Sources */,
 				B20000006 /* WakeManagerTests.swift in Sources */,
 				B20000007 /* KeepAwakeControllerTests.swift in Sources */,
