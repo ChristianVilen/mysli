@@ -40,16 +40,6 @@
                ReferencedContainer = "container:KuKa.xcodeproj">
             </BuildableReference>
          </TestableReference>
-         <TestableReference
-            skipped = "NO">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "C30000040"
-               BuildableName = "KuKaUITests.xctest"
-               BlueprintName = "KuKaUITests"
-               ReferencedContainer = "container:KuKa.xcodeproj">
-            </BuildableReference>
-         </TestableReference>
       </Testables>
    </TestAction>
    <LaunchAction

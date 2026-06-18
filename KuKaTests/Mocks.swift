@@ -74,3 +74,25 @@ class MockWindowListProvider: WindowListProvider {
         windows
     }
 }
+
+// MARK: - Fake Sleep Preventer
+
+class FakeSleepPreventer: SleepPreventing {
+    private(set) var beginCount = 0
+    private(set) var endCount = 0
+    private(set) var lastReason: String?
+    private(set) var isPreventing = false
+
+    func begin(reason: String) {
+        guard !isPreventing else { return }
+        isPreventing = true
+        beginCount += 1
+        lastReason = reason
+    }
+
+    func end() {
+        guard isPreventing else { return }
+        isPreventing = false
+        endCount += 1
+    }
+}

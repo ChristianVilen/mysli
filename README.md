@@ -15,7 +15,14 @@ A lightweight macOS menu bar app that replaces the default `Shift+Command+4` scr
 - Floating thumbnail preview after capture — click to annotate with freehand drawing
 - Delete screenshots from thumbnail or editor — removes file and clears clipboard
 - Launch at Login toggle
+- Keep Awake — stop the Mac from sleeping while a long task (such as an AI coding agent) runs, with a menu-bar toggle and timed sessions
 - Runs as a menu bar agent (no Dock icon)
+
+## Keep Awake
+
+Pick **Keep Awake For** a preset (30 minutes, 1, 2, or 4 hours, or "Until I turn it off") from the menu bar and Ku-Ka will keep your Mac from going to sleep while it's working through something long, like an overnight agent run. The menu-bar icon is tinted while it's on, and the menu shows how much time is left.
+
+It stops the system from sleeping but still lets the display turn off, so you're not burning the screen for nothing. One caveat: closing a laptop's lid still sleeps the Mac unless it's plugged in with an external display attached — no app can get around that. Keep the lid open or run it docked.
 
 ## Requirements
 

@@ -1,7 +1,7 @@
 import Cocoa
 import ServiceManagement
 
-class AppDelegate: NSObject, NSApplicationDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem!
     private let hotkeyManager = HotkeyManager()
     private let captureManager = CaptureManager()
@@ -14,10 +14,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var scrollInvertItem: NSMenuItem!
     private var scrollAccelItem: NSMenuItem!
     private var linesPerTickItems: [NSMenuItem] = []
+    private let keepAwake = KeepAwakeController()
 
     private let scrollInvertKey = "scrollInversionEnabled"
     private let scrollAccelKey = "scrollDisableAcceleration"
     private let scrollLinesKey = "scrollLinesPerTick"
+
+    func applicationWillTerminate(_ notification: Notification) {
+        keepAwake.deactivate()
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let isTesting = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
@@ -28,6 +33,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         setupMenuBar()
         setupThumbnailStack()
+        setupKeepAwake()
     }
 
     private func setupScrollWheel() {
@@ -57,14 +63,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func setupMenuBar() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        if let button = statusItem.button {
-            if let icon = NSImage(named: "MenuBarIcon") {
-                icon.size = NSSize(width: 18, height: 18)
-                button.image = icon
-            } else {
-                button.image = NSImage(systemSymbolName: "camera.viewfinder", accessibilityDescription: "Ku-Ka")
-            }
-        }
+        updateStatusItemIcon()
 
         let menu = NSMenu()
 
@@ -95,6 +94,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         menu.addItem(.separator())
+
+        // --- Keep Awake ---
+        keepAwake.buildMenuSection(into: menu)
 
         // --- Scroll Wheel ---
         let scrollLabel = NSMenuItem(title: "Scroll Wheel", action: nil, keyEquivalent: "")
@@ -163,6 +165,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let quitItem = NSMenuItem(title: "Quit Ku-Ka", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         menu.addItem(quitItem)
 
+        menu.delegate = self
         statusItem.menu = menu
     }
 
@@ -260,6 +263,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    private func setupKeepAwake() {
+        keepAwake.onStateChange = { [weak self] in self?.updateStatusItemIcon() }
+    }
+
     private func showThumbnail(result: CaptureResult, screen: NSScreen) {
         let duration = UserDefaults.standard.object(forKey: "thumbnailDuration") as? Double ?? 5.0
         thumbnailStack.add(image: result.image, result: result, screen: screen, duration: duration)
@@ -321,6 +328,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if scrollWheelManager.isRunning { scrollWheelManager.reload() }
     }
 
+    // MARK: - Keep Awake (menu delegate forwarding)
+
+    func menuWillOpen(_ menu: NSMenu) {
+        keepAwake.menuWillOpen()
+    }
+
+    func menuDidClose(_ menu: NSMenu) {
+        keepAwake.menuDidClose()
+    }
+
     @objc private func openReportBug() {
         NSWorkspace.shared.open(URL(string: "https://github.com/ChristianVilen/ku-ka/issues/new?labels=bug")!)
     }
@@ -343,5 +360,37 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         } catch {
             NSLog("Launch at login toggle failed: \(error)")
         }
+    }
+
+    private func updateStatusItemIcon() {
+        guard let button = statusItem.button else { return }
+        guard let base = NSImage(named: "MenuBarIcon") else {
+            button.image = NSImage(systemSymbolName: "camera.viewfinder", accessibilityDescription: "Ku-Ka")
+            return
+        }
+        let size = NSSize(width: 18, height: 18)
+
+        guard keepAwake.isActive else {
+            let icon = (base.copy() as? NSImage) ?? base
+            icon.size = size
+            icon.isTemplate = false
+            button.image = icon
+            return
+        }
+
+        // Active: keep the normal icon and add a small accent dot (with a light
+        // ring for contrast) in the bottom-right corner.
+        let badged = NSImage(size: size, flipped: false) { rect in
+            base.draw(in: rect)
+            let dot = NSRect(x: rect.maxX - 8, y: rect.minY + 1, width: 7, height: 7)
+            let ring = dot.insetBy(dx: -1.5, dy: -1.5)
+            NSColor.white.setFill()
+            NSBezierPath(ovalIn: ring).fill()
+            NSColor.controlAccentColor.setFill()
+            NSBezierPath(ovalIn: dot).fill()
+            return true
+        }
+        badged.isTemplate = false
+        button.image = badged
     }
 }
