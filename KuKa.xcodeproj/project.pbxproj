@@ -30,6 +30,8 @@
 		B20000002 /* Mocks.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000012 /* Mocks.swift */; };
 		B20000006 /* WakeManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000016 /* WakeManagerTests.swift */; };
 		B20000007 /* KeepAwakeControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000017 /* KeepAwakeControllerTests.swift */; };
+		B20000008 /* ThumbnailStackManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000018 /* ThumbnailStackManagerTests.swift */; };
+		B20000009 /* DrawingViewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000019 /* DrawingViewTests.swift */; };
 		E227F2EA2F51CF630032905B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E28DFEF72F4C8D93001B8D91 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
@@ -71,6 +73,8 @@
 		B20000013 /* WindowListProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowListProviderTests.swift; sourceTree = "<group>"; };
 		B20000016 /* WakeManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WakeManagerTests.swift; sourceTree = "<group>"; };
 		B20000017 /* KeepAwakeControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeepAwakeControllerTests.swift; sourceTree = "<group>"; };
+		B20000018 /* ThumbnailStackManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThumbnailStackManagerTests.swift; sourceTree = "<group>"; };
+		B20000019 /* DrawingViewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrawingViewTests.swift; sourceTree = "<group>"; };
 		E28DFEF72F4C8D93001B8D91 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -145,6 +149,8 @@
 				B20000015 /* WakeSessionTests.swift */,
 				B20000016 /* WakeManagerTests.swift */,
 				B20000017 /* KeepAwakeControllerTests.swift */,
+				B20000018 /* ThumbnailStackManagerTests.swift */,
+				B20000019 /* DrawingViewTests.swift */,
 				B20000012 /* Mocks.swift */,
 			);
 			path = KuKaTests;
@@ -261,6 +267,8 @@
 				B20000005 /* WakeSessionTests.swift in Sources */,
 				B20000006 /* WakeManagerTests.swift in Sources */,
 				B20000007 /* KeepAwakeControllerTests.swift in Sources */,
+				B20000008 /* ThumbnailStackManagerTests.swift in Sources */,
+				B20000009 /* DrawingViewTests.swift in Sources */,
 				B20000002 /* Mocks.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -288,7 +296,7 @@
 				ENABLE_TESTABILITY = YES;
 				ENABLE_TESTING_SEARCH_PATHS = YES;
 				INFOPLIST_FILE = KuKa/Info.plist;
-				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.kuka.screenshot;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
@@ -306,7 +314,7 @@
 				DEFINES_MODULE = YES;
 				ENABLE_TESTING_SEARCH_PATHS = YES;
 				INFOPLIST_FILE = KuKa/Info.plist;
-				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.kuka.screenshot;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
@@ -322,7 +330,7 @@
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				GCC_OPTIMIZATION_LEVEL = 0;
-				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = macosx;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
@@ -338,7 +346,7 @@
 				CLANG_ENABLE_OBJC_ARC = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				SDKROOT = macosx;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";

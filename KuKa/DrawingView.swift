@@ -19,27 +19,41 @@ class DrawingView: NSView {
         }
     }
 
+    /// Flatten the strokes onto the screenshot in a CGBitmapContext at the
+    /// source's pixel dimensions. Compositing via NSImage.lockFocus would
+    /// re-render at the screen's backing scale, doubling the pixel size.
     func compositeImage() -> NSImage {
-        let size = image.size
-        let result = NSImage(size: size)
-        result.lockFocus()
-        image.draw(in: NSRect(origin: .zero, size: size))
+        guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil),
+              let context = CGContext(
+                data: nil,
+                width: cgImage.width,
+                height: cgImage.height,
+                bitsPerComponent: 8,
+                bytesPerRow: 0,
+                space: cgImage.colorSpace ?? CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
+              ) else { return image }
 
-        let scaleX = size.width / bounds.width
-        let scaleY = size.height / bounds.height
+        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: cgImage.width, height: cgImage.height))
 
+        let scaleX = CGFloat(cgImage.width) / bounds.width
+        let scaleY = CGFloat(cgImage.height) / bounds.height
+
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: false)
         NSColor.red.setStroke()
         for stroke in strokes {
             let scaled = stroke.copy() as! NSBezierPath
-            let transform = AffineTransform(scaleByX: scaleX, byY: scaleY)
-            scaled.transform(using: transform)
+            scaled.transform(using: AffineTransform(scaleByX: scaleX, byY: scaleY))
             scaled.lineWidth = 3 * scaleX
             scaled.lineCapStyle = .round
             scaled.lineJoinStyle = .round
             scaled.stroke()
         }
-        result.unlockFocus()
-        return result
+        NSGraphicsContext.restoreGraphicsState()
+
+        guard let composited = context.makeImage() else { return image }
+        return NSImage(cgImage: composited, size: NSSize(width: composited.width, height: composited.height))
     }
 
     override func draw(_ dirtyRect: NSRect) {

@@ -26,7 +26,7 @@ It stops the system from sleeping but still lets the display turn off, so you're
 
 ## Requirements
 
-- macOS 13.0 (Ventura) or later
+- macOS 14.0 (Sonoma) or later
 - Xcode 15+ (to build)
 
 ## Installation
@@ -135,7 +135,7 @@ KuKa/
 ## Known Limitations
 
 - You must disable or accept that the system `Shift+Command+3` and `Shift+Command+4` are intercepted (the app suppresses the system shortcuts when running)
-- Requires macOS 13+ for `SMAppService` (launch at login)
+- Requires macOS 14+ for ScreenCaptureKit screenshot capture
 - No preferences UI for changing the shortcut keys
 
 ## Testing

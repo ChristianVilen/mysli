@@ -1,4 +1,5 @@
 import Cocoa
+import ScreenCaptureKit
 import UniformTypeIdentifiers
 
 // MARK: - Protocols
@@ -11,13 +12,13 @@ protocol FileManaging {
 }
 
 protocol ClipboardManaging {
-    func copyImage(tiffData: Data, pngData: Data)
+    func copyImage(tiffData: Data?, pngData: Data)
     func clearClipboard()
 }
 
 protocol ScreenCapturing {
-    func captureScreen(rect: CGRect) -> CGImage?
-    func captureWindow(windowID: CGWindowID) -> CGImage?
+    func captureScreen(rect: CGRect) async -> CGImage?
+    func captureWindow(windowID: CGWindowID) async -> CGImage?
 }
 
 // MARK: - Real Implementations
@@ -29,10 +30,12 @@ extension FileManager: FileManaging {
 }
 
 class SystemClipboard: ClipboardManaging {
-    func copyImage(tiffData: Data, pngData: Data) {
+    func copyImage(tiffData: Data?, pngData: Data) {
         let pb = NSPasteboard.general
         pb.clearContents()
-        pb.setData(tiffData, forType: .tiff)
+        if let tiffData {
+            pb.setData(tiffData, forType: .tiff)
+        }
         pb.setData(pngData, forType: .png)
     }
 
@@ -41,13 +44,87 @@ class SystemClipboard: ClipboardManaging {
     }
 }
 
+// MARK: - MemoryReclaim
+
+enum MemoryReclaim {
+    /// Ask libmalloc to return freed pages to the OS. Captures and combines
+    /// churn through image-sized buffers (raster, TIFF, PNG); once freed the
+    /// allocator keeps those pages as dirty cache, which Activity Monitor
+    /// counts as app memory. Scheduled with a delay so it runs after the
+    /// buffers are actually released (autorelease pools drained, panels
+    /// deallocated).
+    static func schedule(afterSeconds delay: TimeInterval = 1.0) {
+        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + delay) {
+            malloc_zone_pressure_relief(nil, 0)
+        }
+    }
+}
+
 class SystemScreenCapture: ScreenCapturing {
-    func captureScreen(rect: CGRect) -> CGImage? {
-        CGWindowListCreateImage(rect, .optionOnScreenOnly, kCGNullWindowID, .bestResolution)
+    /// `rect` is in CG global coordinates (top-left origin), same contract as
+    /// the old CGWindowListCreateImage-based implementation.
+    func captureScreen(rect: CGRect) async -> CGImage? {
+        guard let content = await shareableContent() else { return nil }
+        guard let display = content.displays.first(where: { $0.frame.contains(CGPoint(x: rect.midX, y: rect.midY)) })
+                ?? content.displays.first else {
+            NSLog("Ku-Ka: No display found for capture rect")
+            return nil
+        }
+
+        let sourceRect = CGRect(
+            x: rect.origin.x - display.frame.origin.x,
+            y: rect.origin.y - display.frame.origin.y,
+            width: rect.width,
+            height: rect.height
+        )
+        return await capture(filter: SCContentFilter(display: display, excludingWindows: []),
+                             sourceRect: sourceRect,
+                             pointSize: sourceRect.size,
+                             label: "Screen capture")
     }
 
-    func captureWindow(windowID: CGWindowID) -> CGImage? {
-        CGWindowListCreateImage(.null, .optionIncludingWindow, windowID, .bestResolution)
+    func captureWindow(windowID: CGWindowID) async -> CGImage? {
+        guard let content = await shareableContent() else { return nil }
+        guard let window = content.windows.first(where: { $0.windowID == windowID }) else {
+            NSLog("Ku-Ka: Window \(windowID) not found for capture")
+            return nil
+        }
+
+        let filter = SCContentFilter(desktopIndependentWindow: window)
+        return await capture(filter: filter,
+                             sourceRect: nil,
+                             pointSize: filter.contentRect.size,
+                             label: "Window capture")
+    }
+
+    private func shareableContent() async -> SCShareableContent? {
+        do {
+            return try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+        } catch {
+            NSLog("Ku-Ka: Shareable content lookup failed: \(error)")
+            return nil
+        }
+    }
+
+    /// Shared capture policy: cursor-free, best resolution, pixel size derived
+    /// from the filter's point-to-pixel scale.
+    private func capture(filter: SCContentFilter, sourceRect: CGRect?, pointSize: CGSize, label: String) async -> CGImage? {
+        let scale = CGFloat(filter.pointPixelScale)
+        let config = SCStreamConfiguration()
+        if let sourceRect {
+            config.sourceRect = sourceRect
+        }
+        config.width = Int(pointSize.width * scale)
+        config.height = Int(pointSize.height * scale)
+        config.showsCursor = false
+        config.captureResolution = .best
+
+        do {
+            return try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
+        } catch {
+            NSLog("Ku-Ka: \(label) failed: \(error)")
+            return nil
+        }
     }
 }
 
@@ -61,19 +138,27 @@ struct CaptureResult {
 // MARK: - CaptureManager
 
 class CaptureManager {
+    /// Images above this pixel count go on the pasteboard as PNG only. An
+    /// uncompressed TIFF costs ~4 bytes per pixel of transient allocation,
+    /// and every modern app reads PNG from the pasteboard.
+    static let defaultClipboardTIFFMaxPixels = 30_000_000
+
     let fileManager: FileManaging
     let clipboard: ClipboardManaging
     let screenCapture: ScreenCapturing
+    let clipboardTIFFMaxPixels: Int
 
     init(fileManager: FileManaging = FileManager.default,
          clipboard: ClipboardManaging = SystemClipboard(),
-         screenCapture: ScreenCapturing = SystemScreenCapture()) {
+         screenCapture: ScreenCapturing = SystemScreenCapture(),
+         clipboardTIFFMaxPixels: Int = CaptureManager.defaultClipboardTIFFMaxPixels) {
         self.fileManager = fileManager
         self.clipboard = clipboard
         self.screenCapture = screenCapture
+        self.clipboardTIFFMaxPixels = clipboardTIFFMaxPixels
     }
 
-    func captureFullScreen(screen: NSScreen) -> CaptureResult? {
+    func captureFullScreen(screen: NSScreen) async -> CaptureResult? {
         let screenFrame = screen.frame
         let primaryHeight = NSScreen.screens[0].frame.height
         let cgRect = CGRect(
@@ -83,23 +168,23 @@ class CaptureManager {
             height: screenFrame.height
         )
 
-        guard let cgImage = screenCapture.captureScreen(rect: cgRect) else {
+        guard let cgImage = await screenCapture.captureScreen(rect: cgRect) else {
             NSLog("Ku-Ka: Full screen capture returned nil")
             return nil
         }
 
-        return finalize(cgImage: cgImage)
+        return finalize(cgImage: cgImage, fileName: generateFileName())
     }
 
-    func captureWindow(windowID: CGWindowID, screen: NSScreen) -> CaptureResult? {
-        guard let cgImage = screenCapture.captureWindow(windowID: windowID) else {
+    func captureWindow(windowID: CGWindowID) async -> CaptureResult? {
+        guard let cgImage = await screenCapture.captureWindow(windowID: windowID) else {
             NSLog("Ku-Ka: Window capture returned nil")
             return nil
         }
-        return finalize(cgImage: cgImage)
+        return finalize(cgImage: cgImage, fileName: generateFileName())
     }
 
-    func capture(rect: CGRect, screen: NSScreen) -> CaptureResult? {
+    func capture(rect: CGRect, screen: NSScreen) async -> CaptureResult? {
         let screenFrame = screen.frame
         let cgRect = CGRect(
             x: screenFrame.origin.x + rect.origin.x,
@@ -108,48 +193,44 @@ class CaptureManager {
             height: rect.height
         )
 
-        guard let cgImage = screenCapture.captureScreen(rect: cgRect) else {
+        guard let cgImage = await screenCapture.captureScreen(rect: cgRect) else {
             NSLog("Ku-Ka: Screen capture returned nil")
             return nil
         }
 
-        return finalize(cgImage: cgImage)
+        return finalize(cgImage: cgImage, fileName: generateFileName())
     }
 
     /// Build the NSImage, persist, and copy to clipboard for a freshly captured
     /// CGImage. Clipboard data is generated from the CGImage in an autorelease
     /// pool so the long-lived NSImage never caches an uncompressed TIFF rep.
-    private func finalize(cgImage: CGImage) -> CaptureResult {
+    private func finalize(cgImage: CGImage, fileName: String) -> CaptureResult {
         let image = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
-        let fileURL = saveToDisk(cgImage: cgImage)
+        let fileURL = saveToDisk(cgImage: cgImage, fileName: fileName)
         copyToClipboard(cgImage: cgImage)
+        MemoryReclaim.schedule()
         return CaptureResult(image: image, fileURL: fileURL)
     }
 
     func saveAnnotated(image: NSImage, to url: URL) {
+        guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return }
         autoreleasepool {
-            guard let tiff = image.tiffRepresentation,
-                  let bitmap = NSBitmapImageRep(data: tiff),
-                  let png = bitmap.representation(using: .png, properties: [:]) else { return }
-            try? fileManager.writeImageData(png, to: url)
+            let bitmap = NSBitmapImageRep(cgImage: cgImage)
+            if let png = bitmap.representation(using: .png, properties: [:]) {
+                try? fileManager.writeImageData(png, to: url)
+            }
         }
-        copyToClipboard(image: image)
-    }
-
-    func copyToClipboard(image: NSImage) {
-        autoreleasepool {
-            guard let tiff = image.tiffRepresentation,
-                  let bitmap = NSBitmapImageRep(data: tiff),
-                  let png = bitmap.representation(using: .png, properties: [:]) else { return }
-            clipboard.copyImage(tiffData: tiff, pngData: png)
-        }
+        copyToClipboard(cgImage: cgImage)
+        MemoryReclaim.schedule()
     }
 
     func copyToClipboard(cgImage: CGImage) {
         autoreleasepool {
             let bitmap = NSBitmapImageRep(cgImage: cgImage)
-            guard let tiff = bitmap.representation(using: .tiff, properties: [:]),
-                  let png = bitmap.representation(using: .png, properties: [:]) else { return }
+            guard let png = bitmap.representation(using: .png, properties: [:]) else { return }
+            let tiff: Data? = cgImage.width * cgImage.height <= clipboardTIFFMaxPixels
+                ? bitmap.representation(using: .tiff, properties: [:])
+                : nil
             clipboard.copyImage(tiffData: tiff, pngData: png)
         }
     }
@@ -172,31 +253,32 @@ class CaptureManager {
         "Screenshot_\(dateString(for: date))_combined.png"
     }
 
+    /// Stack two captures vertically, composited in a CGBitmapContext at the
+    /// sources' pixel dimensions. Composing via NSImage.lockFocus would
+    /// re-render at the screen's backing scale, doubling the pixel size on
+    /// every combine (exponentially for repeated combines).
     func saveCombined(topImage: NSImage, bottomImage: NSImage) -> CaptureResult? {
-        let width = max(topImage.size.width, bottomImage.size.width)
-        let height = topImage.size.height + bottomImage.size.height
-        let combined = NSImage(size: NSSize(width: width, height: height))
+        guard let topCG = topImage.cgImage(forProposedRect: nil, context: nil, hints: nil),
+              let bottomCG = bottomImage.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return nil }
 
-        combined.lockFocus()
-        topImage.draw(in: NSRect(x: 0, y: bottomImage.size.height, width: topImage.size.width, height: topImage.size.height))
-        bottomImage.draw(in: NSRect(x: 0, y: 0, width: bottomImage.size.width, height: bottomImage.size.height))
-        combined.unlockFocus()
+        let width = max(topCG.width, bottomCG.width)
+        let height = topCG.height + bottomCG.height
 
-        let dir = screenshotsDirectory()
-        try? fileManager.createDirectory(at: dir, withIntermediateDirectories: true, attributes: nil)
-        let url = dir.appendingPathComponent(generateCombinedFileName())
+        guard let context = CGContext(
+            data: nil,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: topCG.colorSpace ?? CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
+        ) else { return nil }
 
-        let written: Bool = autoreleasepool {
-            guard let tiff = combined.tiffRepresentation,
-                  let bitmap = NSBitmapImageRep(data: tiff),
-                  let pngData = bitmap.representation(using: .png, properties: [:]) else { return false }
-            try? fileManager.writeImageData(pngData, to: url)
-            return true
-        }
-        guard written else { return nil }
-        copyToClipboard(image: combined)
+        context.draw(bottomCG, in: CGRect(x: 0, y: 0, width: bottomCG.width, height: bottomCG.height))
+        context.draw(topCG, in: CGRect(x: 0, y: bottomCG.height, width: topCG.width, height: topCG.height))
 
-        return CaptureResult(image: combined, fileURL: url)
+        guard let combined = context.makeImage() else { return nil }
+        return finalize(cgImage: combined, fileName: generateCombinedFileName())
     }
 
     func deleteScreenshot(at url: URL) {
@@ -204,11 +286,11 @@ class CaptureManager {
         clipboard.clearClipboard()
     }
 
-    private func saveToDisk(cgImage: CGImage) -> URL {
+    private func saveToDisk(cgImage: CGImage, fileName: String) -> URL {
         let dir = screenshotsDirectory()
         try? fileManager.createDirectory(at: dir, withIntermediateDirectories: true, attributes: nil)
 
-        let url = dir.appendingPathComponent(generateFileName())
+        let url = dir.appendingPathComponent(fileName)
 
         autoreleasepool {
             let bitmapRep = NSBitmapImageRep(cgImage: cgImage)

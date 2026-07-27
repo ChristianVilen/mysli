@@ -81,9 +81,9 @@ Shift+Cmd+4 → HotkeyManager (suppresses event) → AppDelegate.startCapture()
 
 ### Technical Requirements
 
-- **Language**: Swift 5, macOS 13.0+
-- **Frameworks**: AppKit, CoreGraphics, ServiceManagement
-- **Permissions**: Accessibility (CGEvent tap), Screen Recording (CGWindowListCreateImage)
+- **Language**: Swift 5, macOS 14.0+
+- **Frameworks**: AppKit, CoreGraphics, ScreenCaptureKit, ServiceManagement
+- **Permissions**: Accessibility (CGEvent tap), Screen Recording (ScreenCaptureKit)
 - **Launch at Login**: `SMAppService.mainApp.register()` / `unregister()`
 
 ---

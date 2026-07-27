@@ -5,6 +5,7 @@ class ThumbnailStackManager {
     var onEdit: ((CaptureResult) -> Void)?
     var onCombine: ((NSImage, NSImage) -> CaptureResult?)?
     var onDelete: ((CaptureResult) -> Void)?
+    var onStackEmptied: (() -> Void)?
     private var combineButtons: [CombineButton] = []
     private var currentDuration: TimeInterval = 5.0
     private var currentScreen: NSScreen?
@@ -43,6 +44,10 @@ class ThumbnailStackManager {
         // If back to 1, restart timer
         if entries.count == 1, currentDuration > 0 {
             entries[0].panel.startDismissTimer(duration: currentDuration)
+        }
+
+        if entries.isEmpty {
+            onStackEmptied?()
         }
 
         repositionAll(animated: true)
