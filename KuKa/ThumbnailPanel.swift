@@ -62,9 +62,15 @@ class ThumbnailPanel: FloatingPanel {
         container.addSubview(imageView)
 
         let closeSize: CGFloat = 20
+        // White glyph on a dark translucent circle so the buttons stay visible
+        // over light screenshot content.
+        let symbolConfig = NSImage.SymbolConfiguration(pointSize: closeSize - 4, weight: .regular)
+            .applying(.init(paletteColors: [.white, NSColor.black.withAlphaComponent(0.55)]))
+
         let closeButton = NSButton(frame: NSRect(x: size.width - closeSize - 4, y: size.height - closeSize - 4, width: closeSize, height: closeSize))
         closeButton.bezelStyle = .circular
-        closeButton.image = NSImage(systemSymbolName: "xmark.circle.fill", accessibilityDescription: "Close")
+        closeButton.image = NSImage(systemSymbolName: "xmark.circle.fill", accessibilityDescription: "Close")?
+            .withSymbolConfiguration(symbolConfig)
         closeButton.isBordered = false
         closeButton.target = self
         closeButton.action = #selector(dismissThumbnail)
@@ -72,7 +78,8 @@ class ThumbnailPanel: FloatingPanel {
 
         let deleteButton = NSButton(frame: NSRect(x: 4, y: size.height - closeSize - 4, width: closeSize, height: closeSize))
         deleteButton.bezelStyle = .circular
-        deleteButton.image = NSImage(systemSymbolName: "trash.circle.fill", accessibilityDescription: "Delete")
+        deleteButton.image = NSImage(systemSymbolName: "trash.circle.fill", accessibilityDescription: "Delete")?
+            .withSymbolConfiguration(symbolConfig)
         deleteButton.isBordered = false
         deleteButton.target = self
         deleteButton.action = #selector(deleteThumbnail)
