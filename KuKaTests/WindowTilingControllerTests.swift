@@ -201,4 +201,37 @@ final class WindowTilingControllerTests: XCTestCase {
         XCTAssertEqual(mock.setFrameCalls.count, 2)
         XCTAssertEqual(mock.setFrameCalls[1].frame, idealTarget)
     }
+
+    // MARK: - Center
+
+    func testCenterMovesWindowToScreenCenterKeepingItsSize() {
+        let mock = MockWindowControlling()
+        let controller = makeController(mock)
+        let visible = mainScreen.visibleFrame
+        let original = CGRect(x: visible.minX + 10, y: visible.minY + 10, width: 400, height: 300)
+
+        mock.focusedWindowToReturn = focusedWindow(frame: original)
+        mock.achievedFrameToReturn = original
+        controller.tile(.center)
+
+        XCTAssertEqual(mock.setFrameCalls.count, 1)
+        let expected = CGRect(
+            x: visible.midX - 200,
+            y: visible.midY - 150,
+            width: 400,
+            height: 300
+        )
+        XCTAssertEqual(mock.setFrameCalls[0].frame, expected)
+    }
+
+    func testCenterDoesNothingWhenWindowIsAtMaximizeSize() {
+        let mock = MockWindowControlling()
+        let controller = makeController(mock)
+        let visible = mainScreen.visibleFrame
+
+        mock.focusedWindowToReturn = focusedWindow(frame: visible)
+        controller.tile(.center)
+
+        XCTAssertTrue(mock.setFrameCalls.isEmpty)
+    }
 }

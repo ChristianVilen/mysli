@@ -1,25 +1,18 @@
 import CoreGraphics
 
-/// Two screen-related rules the tiling feature needs and the layout engine
-/// deliberately doesn't own: counting how many windows "belong" to a given
-/// screen (for `TilingContext.windowCount`), and picking which screen a
-/// window should be tiled against in the first place. Both work purely off
-/// `CGRect` geometry, with no AppKit or Accessibility dependency, so they
-/// stay easy to unit test.
+/// Screen-geometry rules the tiling feature needs and the layout engine
+/// deliberately doesn't own. Pure `CGRect` math with no AppKit or
+/// Accessibility dependency, so they stay easy to unit test.
 enum TilingScreenRules {
     /// Owner name of Stage Manager's strip/backdrop process. Its windows
     /// never count toward a screen's window count.
     static let stageManagerOwnerName = "WindowManager"
 
-    /// A window counts for `screenFrame` if the area of its intersection
-    /// with the screen is at least half the window's own area. Zero-area
-    /// windows never count. `windows` is expected to already be filtered by
-    /// the caller to on-screen, layer-0, non-Ku-Ka windows.
-    ///
-    /// v1 limitation: a window wider (or taller) than twice the screen it's
-    /// centered on will never clear the 50% threshold for any screen, so it
-    /// counts on none of them. Accepted for now — not a case we expect in
-    /// practice.
+    /// A window counts for `screenFrame` if at least half its own area
+    /// intersects it; zero-area windows never count. `windows` is expected
+    /// to already be filtered to on-screen, layer-0, non-Ku-Ka windows.
+    /// Accepted v1 limitation: a window wider than twice the screen never
+    /// clears the threshold, so it counts on no screen.
     static func windowCount(on screenFrame: CGRect, windows: [WindowInfo]) -> Int {
         windows.filter { window in
             guard window.ownerName != stageManagerOwnerName else { return false }
@@ -32,20 +25,27 @@ enum TilingScreenRules {
         }.count
     }
 
-    /// Picks the index of the screen `windowFrame` overlaps the most, for
-    /// deciding which screen to tile a window against. Ties break toward the
-    /// lowest index. Returns `nil` when `screenFrames` is empty or
-    /// `windowFrame` doesn't overlap any of them at all — the caller is
-    /// expected to fall back to a default screen (e.g. `NSScreen.main`) in
-    /// that case.
-    ///
-    /// This deliberately does not share `windowCount`'s "at least 50% of the
-    /// window's own area" rule. Counting is allowed to answer "this window
-    /// doesn't belong to any screen" — a window barely brushing an edge
-    /// shouldn't be counted anywhere. Picking a screen to tile against can't
-    /// afford that: a window has to move somewhere, so even a one-point
-    /// sliver of overlap is still the only candidate screen available, and
-    /// the picker has to return it rather than say "nowhere".
+    /// Index of the screen `windowFrame` overlaps the most; ties break
+    /// toward the lowest index. Nil when there's no overlap at all — the
+    /// caller falls back to a default screen. Deliberately not
+    /// `windowCount`'s 50% rule: a window has to be tiled somewhere, so even
+    /// a sliver of overlap makes that screen the answer.
+    /// Index of the screen next to `currentIndex` in `direction`, ordered by
+    /// horizontal center with wrap-around — so with two screens, either
+    /// direction gives the other one. Returns nil when there is no other
+    /// screen to hop to, or `currentIndex` is out of range.
+    static func adjacentScreenIndex(of currentIndex: Int, direction: HorizontalDirection, screenFrames: [CGRect]) -> Int? {
+        guard screenFrames.count >= 2, screenFrames.indices.contains(currentIndex) else { return nil }
+        // Explicit index tie-break: Swift's sort is not guaranteed stable,
+        // and the wrap-around math needs one total order.
+        let ordered = screenFrames.indices.sorted {
+            (screenFrames[$0].midX, $0) < (screenFrames[$1].midX, $1)
+        }
+        guard let position = ordered.firstIndex(of: currentIndex) else { return nil }
+        let step = direction == .left ? -1 : 1
+        return ordered[(position + step + ordered.count) % ordered.count]
+    }
+
     static func bestScreenIndex(for windowFrame: CGRect, screenFrames: [CGRect]) -> Int? {
         var bestIndex: Int?
         var bestArea: CGFloat = 0

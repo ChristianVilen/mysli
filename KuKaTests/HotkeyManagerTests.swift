@@ -31,6 +31,7 @@ final class HotkeyManagerTests: XCTestCase {
         (0x7B, .tile(.leftHalf), "left arrow"),
         (0x7C, .tile(.rightHalf), "right arrow"),
         (0x24, .tile(.maximize), "return"),
+        (0x08, .tile(.center), "c"),
     ]
     private let ctrlOption: CGEventFlags = [.maskControl, .maskAlternate]
 

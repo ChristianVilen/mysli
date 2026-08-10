@@ -129,4 +129,55 @@ final class TilingAdaptersTests: XCTestCase {
         XCTAssertEqual(TilingScreenRules.bestScreenIndex(for: window, screenFrames: screens), 0)
     }
 
+    // MARK: - TilingScreenRules.adjacentScreenIndex(of:direction:screenFrames:)
+
+    func testAdjacentScreenIndexWithTwoScreensEitherDirectionGivesTheOtherScreen() {
+        let screens = [screenA, screenB]
+        XCTAssertEqual(TilingScreenRules.adjacentScreenIndex(of: 0, direction: .left, screenFrames: screens), 1)
+        XCTAssertEqual(TilingScreenRules.adjacentScreenIndex(of: 0, direction: .right, screenFrames: screens), 1)
+        XCTAssertEqual(TilingScreenRules.adjacentScreenIndex(of: 1, direction: .left, screenFrames: screens), 0)
+        XCTAssertEqual(TilingScreenRules.adjacentScreenIndex(of: 1, direction: .right, screenFrames: screens), 0)
+    }
+
+    func testAdjacentScreenIndexWithThreeScreensStepsByHorizontalPosition() {
+        let screens = [
+            CGRect(x: 0, y: 0, width: 1000, height: 1000),
+            CGRect(x: 1000, y: 0, width: 1000, height: 1000),
+            CGRect(x: 2000, y: 0, width: 1000, height: 1000)
+        ]
+        XCTAssertEqual(TilingScreenRules.adjacentScreenIndex(of: 1, direction: .left, screenFrames: screens), 0)
+        XCTAssertEqual(TilingScreenRules.adjacentScreenIndex(of: 1, direction: .right, screenFrames: screens), 2)
+    }
+
+    func testAdjacentScreenIndexWrapsAroundAtTheEdges() {
+        let screens = [
+            CGRect(x: 0, y: 0, width: 1000, height: 1000),
+            CGRect(x: 1000, y: 0, width: 1000, height: 1000),
+            CGRect(x: 2000, y: 0, width: 1000, height: 1000)
+        ]
+        XCTAssertEqual(TilingScreenRules.adjacentScreenIndex(of: 0, direction: .left, screenFrames: screens), 2)
+        XCTAssertEqual(TilingScreenRules.adjacentScreenIndex(of: 2, direction: .right, screenFrames: screens), 0)
+    }
+
+    func testAdjacentScreenIndexOrdersByPositionNotArrayOrder() {
+        // The array lists the rightmost screen first — stepping right from
+        // the middle screen (index 2) must land on the geometrically next
+        // one (index 0), not follow array order.
+        let screens = [
+            CGRect(x: 2000, y: 0, width: 1000, height: 1000),
+            CGRect(x: 0, y: 0, width: 1000, height: 1000),
+            CGRect(x: 1000, y: 0, width: 1000, height: 1000)
+        ]
+        XCTAssertEqual(TilingScreenRules.adjacentScreenIndex(of: 2, direction: .right, screenFrames: screens), 0)
+        XCTAssertEqual(TilingScreenRules.adjacentScreenIndex(of: 2, direction: .left, screenFrames: screens), 1)
+    }
+
+    func testAdjacentScreenIndexReturnsNilWithSingleScreen() {
+        XCTAssertNil(TilingScreenRules.adjacentScreenIndex(of: 0, direction: .left, screenFrames: [screenA]))
+    }
+
+    func testAdjacentScreenIndexReturnsNilForOutOfRangeIndex() {
+        XCTAssertNil(TilingScreenRules.adjacentScreenIndex(of: 5, direction: .left, screenFrames: [screenA, screenB]))
+    }
+
 }

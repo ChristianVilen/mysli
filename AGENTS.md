@@ -12,7 +12,7 @@ A lightweight macOS app to replace the default `Shift+Command+4` selected area s
 - Floating thumbnail preview after capture — click to annotate with freehand drawing.
 - Delete screenshots from thumbnail or editor — removes file and clears clipboard.
 - Keep Awake — prevent the Mac from idle-sleeping from the menu bar, for a preset time (30m/1h/2h/4h) or until turned off, with an optional "keep display awake" preference.
-- Window tiling — `Ctrl+Option+Left/Right/Return` snaps the active window to the left half, right half, or full screen of its display (maximize toggles back to the previous frame). Stage Manager-aware, with a menu toggle to turn the hotkeys off.
+- Window tiling — `Ctrl+Option+Left/Right/Return/C` snaps the active window to the left half, right half, full screen, or center of its display (maximize toggles back to the previous frame; center keeps the window's size and does nothing when it's already maximize-sized). Pressing Left/Right again on an already-snapped window sends it to the same half of the next screen in that direction (wrapping — with two monitors, either direction reaches the other one). Stage Manager-aware, with a menu toggle to turn the hotkeys off.
 
 ---
 
@@ -41,8 +41,8 @@ KuKa/
 ├── KeepAwakeController.swift # Keep Awake menu section: state, countdown, persistence, notification
 ├── KeepAwakePanelView.swift # Inline menu panel: duration chips + display-awake checkbox
 ├── WindowTilingController.swift # @MainActor: ties tiling hotkeys to TilingLayoutEngine and AccessibilityWindowControl
-├── TilingLayoutEngine.swift  # Pure layout math: target frame + move/restore decision for left/right/maximize
-├── TilingScreenRules.swift # Screen-picking + windows-per-screen counting (for the Stage Manager check)
+├── TilingLayoutEngine.swift  # Pure layout math: target frame + move/restore/hop/center decision for left/right/maximize/center
+├── TilingScreenRules.swift # Screen-picking, adjacent-screen (hop) picking + windows-per-screen counting (for the Stage Manager check)
 ├── StageManagerDetector.swift # Reads the system Stage Manager on/off setting, fresh on every access
 ├── AccessibilityWindowControl.swift # AX-API glue: reads/moves the focused window, NS-space coordinates
 ├── ScreenCoordinates.swift   # Shared top-left (CG/AX) <-> bottom-left (NS) coordinate flip
@@ -55,7 +55,7 @@ KuKa/
 | Class | Responsibility |
 |-------|---------------|
 | `AppDelegate` | Menu bar icon, launch-at-login toggle, Window Tiling toggle (persisted as `windowTilingEnabled`), thumbnail duration setting, orchestrates the capture flow, multi-monitor overlay management |
-| `HotkeyManager` | `CGEvent.tapCreate` to intercept the screenshot combos (`Shift+Command+3/4`) and, while tiling is enabled, the tiling combos (`Ctrl+Option+Left/Right/Return`); routes everything through a single `onAction` callback with the `HotkeyAction` enum |
+| `HotkeyManager` | `CGEvent.tapCreate` to intercept the screenshot combos (`Shift+Command+3/4`) and, while tiling is enabled, the tiling combos (`Ctrl+Option+Left/Right/Return/C`); routes everything through a single `onAction` callback with the `HotkeyAction` enum |
 | `OverlayWindow` | Full-screen borderless `NSWindow` covering each display |
 | `SelectionView` | Mouse drag selection, dimmed background, real-time dimensions label |
 | `CaptureManager` | Protocol-based DI (`FileManaging`, `ClipboardManaging`, `ScreenCapturing`), PNG save to `~/Screenshots/`, clipboard copy, screenshot deletion |
@@ -70,8 +70,8 @@ KuKa/
 | `KeepAwakeController` | Keep Awake AppKit glue: builds the menu section, per-second countdown, persists the display preference, expiry notification |
 | `KeepAwakePanelView` | Custom `NSView` menu item: status line, duration chips (segmented control), "Keep display awake" checkbox |
 | `WindowTilingController` | `@MainActor`, thin orchestrator: reads the focused window, picks its screen, asks `TilingLayoutEngine` what to do, carries it out through `WindowControlling`; owns the pre-maximize saved-frame map |
-| `TilingLayoutEngine` | Pure, stateless layout math: target frame for left-half/right-half/maximize, and whether a maximize should move the window or restore its pre-maximize frame |
-| `TilingScreenRules` | Two screen-related rules: counts how many on-screen windows "belong" to a given screen (for the Stage Manager strip check), and picks which screen a window should be tiled against |
+| `TilingLayoutEngine` | Pure, stateless layout math: target frame for left-half/right-half/maximize/center, whether a maximize should move the window or restore its pre-maximize frame, whether a second half-press should hop to the adjacent screen, and whether a center press should do nothing (window already maximize-sized) |
+| `TilingScreenRules` | Screen-related rules: counts how many on-screen windows "belong" to a given screen (for the Stage Manager strip check), picks which screen a window should be tiled against, and picks the adjacent screen a second half-press hops to (ordered by horizontal center, wrapping) |
 | `StageManagerDetector` | Reads whether Stage Manager is turned on, fresh on every access (no caching, since the user can toggle it any time) |
 | `AccessibilityWindowControl` | Accessibility-API glue: reads the focused window's frame and moves/resizes it; converts between AX (top-left origin) and NS (bottom-left origin) coordinates |
 | `WindowListProvider` | Lists on-screen, layer-0 windows (excluding Ku-Ka's own) via `CGWindowListCopyWindowInfo`, converted to NS coordinates |
@@ -91,9 +91,9 @@ Shift+Cmd+4 → HotkeyManager (suppresses event) → AppDelegate.startCapture()
 → ThumbnailPanel shown (bottom-right, 5s timeout) → Click thumbnail → EditorWindow opens
 → Freehand drawing → Done → Overwrite PNG + Update clipboard
 
-Ctrl+Opt+Left/Right/Return → HotkeyManager (suppresses event; skipped entirely when the
+Ctrl+Opt+Left/Right/Return/C → HotkeyManager (suppresses event; skipped entirely when the
 "Window Tiling" menu toggle is off — keys pass through) → WindowTilingController.tile(action)
-→ TilingLayoutEngine.resolve(action, ...) decides move-and-save or restore
+→ TilingLayoutEngine.resolve(action, ...) decides move-and-save, restore, screen hop, or nothing
 → AccessibilityWindowControl.setFrame(...) moves the window
 ```
 
@@ -131,7 +131,7 @@ Ctrl+Opt+Left/Right/Return → HotkeyManager (suppresses event; skipped entirely
 ### Keyboard Shortcut
 - Uses `CGEvent.tapCreate` at `.cgSessionEventTap` to intercept key-down events globally.
 - Screenshot combos: keyCode `0x14` (3 key) and `0x15` (4 key) with `.maskShift` + `.maskCommand`.
-- Tiling combos: keyCode `0x7B` (Left), `0x7C` (Right), `0x24` (Return) with `.maskControl` + `.maskAlternate`. Command and Shift must be absent so these can't collide with the screenshot combos. Arrow keys carry extra flags (`.maskSecondaryFn`, `.maskNumericPad`), so the check is "required flags present, forbidden flags absent" rather than an exact match.
+- Tiling combos: keyCode `0x7B` (Left), `0x7C` (Right), `0x24` (Return), `0x08` (C) with `.maskControl` + `.maskAlternate`. Command and Shift must be absent so these can't collide with the screenshot combos. Arrow keys carry extra flags (`.maskSecondaryFn`, `.maskNumericPad`), so the check is "required flags present, forbidden flags absent" rather than an exact match.
 - All matches route through one `onAction` closure with the `HotkeyAction` enum (`.captureArea`, `.captureFullScreen`, `.tile(TilingAction)`).
 - The `tilingEnabled` flag gates the tiling combos: while off they are not matched at all and pass through to other apps. Screenshot combos are unaffected by the flag.
 - Returns `nil` to suppress the system screenshot tool.
@@ -205,8 +205,8 @@ When running under XCTest, `AppDelegate` skips hotkey registration and notificat
 - `saveAnnotated()` writes file and updates clipboard
 - `deleteScreenshot()` removes file and clears clipboard
 - Keep Awake: activation passes the display-awake flag to the preventer; toggling it mid-session swaps the assertion without ending the session; timed sessions expire and fire callbacks; the menu panel reflects state and the display preference persists across launches
-- Tiling layout math and the maximize/restore toggle, including apps that snap window sizes (`TilingLayoutEngine`)
-- Screen-membership and screen-picking rules (`TilingScreenRules`), and the controller's saved-frame map behavior across save/restore/failure (`WindowTilingController`)
+- Tiling layout math, the maximize/restore toggle (including apps that snap window sizes), the second-press screen hop, and center's move/no-op decision (`TilingLayoutEngine`)
+- Screen-membership, screen-picking, and adjacent-screen (hop) rules (`TilingScreenRules`), and the controller's saved-frame map behavior across save/restore/failure plus center pass-through (`WindowTilingController`)
 - Hotkey routing (`HotkeyManager`): tiling combos swallowed while enabled, passed through while disabled; screenshot combos work in both states
 
 ### Keep Awake implementation
@@ -220,7 +220,9 @@ When running under XCTest, `AppDelegate` skips hotkey registration and notificat
 
 - All layout math works on `visibleFrame` (menu bar and Dock excluded) in NS (bottom-left) coordinates.
 - Stage Manager insets on maximize: 7% of visible width on the left (`stageManagerLeftInsetFraction`), 2% of visible *height* on top, bottom, and right (`stageManagerEdgeInsetFraction`; height-based on all three so the gaps are equal in points). Applied only when Stage Manager is on **and** the screen has 2+ windows — with one window the strip hides itself. Half-screen tiling gets no inset.
-- Maximize/restore toggle: restore fires when the window's current frame matches the previously *achieved* frame (not the requested one) within 2 pt (`maximizeTolerance`). This handles apps like Terminal that snap sizes to a character grid.
+- Maximize/restore toggle: restore fires when the window's current frame matches the previously *achieved* frame (not the requested one) within 2 pt (`frameMatchTolerance`). This handles apps like Terminal that snap sizes to a character grid.
+- Screen hop: a Left/Right press on a window already sitting at that half's target (within the same 2 pt tolerance) moves it to the same half of the adjacent screen in that direction. Screens are ordered by horizontal center (`TilingScreenRules.adjacentScreenIndex`) and the step wraps, so with two monitors either direction reaches the other one. Judged against the ideal target, not an achieved frame — an app that snaps its size by more than 2 pt never hops and just gets the half re-applied (accepted).
+- Center (`Ctrl+Option+C`): moves the window to the middle of the visible frame keeping its size. Does nothing when the window's size already matches the maximize target's size within 2 pt (position is ignored); with the Stage Manager strip taking space, "maximize size" means the inset stage target.
 - Screen rules: a window "belongs" to a screen when at least 50% of its own area intersects it; Stage Manager's own windows (owner `"WindowManager"`) and zero-area windows are excluded from the count. A window is tiled against the screen it overlaps the most; ties go to the lowest index, and with no overlap the controller falls back to `NSScreen.main`, then the first screen.
 - AX safety: a 0.5 s `AXUIElementSetMessagingTimeout` cap stops a hung app from stalling the main thread; attributes are checked with `AXUIElementIsAttributeSettable` before writing; position is written before and after size for reliable edge snapping; the achieved frame is re-read and returned. Ku-Ka refuses to tile its own windows (pid check). Failures are only `NSLog`ged — no user feedback.
 - The `windowTilingEnabled` `UserDefaults` key defaults to on. `WindowTilingController.savedFrames` entries for closed windows are never cleaned up (accepted for v1).

@@ -108,17 +108,18 @@ class HotkeyManager {
             if keyCode == 0x15 { return .captureArea }
         }
 
-        // Tiling shortcuts: Ctrl+Option+Left/Right/Return. Arrow key events
-        // also carry .maskSecondaryFn and .maskNumericPad, so this only
-        // requires the two modifiers it cares about rather than matching the
-        // full flag set, and explicitly rules out Command/Shift so it can't
-        // collide with the screenshot shortcuts above.
+        // Tiling shortcuts: Ctrl+Option+Left/Right/Return/C. Arrow key
+        // events also carry .maskSecondaryFn and .maskNumericPad, so this
+        // only requires the two modifiers it cares about rather than
+        // matching the full flag set, and explicitly rules out Command/Shift
+        // so it can't collide with the screenshot shortcuts above.
         if tilingEnabled,
             flags.contains(.maskControl), flags.contains(.maskAlternate),
             !flags.contains(.maskCommand), !flags.contains(.maskShift) {
             if keyCode == 0x7B { return .tile(.leftHalf) }
             if keyCode == 0x7C { return .tile(.rightHalf) }
             if keyCode == 0x24 { return .tile(.maximize) }
+            if keyCode == 0x08 { return .tile(.center) }
         }
 
         return nil
