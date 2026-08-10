@@ -86,13 +86,22 @@ class FakeSleepPreventer: SleepPreventing {
     private(set) var beginCount = 0
     private(set) var endCount = 0
     private(set) var lastReason: String?
+    private(set) var lastKeepDisplayAwake: Bool?
     private(set) var isPreventing = false
+    /// One-shot failure switch for exercising assertion-creation failure.
+    var failNextBegin = false
 
-    func begin(reason: String) {
-        guard !isPreventing else { return }
+    func begin(reason: String, keepDisplayAwake: Bool) -> Bool {
+        guard !isPreventing else { return true }
+        if failNextBegin {
+            failNextBegin = false
+            return false
+        }
         isPreventing = true
         beginCount += 1
         lastReason = reason
+        lastKeepDisplayAwake = keepDisplayAwake
+        return true
     }
 
     func end() {

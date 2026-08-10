@@ -2,9 +2,12 @@ import XCTest
 @testable import KuKa
 
 final class KeepAwakeControllerTests: XCTestCase {
+    private static let defaultsSuite = "KeepAwakeControllerTests"
+
     private var clock: Date!
     private var preventer: FakeSleepPreventer!
     private var manager: WakeManager!
+    private var defaults: UserDefaults!
     private var controller: KeepAwakeController!
     private var menu: NSMenu!
 
@@ -13,30 +16,37 @@ final class KeepAwakeControllerTests: XCTestCase {
         clock = Date(timeIntervalSince1970: 1_000_000)
         preventer = FakeSleepPreventer()
         manager = WakeManager(preventer: preventer, now: { self.clock })
-        controller = KeepAwakeController(wakeManager: manager, now: { self.clock })
+        defaults = UserDefaults(suiteName: Self.defaultsSuite)!
+        defaults.removePersistentDomain(forName: Self.defaultsSuite)
+        controller = KeepAwakeController(wakeManager: manager, now: { self.clock }, defaults: defaults)
         menu = NSMenu()
         controller.buildMenuSection(into: menu)
     }
 
-    // MARK: - Menu lookups
+    // MARK: - Panel lookups
 
-    /// The "Keep Awake For" submenu is the only section item carrying a submenu.
-    private var presetSubmenu: NSMenu {
-        menu.items.first { $0.submenu != nil }!.submenu!
-    }
-
-    private func preset(_ title: String) -> NSMenuItem {
-        presetSubmenu.items.first { $0.title == title }!
-    }
+    private var panel: KeepAwakePanelView { controller.panelView }
 
     private var turnOffItem: NSMenuItem {
         menu.items.first { $0.title == "Turn Off" }!
     }
 
-    /// The header is the disabled, actionless item directly before "Turn Off".
-    private var headerItem: NSMenuItem {
-        let turnOffIndex = menu.items.firstIndex(of: turnOffItem)!
-        return menu.items[turnOffIndex - 1]
+    /// Chip indices follow `KeepAwakeController.presets` order.
+    private func chipIndex(_ chip: String) -> Int {
+        KeepAwakeController.presets.firstIndex { $0.chip == chip }!
+    }
+
+    /// Drives the panel's segmented control exactly as a click would.
+    private func clickChip(_ chip: String) {
+        panel.durationControl.selectedSegment = chipIndex(chip)
+        panel.durationClicked(panel.durationControl)
+    }
+
+    /// Flips the checkbox and fires its action, as a click would.
+    private func toggleDisplayCheckbox() {
+        let box = panel.displayAwakeCheckbox
+        box.state = box.state == .on ? .off : .on
+        panel.displayAwakeToggled(box)
     }
 
     /// Invokes an item's target/action exactly as a click would, without
@@ -47,44 +57,40 @@ final class KeepAwakeControllerTests: XCTestCase {
 
     // MARK: - Initial state
 
-    func testInactiveSectionHidesStatusAndChecksNothing() {
+    func testInactiveSectionShowsIdleTitleAndNoSelection() {
         XCTAssertFalse(controller.isActive)
-        XCTAssertTrue(headerItem.isHidden)
+        XCTAssertEqual(panel.titleLabel.stringValue, "Keep Awake")
+        XCTAssertEqual(panel.durationControl.selectedSegment, -1)
         XCTAssertTrue(turnOffItem.isHidden)
-        XCTAssertTrue(presetSubmenu.items.allSatisfy { $0.state == .off })
     }
 
-    // MARK: - Selecting presets (exercises representedObject decode)
+    // MARK: - Clicking chips (exercises index → preset decode)
 
-    func testClickingIndefinitePresetActivatesAndChecksIt() {
-        click(preset("Until I turn it off"))
+    func testClickingIndefiniteChipActivatesAndSelectsIt() {
+        clickChip("∞")
 
         XCTAssertTrue(controller.isActive)
         XCTAssertEqual(preventer.beginCount, 1)
-        XCTAssertFalse(headerItem.isHidden)
         XCTAssertFalse(turnOffItem.isHidden)
-        XCTAssertEqual(headerItem.title, "☕ Awake · On")
-        XCTAssertEqual(preset("Until I turn it off").state, .on)
-        XCTAssertEqual(preset("1 hour").state, .off)
+        XCTAssertEqual(panel.titleLabel.stringValue, "☕ Awake · On")
+        XCTAssertEqual(panel.durationControl.selectedSegment, chipIndex("∞"))
     }
 
-    func testActivateTimedChecksMatchingPresetAndShowsCountdown() {
+    func testActivateTimedSelectsMatchingChipAndShowsCountdown() {
         controller.activate(.timed(30 * 60))
 
         XCTAssertTrue(controller.isActive)
-        XCTAssertEqual(preset("30 minutes").state, .on)
-        XCTAssertEqual(preset("1 hour").state, .off)
-        XCTAssertEqual(preset("Until I turn it off").state, .off)
-        XCTAssertEqual(headerItem.title, "☕ Awake · 30 min left")
+        XCTAssertEqual(panel.durationControl.selectedSegment, chipIndex("30m"))
+        XCTAssertEqual(panel.titleLabel.stringValue, "☕ Awake · 30 min left")
     }
 
-    func testCountdownHeaderTracksTheInjectedClock() {
+    func testCountdownTitleTracksTheInjectedClock() {
         controller.activate(.timed(60 * 60))
-        XCTAssertEqual(headerItem.title, "☕ Awake · 1h left")
+        XCTAssertEqual(panel.titleLabel.stringValue, "☕ Awake · 1h left")
 
         clock = clock.addingTimeInterval(15 * 60)
-        controller.menuWillOpen() // refreshes the header on open
-        XCTAssertEqual(headerItem.title, "☕ Awake · 45 min left")
+        controller.menuWillOpen() // refreshes the title on open
+        XCTAssertEqual(panel.titleLabel.stringValue, "☕ Awake · 45 min left")
         controller.menuDidClose()
     }
 
@@ -96,18 +102,40 @@ final class KeepAwakeControllerTests: XCTestCase {
 
         XCTAssertFalse(controller.isActive)
         XCTAssertEqual(preventer.endCount, 1)
-        XCTAssertTrue(headerItem.isHidden)
         XCTAssertTrue(turnOffItem.isHidden)
-        XCTAssertTrue(presetSubmenu.items.allSatisfy { $0.state == .off })
+        XCTAssertEqual(panel.titleLabel.stringValue, "Keep Awake")
+        XCTAssertEqual(panel.durationControl.selectedSegment, -1)
     }
 
-    func testSwitchingPresetMovesTheCheckmark() {
-        controller.activate(.timed(60 * 60))
-        XCTAssertEqual(preset("1 hour").state, .on)
+    func testSwitchingChipMovesSelection() {
+        clickChip("1h")
+        XCTAssertEqual(panel.durationControl.selectedSegment, chipIndex("1h"))
 
-        controller.activate(.timed(120 * 60))
-        XCTAssertEqual(preset("1 hour").state, .off)
-        XCTAssertEqual(preset("2 hours").state, .on)
+        clickChip("2h")
+        XCTAssertEqual(panel.durationControl.selectedSegment, chipIndex("2h"))
+        XCTAssertEqual(manager.session?.duration, .timed(120 * 60))
+    }
+
+    // MARK: - Keep display awake preference
+
+    func testDisplayAwakeDefaultsToOn() {
+        XCTAssertEqual(panel.displayAwakeCheckbox.state, .on)
+        XCTAssertTrue(manager.keepDisplayAwake)
+
+        clickChip("∞")
+        XCTAssertEqual(preventer.lastKeepDisplayAwake, true)
+    }
+
+    func testTogglingDisplayCheckboxUpdatesManagerAndPersists() {
+        toggleDisplayCheckbox()
+
+        XCTAssertFalse(manager.keepDisplayAwake)
+        XCTAssertEqual(defaults.object(forKey: KeepAwakeController.displayAwakeDefaultsKey) as? Bool, false)
+
+        // A fresh controller (fresh app launch) reads the persisted value.
+        let newManager = WakeManager(preventer: FakeSleepPreventer(), now: { self.clock })
+        _ = KeepAwakeController(wakeManager: newManager, now: { self.clock }, defaults: defaults)
+        XCTAssertFalse(newManager.keepDisplayAwake)
     }
 
     // MARK: - State-change hook (drives the status-bar icon)

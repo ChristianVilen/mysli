@@ -24,6 +24,7 @@
 		A10000100 /* WakeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000023 /* WakeManager.swift */; };
 		A10000101 /* KeepAwakeController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000024 /* KeepAwakeController.swift */; };
 		A10000102 /* FloatingPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000025 /* FloatingPanel.swift */; };
+		A10000103 /* KeepAwakePanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000026 /* KeepAwakePanelView.swift */; };
 		B20000001 /* CaptureManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000011 /* CaptureManagerTests.swift */; };
 		B20000003 /* WindowListProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000013 /* WindowListProviderTests.swift */; };
 		B20000005 /* WakeSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000015 /* WakeSessionTests.swift */; };
@@ -66,6 +67,7 @@
 		A10000023 /* WakeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WakeManager.swift; sourceTree = "<group>"; };
 		A10000024 /* KeepAwakeController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeepAwakeController.swift; sourceTree = "<group>"; };
 		A10000025 /* FloatingPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingPanel.swift; sourceTree = "<group>"; };
+		A10000026 /* KeepAwakePanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeepAwakePanelView.swift; sourceTree = "<group>"; };
 		B20000015 /* WakeSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WakeSessionTests.swift; sourceTree = "<group>"; };
 		B20000010 /* KuKaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KuKaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B20000011 /* CaptureManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureManagerTests.swift; sourceTree = "<group>"; };
@@ -123,6 +125,7 @@
 				A10000023 /* WakeManager.swift */,
 				A10000024 /* KeepAwakeController.swift */,
 				A10000025 /* FloatingPanel.swift */,
+				A10000026 /* KeepAwakePanelView.swift */,
 				A1000001A /* DrawingView.swift */,
 				A1000001B /* EditorWindow.swift */,
 				A10000017 /* Info.plist */,
@@ -255,6 +258,7 @@
 				A10000100 /* WakeManager.swift in Sources */,
 				A10000101 /* KeepAwakeController.swift in Sources */,
 				A10000102 /* FloatingPanel.swift in Sources */,
+				A10000103 /* KeepAwakePanelView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

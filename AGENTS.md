@@ -11,6 +11,7 @@ A lightweight macOS app to replace the default `Shift+Command+4` selected area s
 - Copy the screenshot to the clipboard.
 - Floating thumbnail preview after capture — click to annotate with freehand drawing.
 - Delete screenshots from thumbnail or editor — removes file and clears clipboard.
+- Keep Awake — prevent the Mac from idle-sleeping from the menu bar, for a preset time (30m/1h/2h/4h) or until turned off, with an optional "keep display awake" preference.
 
 ---
 
@@ -29,9 +30,15 @@ KuKa/
 ├── FlashView.swift      # White flash animation on screen after full-screen capture
 ├── ThumbnailPanel.swift # Floating preview panel in bottom-right corner after capture
 ├── ThumbnailStackManager.swift # Manages stacking of multiple thumbnail panels
+├── FloatingPanel.swift  # Base class for borderless floating panels (thumbnails, combine button)
 ├── CombineButton.swift  # Floating "Combine" button between adjacent thumbnails
 ├── DrawingView.swift    # NSView for freehand red drawing on screenshot image
 ├── EditorWindow.swift   # Centered modal window for annotating screenshots
+├── WindowListProvider.swift # Enumerates on-screen windows for window capture
+├── WakeSession.swift    # Pure model of a keep-awake session (duration, expiry)
+├── WakeManager.swift    # Keep-awake orchestration + IOKit power assertion seam
+├── KeepAwakeController.swift # Keep Awake menu section: state, countdown, persistence, notification
+├── KeepAwakePanelView.swift # Inline menu panel: duration chips + display-awake checkbox
 ├── Info.plist           # LSUIElement=true, NSScreenCaptureUsageDescription
 └── KuKa.entitlements    # Sandbox disabled (required for CGEvent tap + screen capture)
 ```
@@ -51,6 +58,10 @@ KuKa/
 | `CombineButton` | Floating "Combine" button with liquid glass visual, appears between adjacent thumbnails for merging two screenshots into one |
 | `DrawingView` | Freehand red drawing on screenshot, undo support, composites final image |
 | `EditorWindow` | Centered modal for annotation with Undo, Delete, and Done buttons |
+| `WakeSession` | Pure, side-effect-free session model; all time queries take an explicit `now` |
+| `WakeManager` | Drives the `SleepPreventing` seam (IOKit power assertion), expiry timer, `keepDisplayAwake` mode |
+| `KeepAwakeController` | Keep Awake AppKit glue: builds the menu section, per-second countdown, persists the display preference, expiry notification |
+| `KeepAwakePanelView` | Custom `NSView` menu item: status line, duration chips (segmented control), "Keep display awake" checkbox |
 
 ### Flow
 
@@ -134,7 +145,13 @@ Shift+Cmd+4 → HotkeyManager (suppresses event) → AppDelegate.startCapture()
 ```
 KuKaTests/                    # Unit tests (XCTest, macOS 14.0+)
 ├── CaptureManagerTests.swift # Tests for capture, save, clipboard, coordinate conversion, file naming
-└── Mocks.swift               # MockFileManager, MockClipboard, MockScreenCapture
+├── DrawingViewTests.swift    # Tests for freehand drawing and image compositing
+├── ThumbnailStackManagerTests.swift # Tests for thumbnail stacking and timer logic
+├── WindowListProviderTests.swift # Tests for window enumeration
+├── WakeSessionTests.swift    # Tests for the pure keep-awake session model
+├── WakeManagerTests.swift    # Tests for keep-awake orchestration against a fake preventer
+├── KeepAwakeControllerTests.swift # Tests for the Keep Awake menu section and persistence
+└── Mocks.swift               # MockFileManager, MockClipboard, MockScreenCapture, FakeSleepPreventer
 
 KuKaUITests/                  # UI tests (XCUITest, macOS 14.0+)
 └── MenuBarTests.swift        # Menu bar icon, menu items, thumbnail duration selection
@@ -160,6 +177,14 @@ When running under XCTest, `AppDelegate` skips hotkey registration and notificat
 - File naming format: `Screenshot_YYYY-MM-DD_at_HH-MM-SS.png`
 - `saveAnnotated()` writes file and updates clipboard
 - `deleteScreenshot()` removes file and clears clipboard
+- Keep Awake: activation passes the display-awake flag to the preventer; toggling it mid-session swaps the assertion without ending the session; timed sessions expire and fire callbacks; the menu panel reflects state and the display preference persists across launches
+
+### Keep Awake implementation
+
+- `IOKitSleepPreventer` creates an IOKit power assertion: `PreventUserIdleDisplaySleep` when "Keep display awake" is on (display and system both stay awake), `PreventUserIdleSystemSleep` when off (system stays awake, display sleeps and locks on its normal schedule).
+- Lid-close sleep is never prevented; the menu hint says so.
+- The display-awake preference lives in `UserDefaults` under `keepDisplayAwake`, default on.
+- The menu UI is an inline custom-view panel (no submenu): one row of duration chips plus the checkbox; Turn Off appears below while a session is active.
 
 ### UI Test Coverage
 

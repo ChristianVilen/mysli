@@ -74,6 +74,70 @@ final class WakeManagerTests: XCTestCase {
         XCTAssertTrue(expired)
     }
 
+    // MARK: - Keep display awake
+
+    func testActivateDefaultsToSystemOnlyAssertion() {
+        manager.activate(.indefinite)
+
+        XCTAssertEqual(preventer.lastKeepDisplayAwake, false)
+    }
+
+    func testActivatePassesDisplayAwakeFlagToPreventer() {
+        manager.keepDisplayAwake = true
+        manager.activate(.indefinite)
+
+        XCTAssertEqual(preventer.lastKeepDisplayAwake, true)
+    }
+
+    func testTogglingDisplayAwakeMidSessionSwapsAssertionWithoutEndingSession() {
+        manager.activate(.timed(3600))
+        manager.keepDisplayAwake = true
+
+        XCTAssertEqual(preventer.endCount, 1)
+        XCTAssertEqual(preventer.beginCount, 2)
+        XCTAssertEqual(preventer.lastKeepDisplayAwake, true)
+        XCTAssertTrue(manager.isActive)
+        XCTAssertEqual(manager.session?.duration, .timed(3600))
+    }
+
+    func testTogglingDisplayAwakeWhileInactiveDoesNotTouchPreventer() {
+        manager.keepDisplayAwake = true
+
+        XCTAssertEqual(preventer.beginCount, 0)
+        XCTAssertEqual(preventer.endCount, 0)
+    }
+
+    func testFailedActivationDoesNotStartSession() {
+        preventer.failNextBegin = true
+        var stateChanges = 0
+        manager.onStateChange = { stateChanges += 1 }
+
+        manager.activate(.indefinite)
+
+        XCTAssertFalse(manager.isActive)
+        XCTAssertEqual(preventer.beginCount, 0)
+        XCTAssertEqual(stateChanges, 0)
+    }
+
+    func testFailedMidSessionSwapDeactivates() {
+        manager.activate(.indefinite)
+        preventer.failNextBegin = true
+
+        manager.keepDisplayAwake = true
+
+        XCTAssertFalse(manager.isActive)
+        XCTAssertEqual(preventer.endCount, 1)
+        XCTAssertNil(manager.session)
+    }
+
+    func testSettingSameDisplayAwakeValueMidSessionDoesNothing() {
+        manager.activate(.indefinite)
+        manager.keepDisplayAwake = false
+
+        XCTAssertEqual(preventer.beginCount, 1)
+        XCTAssertEqual(preventer.endCount, 0)
+    }
+
     func testSwitchingToIndefiniteCancelsExpiryTimer() {
         var expired = false
         manager.onExpire = { expired = true }

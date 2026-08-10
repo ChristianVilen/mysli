@@ -2,28 +2,30 @@ import Cocoa
 import UserNotifications
 
 /// Owns the "Keep Awake" menu section and drives a `WakeManager`: builds the
-/// menu items, reflects session state (countdown header, preset checkmarks),
-/// runs the per-second countdown while the menu is open, and posts the expiry
-/// notification. Keeping all of the feature's AppKit glue here lets
+/// inline panel (status line, duration chips, display checkbox) plus the
+/// Turn Off item, reflects session state, runs the per-second countdown while
+/// the menu is open, persists the display-awake preference, and posts the
+/// expiry notification. Keeping all of the feature's AppKit glue here lets
 /// `AppDelegate` stay a thin coordinator.
 final class KeepAwakeController: NSObject {
-    /// Selectable keep-awake durations, in menu order. The `WakeDuration` is
-    /// carried directly on each item's `representedObject`, so there is no
-    /// separate tag encoding to keep in sync.
-    private static let presets: [(title: String, duration: WakeDuration)] = [
-        ("30 minutes", .timed(30 * 60)),
-        ("1 hour", .timed(60 * 60)),
-        ("2 hours", .timed(120 * 60)),
-        ("4 hours", .timed(240 * 60)),
-        ("Until I turn it off", .indefinite),
+    /// Selectable keep-awake durations, in chip order. The chip index is the
+    /// only identifier that travels through the panel's callback.
+    static let presets: [(chip: String, duration: WakeDuration)] = [
+        ("30m", .timed(30 * 60)),
+        ("1h", .timed(60 * 60)),
+        ("2h", .timed(120 * 60)),
+        ("4h", .timed(240 * 60)),
+        ("∞", .indefinite),
     ]
+
+    static let displayAwakeDefaultsKey = "keepDisplayAwake"
 
     private let wakeManager: WakeManager
     private let now: () -> Date
+    private let defaults: UserDefaults
 
-    private var headerItem: NSMenuItem?
-    private var turnOffItem: NSMenuItem?
-    private var presetItems: [NSMenuItem] = []
+    let panelView: KeepAwakePanelView
+    private let turnOffItem: NSMenuItem
     private var countdownTimer: Timer?
     private var hasRequestedNotificationAuth = false
 
@@ -33,10 +35,22 @@ final class KeepAwakeController: NSObject {
 
     var isActive: Bool { wakeManager.isActive }
 
-    init(wakeManager: WakeManager = WakeManager(), now: @escaping () -> Date = { Date() }) {
+    init(wakeManager: WakeManager = WakeManager(),
+         now: @escaping () -> Date = { Date() },
+         defaults: UserDefaults = .standard) {
         self.wakeManager = wakeManager
         self.now = now
+        self.defaults = defaults
+        panelView = KeepAwakePanelView(presets: Self.presets)
+        turnOffItem = NSMenuItem(title: "Turn Off", action: #selector(turnOff(_:)), keyEquivalent: "")
         super.init()
+        turnOffItem.target = self
+        turnOffItem.isHidden = true
+        panelView.onSelectDuration = { [weak self] duration in self?.select(duration) }
+        panelView.onToggleDisplayAwake = { [weak self] isOn in self?.setDisplayAwake(isOn) }
+        // Defaults to on: a dark, locked screen reads as "the feature didn't
+        // work", so keeping the display awake is the least surprising default.
+        wakeManager.keepDisplayAwake = defaults.object(forKey: Self.displayAwakeDefaultsKey) as? Bool ?? true
         wakeManager.onStateChange = { [weak self] in self?.handleStateChange() }
         wakeManager.onExpire = { [weak self] in self?.notifyEnded() }
     }
@@ -46,44 +60,21 @@ final class KeepAwakeController: NSObject {
         wakeManager.deactivate()
     }
 
-    /// Starts a keep-awake session. The non-UI activation path; `selectDuration`
-    /// layers the notification-permission prompt on top of this.
+    /// Starts a keep-awake session. The non-UI activation path; chip clicks
+    /// layer the notification-permission prompt on top of this.
     func activate(_ duration: WakeDuration) {
         wakeManager.activate(duration)
     }
 
     // MARK: - Menu construction
 
-    /// Appends the full "Keep Awake" section (label, status header, Turn Off,
-    /// preset submenu, lid hint, and a trailing separator) to `menu`.
+    /// Appends the full "Keep Awake" section (inline panel, Turn Off, lid
+    /// hint, and a trailing separator) to `menu`.
     func buildMenuSection(into menu: NSMenu) {
-        let label = NSMenuItem(title: "Keep Awake", action: nil, keyEquivalent: "")
-        label.isEnabled = false
-        menu.addItem(label)
-
-        let header = NSMenuItem(title: "", action: nil, keyEquivalent: "")
-        header.isEnabled = false
-        header.isHidden = true
-        menu.addItem(header)
-        headerItem = header
-
-        let turnOff = NSMenuItem(title: "Turn Off", action: #selector(turnOff(_:)), keyEquivalent: "")
-        turnOff.target = self
-        turnOff.isHidden = true
-        menu.addItem(turnOff)
-        turnOffItem = turnOff
-
-        let forItem = NSMenuItem(title: "Keep Awake For", action: nil, keyEquivalent: "")
-        let submenu = NSMenu()
-        for preset in Self.presets {
-            let item = NSMenuItem(title: preset.title, action: #selector(selectDuration(_:)), keyEquivalent: "")
-            item.target = self
-            item.representedObject = preset.duration
-            submenu.addItem(item)
-            presetItems.append(item)
-        }
-        forItem.submenu = submenu
-        menu.addItem(forItem)
+        let panelItem = NSMenuItem()
+        panelItem.view = panelView
+        menu.addItem(panelItem)
+        menu.addItem(turnOffItem)
 
         let hint = NSMenuItem(title: "Closing the lid still sleeps your Mac", action: nil, keyEquivalent: "")
         hint.isEnabled = false
@@ -119,14 +110,18 @@ final class KeepAwakeController: NSObject {
 
     // MARK: - Actions
 
-    @objc private func selectDuration(_ sender: NSMenuItem) {
-        guard let duration = sender.representedObject as? WakeDuration else { return }
-        // Only timed sessions post an expiry notification, so request permission
-        // (once) only for them.
+    private func select(_ duration: WakeDuration) {
+        // Only timed sessions post an expiry notification, so request
+        // permission (once) only for them.
         if case .timed = duration {
             requestNotificationAuthIfNeeded()
         }
         activate(duration)
+    }
+
+    private func setDisplayAwake(_ isOn: Bool) {
+        defaults.set(isOn, forKey: Self.displayAwakeDefaultsKey)
+        wakeManager.keepDisplayAwake = isOn
     }
 
     @objc private func turnOff(_ sender: NSMenuItem) {
@@ -142,21 +137,20 @@ final class KeepAwakeController: NSObject {
 
     private func updateMenu() {
         let session = wakeManager.session
-        headerItem?.isHidden = session == nil
-        turnOffItem?.isHidden = session == nil
+        turnOffItem.isHidden = session == nil
 
         if let session {
             if let remaining = session.remaining(now: now()) {
-                headerItem?.title = "☕ Awake · \(Self.formatRemaining(remaining))"
+                panelView.titleLabel.stringValue = "☕ Awake · \(Self.formatRemaining(remaining))"
             } else {
-                headerItem?.title = "☕ Awake · On"
+                panelView.titleLabel.stringValue = "☕ Awake · On"
             }
+        } else {
+            panelView.titleLabel.stringValue = "Keep Awake"
         }
 
-        for item in presetItems {
-            let duration = item.representedObject as? WakeDuration
-            item.state = (duration == session?.duration) ? .on : .off
-        }
+        panelView.showSelection(session?.duration)
+        panelView.displayAwakeCheckbox.state = wakeManager.keepDisplayAwake ? .on : .off
     }
 
     private func requestNotificationAuthIfNeeded() {
