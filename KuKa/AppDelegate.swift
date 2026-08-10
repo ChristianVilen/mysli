@@ -1,6 +1,7 @@
 import Cocoa
 import ServiceManagement
 
+@MainActor
 class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem!
     private let hotkeyManager = HotkeyManager()
@@ -9,8 +10,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let thumbnailStack = ThumbnailStackManager()
     private var editorWindow: EditorWindow?
     private var launchAtLoginItem: NSMenuItem!
+    private var windowTilingItem: NSMenuItem!
+    private static let windowTilingEnabledKey = "windowTilingEnabled"
     private var durationItems: [NSMenuItem] = []
     private let keepAwake = KeepAwakeController()
+    private let windowTiling = WindowTilingController()
 
     func applicationWillTerminate(_ notification: Notification) {
         keepAwake.deactivate()
@@ -44,6 +48,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         launchAtLoginItem.target = self
         launchAtLoginItem.state = SMAppService.mainApp.status == .enabled ? .on : .off
         menu.addItem(launchAtLoginItem)
+
+        windowTilingItem = NSMenuItem(title: "Window Tiling", action: #selector(toggleWindowTiling), keyEquivalent: "")
+        windowTilingItem.target = self
+        windowTilingItem.state = Self.isWindowTilingEnabled ? .on : .off
+        menu.addItem(windowTilingItem)
 
         menu.addItem(.separator())
 
@@ -110,8 +119,21 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // MARK: - Hotkey
 
     private func setupHotkey() {
-        hotkeyManager.onHotkey = { [weak self] in self?.startCapture() }
-        hotkeyManager.onFullScreenHotkey = { [weak self] in self?.startFullScreenCapture() }
+        // HotkeyManager always delivers actions via DispatchQueue.main.async,
+        // so we're already on the main thread here — assumeIsolated documents
+        // that instead of hopping through a Task, which would run the action
+        // one runloop turn late and could reorder rapid key presses.
+        hotkeyManager.onAction = { [weak self] action in
+            guard let self else { return }
+            MainActor.assumeIsolated {
+                switch action {
+                case .captureArea: self.startCapture()
+                case .captureFullScreen: self.startFullScreenCapture()
+                case .tile(let tilingAction): self.windowTiling.tile(tilingAction)
+                }
+            }
+        }
+        hotkeyManager.tilingEnabled = Self.isWindowTilingEnabled
         hotkeyManager.start()
     }
 
@@ -270,6 +292,19 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func openSuggestFeature() {
         NSWorkspace.shared.open(URL(string: "https://github.com/ChristianVilen/ku-ka/issues/new?labels=enhancement")!)
+    }
+
+    // MARK: - Window Tiling
+
+    private static var isWindowTilingEnabled: Bool {
+        UserDefaults.standard.object(forKey: windowTilingEnabledKey) as? Bool ?? true
+    }
+
+    @objc private func toggleWindowTiling() {
+        let enabled = !Self.isWindowTilingEnabled
+        UserDefaults.standard.set(enabled, forKey: Self.windowTilingEnabledKey)
+        hotkeyManager.tilingEnabled = enabled
+        windowTilingItem.state = enabled ? .on : .off
     }
 
     // MARK: - Launch at Login

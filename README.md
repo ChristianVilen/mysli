@@ -16,6 +16,7 @@ A lightweight macOS menu bar app that replaces the default `Shift+Command+4` scr
 - Delete screenshots from thumbnail or editor — removes file and clears clipboard
 - Launch at Login toggle
 - Keep Awake — stop the Mac from sleeping while a long task (such as an AI coding agent) runs, with a menu-bar toggle and timed sessions
+- Window tiling — hotkeys to snap the active window to the left half, right half, or full screen of its display
 - Runs as a menu bar agent (no Dock icon)
 
 ## Keep Awake
@@ -23,6 +24,20 @@ A lightweight macOS menu bar app that replaces the default `Shift+Command+4` scr
 Pick **Keep Awake For** a preset (30 minutes, 1, 2, or 4 hours, or "Until I turn it off") from the menu bar and Ku-Ka will keep your Mac from going to sleep while it's working through something long, like an overnight agent run. The menu-bar icon is tinted while it's on, and the menu shows how much time is left.
 
 It stops the system from sleeping but still lets the display turn off, so you're not burning the screen for nothing. One caveat: closing a laptop's lid still sleeps the Mac unless it's plugged in with an external display attached — no app can get around that. Keep the lid open or run it docked.
+
+## Window Tiling
+
+Three hotkeys move the active window around its display:
+
+- `Ctrl+Option+Left Arrow` — snap the window to the left half of the screen
+- `Ctrl+Option+Right Arrow` — snap the window to the right half of the screen
+- `Ctrl+Option+Return` — maximize the window; press it again to put the window back where it was before
+
+If you use Stage Manager (the macOS feature that shows recent apps as small thumbnails down the side of the screen), maximize leaves room for its strip on the left, plus a small gap at the top, bottom, and right. This only happens when Stage Manager is turned on **and** there are two or more windows visible on that screen — with just one window, or with Stage Manager off, maximize fills the whole screen. Left- and right-half tiling never leaves this gap, so a half-tiled window can sit under the Stage Manager strip.
+
+With more than one display, the window is tiled on the screen it overlaps the most. This differs from the screenshot features, which follow the cursor.
+
+The whole feature can be turned on and off with the **Window Tiling** checkbox in the menu bar menu (under Settings); the choice is remembered across restarts. While it's off, the hotkeys pass through to other apps. The keys themselves aren't configurable.
 
 ## Requirements
 
@@ -70,7 +85,7 @@ Alternatively, you can use the GUI method:
 On first launch, Ku-Ka needs two permissions:
 
 ### Accessibility (required)
-The app intercepts `Shift+Command+4` via a `CGEvent` tap, which requires Accessibility access.
+The app intercepts `Shift+Command+4` via a `CGEvent` tap, which requires Accessibility access. The same permission also lets Ku-Ka move and resize windows, which is what the window tiling hotkeys use — no separate permission is needed for that.
 
 **System Settings → Privacy & Security → Accessibility** → Enable Ku-Ka
 
@@ -109,7 +124,9 @@ The folder is created automatically if it doesn't exist.
 ## Menu Bar Options
 
 - **Launch at Login** — Toggle to start Ku-Ka automatically when you log in
+- **Window Tiling** — Turn the tiling hotkeys on or off (remembered across restarts)
 - **Thumbnail Duration** — Choose how long the floating thumbnail stays visible: 3 Seconds, 5 Seconds, or Forever (until dismissed)
+- **Keep Awake** — Keep the Mac from sleeping for a preset time (30 minutes, 1, 2, or 4 hours, or until turned off), with a "Keep display awake" checkbox
 - **Quit Ku-Ka** — Exit the app
 
 ## File Structure
@@ -128,6 +145,13 @@ KuKa/
 ├── CombineButton.swift  # Floating "Combine" button between adjacent thumbnails
 ├── DrawingView.swift    # Freehand red drawing on screenshot image
 ├── EditorWindow.swift   # Centered modal for annotating screenshots
+├── WindowTilingController.swift # Ties tiling hotkeys to the layout engine and window control
+├── TilingLayoutEngine.swift  # Pure layout math for left/right/maximize tiling
+├── TilingScreenRules.swift # Screen-picking + windows-per-screen counting, for the Stage Manager check
+├── StageManagerDetector.swift # Reads whether Stage Manager is turned on
+├── AccessibilityWindowControl.swift # Reads/moves the focused window via the Accessibility API
+├── WindowListProvider.swift  # Lists on-screen windows via the window server
+├── ScreenCoordinates.swift   # Shared top-left/bottom-left coordinate flip
 ├── Info.plist           # App config (LSUIElement, screen capture usage)
 └── KuKa.entitlements    # Entitlements (sandbox disabled)
 ```
@@ -135,8 +159,10 @@ KuKa/
 ## Known Limitations
 
 - You must disable or accept that the system `Shift+Command+3` and `Shift+Command+4` are intercepted (the app suppresses the system shortcuts when running)
+- `Ctrl+Option+Left/Right/Return` are intercepted globally while window tiling is enabled, even inside apps that use those same keys for something else. Turn off **Window Tiling** in the menu to give the keys back to other apps.
 - Requires macOS 14+ for ScreenCaptureKit screenshot capture
-- No preferences UI for changing the shortcut keys
+- No preferences UI for changing the shortcut keys, including the window tiling hotkeys
+- Some windows can't be tiled — apps that don't let their windows be moved or resized through the Accessibility API, and Ku-Ka's own windows. The hotkey then does nothing; there is no error message.
 
 ## Testing
 
@@ -156,6 +182,9 @@ Tests cover:
 - Screenshot file naming format
 - Annotated image save
 - Screenshot deletion (file removal + clipboard clear)
+- Tiling layout math and the maximize/restore toggle, including apps that snap window sizes
+- Screen-picking and windows-per-screen rules, plus the tiling controller's saved-frame handling
+- Hotkey routing: tiling keys are swallowed while enabled and pass through while disabled; screenshot keys work either way
 
 ### UI Tests (KuKaUITests)
 

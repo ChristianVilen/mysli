@@ -26,12 +26,11 @@ class CGWindowListProvider: WindowListProvider {
                   let w = bounds["Width"], let h = bounds["Height"] else { return nil }
 
             // Convert CG (top-left) to NS (bottom-left)
-            let nsY = primaryHeight - y - h
-            return WindowInfo(windowID: id, frame: CGRect(x: x, y: nsY, width: w, height: h), ownerName: dict[kCGWindowOwnerName as CFString] as? String ?? "", layer: layer)
+            let nsFrame = ScreenCoordinates.flipVertical(
+                CGRect(x: x, y: y, width: w, height: h),
+                primaryScreenHeight: primaryHeight
+            )
+            return WindowInfo(windowID: id, frame: nsFrame, ownerName: dict[kCGWindowOwnerName as CFString] as? String ?? "", layer: layer)
         }
-    }
-
-    static func cgToNS(cgRect: CGRect, primaryScreenHeight: CGFloat) -> CGRect {
-        CGRect(x: cgRect.origin.x, y: primaryScreenHeight - cgRect.origin.y - cgRect.height, width: cgRect.width, height: cgRect.height)
     }
 }

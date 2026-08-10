@@ -80,6 +80,33 @@ class MockWindowListProvider: WindowListProvider {
     }
 }
 
+// MARK: - Mock WindowControlling (window tiling)
+
+@MainActor
+class MockWindowControlling: WindowControlling {
+    var focusedWindowToReturn: FocusedWindow?
+    /// What `setFrame` returns on every call — set to `nil` to simulate a
+    /// failed move (e.g. the AX re-read failing).
+    var achievedFrameToReturn: CGRect?
+    private(set) var setFrameCalls: [(frame: CGRect, handle: WindowHandle)] = []
+
+    func focusedWindow() -> FocusedWindow? {
+        focusedWindowToReturn
+    }
+
+    @discardableResult
+    func setFrame(_ frame: CGRect, of handle: WindowHandle) -> CGRect? {
+        setFrameCalls.append((frame, handle))
+        return achievedFrameToReturn
+    }
+}
+
+// MARK: - Mock StageManagerDetecting
+
+class MockStageManagerDetecting: StageManagerDetecting {
+    var isStageManagerEnabled: Bool = false
+}
+
 // MARK: - Fake Sleep Preventer
 
 class FakeSleepPreventer: SleepPreventing {
