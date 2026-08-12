@@ -1,5 +1,6 @@
-# Default recipe
-default: build
+# List available commands
+default:
+    @just --list
 
 # Build the app (Debug)
 build:

@@ -1,7 +1,316 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* Hallmark · genre: modern-minimal · macrostructure: Narrative Workflow · theme: Cobalt
+ * enrichment: Tier-A interactive capture demo · nav: N9 edge-aligned · footer: Ft2 inline line
+ * accent: electric cobalt oklch(58% 0.20 256), <5% of any viewport
+ * pre-emit critique: P4 H4 E4 S4 R5 V4 */
+@import "tailwindcss";
 
-html {
-	scroll-behavior: smooth;
+/* Tailwind v4 theme — these become both utilities (bg-paper, text-ink, …)
+   and plain CSS variables on :root. */
+@theme {
+	--font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+	--font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+	--font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+	/* Cobalt palette — cool engineered near-white, charcoal ink, one signal */
+	--color-paper: oklch(98.5% 0.004 250);
+	--color-paper-2: oklch(96.5% 0.005 252);
+	--color-paper-3: oklch(94% 0.006 254);
+	--color-paper-glass: oklch(98.5% 0.004 250 / 0.85);
+	--color-rule: oklch(91% 0.008 255);
+	--color-rule-2: oklch(83% 0.011 255);
+	--color-muted: oklch(56% 0.013 255);
+	--color-neutral: oklch(46% 0.015 255);
+	--color-ink-2: oklch(34% 0.018 257);
+	--color-ink: oklch(24% 0.02 258);
+	--color-accent: oklch(58% 0.2 256);
+	--color-accent-hover: oklch(52% 0.2 256);
+	--color-accent-ink: oklch(99% 0.004 256);
+	--color-focus: oklch(58% 0.2 256);
+
+	/* The one dark band + the hero code card */
+	--color-graphite: oklch(22% 0.016 260);
+	--color-graphite-2: oklch(26% 0.018 260);
+	--color-graphite-rule: oklch(34% 0.018 258);
+	--color-graphite-ink: oklch(93% 0.006 250);
+	--color-graphite-muted: oklch(68% 0.012 252);
+	--color-accent-bright: oklch(72% 0.16 256); /* accent legible on graphite */
+	--color-scrim: oklch(24% 0.02 258 / 0.28); /* capture-demo dim, ink-toned */
+	--color-flash: oklch(100% 0 0); /* the capture flash — a real flash is white */
+	--color-selection: oklch(58% 0.2 256 / 0.18);
+	--color-thumb-btn: oklch(28% 0.015 255 / 0.7); /* HUD-style circular controls */
+	--color-thumb-btn-hover: oklch(20% 0.015 255 / 0.8);
+}
+
+:root {
+	--ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+	--ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+	--dur-micro: 120ms;
+	--dur-short: 220ms;
+	--dur-long: 420ms;
+}
+
+html,
+body {
+	overflow-x: clip;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	html {
+		scroll-behavior: smooth;
+	}
+}
+
+body {
+	background: var(--color-paper);
+	color: var(--color-ink-2);
+}
+
+::selection {
+	background: var(--color-selection);
+}
+
+h1,
+h2,
+h3 {
+	overflow-wrap: anywhere;
+	min-width: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		transition-duration: 0.01ms !important;
+		animation-duration: 0.01ms !important;
+	}
+}
+
+:focus-visible {
+	outline: 2px solid var(--color-focus);
+	outline-offset: 2px;
+}
+
+/* ---------- Shared voices ---------- */
+
+/* Machine-readout labels — JetBrains Mono, uppercase, tracked */
+.mono-label {
+	font-family: var(--font-mono);
+	font-size: 0.75rem;
+	font-weight: 500;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	color: var(--color-muted);
+}
+
+kbd {
+	font-family: var(--font-mono);
+	font-size: 0.8em;
+	border: 1px solid var(--color-rule-2);
+	border-radius: 4px;
+	background: var(--color-paper-2);
+	padding: 0.1em 0.4em;
+	color: var(--color-ink-2);
+	white-space: nowrap;
+}
+
+.dark-band kbd {
+	border-color: var(--color-graphite-rule);
+	background: var(--color-graphite-2);
+	color: var(--color-graphite-ink);
+}
+
+.btn-primary {
+	display: inline-flex;
+	align-items: center;
+	white-space: nowrap;
+	background: var(--color-accent);
+	color: var(--color-accent-ink);
+	border-radius: 6px;
+	font-weight: 500;
+	transition:
+		background-color var(--dur-micro) var(--ease-out),
+		transform 100ms var(--ease-out);
+}
+.btn-primary:hover {
+	background: var(--color-accent-hover);
+}
+.btn-primary:active {
+	transform: translateY(1px);
+}
+
+.link-quiet {
+	color: var(--color-ink-2);
+	text-decoration: underline;
+	text-decoration-color: var(--color-rule-2);
+	text-underline-offset: 4px;
+	transition:
+		color var(--dur-micro) var(--ease-out),
+		text-decoration-color var(--dur-micro) var(--ease-out);
+	white-space: nowrap;
+}
+.link-quiet:hover {
+	color: var(--color-ink);
+	text-decoration-color: var(--color-accent);
+}
+
+/* Copy affordance — bordered mono chip, quiet */
+.btn-copy {
+	font-family: var(--font-mono);
+	font-size: 0.75rem;
+	border: 1px solid var(--color-rule-2);
+	border-radius: 6px;
+	padding: 0.2rem 0.55rem;
+	color: var(--color-muted);
+	white-space: nowrap;
+	transition:
+		color var(--dur-micro) var(--ease-out),
+		border-color var(--dur-micro) var(--ease-out),
+		transform 100ms var(--ease-out);
+}
+.btn-copy:hover {
+	color: var(--color-ink);
+	border-color: var(--color-accent);
+}
+.btn-copy:active {
+	transform: translateY(1px);
+}
+.dark-band .btn-copy,
+.code-card .btn-copy {
+	border-color: var(--color-graphite-rule);
+	color: var(--color-graphite-muted);
+}
+.dark-band .btn-copy:hover,
+.code-card .btn-copy:hover {
+	color: var(--color-graphite-ink);
+	border-color: var(--color-accent-bright);
+}
+
+/* Code surfaces — typographic frame (rule + label), never fake window chrome */
+.code-card {
+	background: var(--color-graphite);
+	border: 1px solid var(--color-graphite-rule);
+	border-radius: 10px;
+	box-shadow: 0 1px 2px oklch(24% 0.02 258 / 0.05);
+	font-family: var(--font-mono);
+	color: var(--color-graphite-ink);
+}
+
+/* ---------- Hero entrance — the page's one orchestrated moment ---------- */
+/* Pure CSS: runs without JS, gates behind reduced-motion, stagger caps at ~350ms */
+@media (prefers-reduced-motion: no-preference) {
+	.rise {
+		opacity: 0;
+		transform: translateY(10px);
+		animation: rise var(--dur-long) var(--ease-out) forwards;
+		animation-delay: calc(var(--i, 0) * 70ms);
+	}
+	@keyframes rise {
+		to {
+			opacity: 1;
+			transform: none;
+		}
+	}
+}
+
+/* ---------- Capture demo overlay ---------- */
+.capture-sel {
+	position: fixed;
+	z-index: 200;
+	border: 1px solid var(--color-accent);
+	box-shadow: 0 0 0 200vmax var(--color-scrim);
+	pointer-events: none;
+}
+.capture-dims {
+	position: fixed;
+	z-index: 210;
+	font-family: var(--font-mono);
+	font-size: 0.75rem;
+	font-variant-numeric: tabular-nums;
+	color: var(--color-ink);
+	background: var(--color-paper);
+	border: 1px solid var(--color-rule-2);
+	border-radius: 4px;
+	padding: 0.15rem 0.45rem;
+	pointer-events: none;
+}
+.capture-flash {
+	position: fixed;
+	inset: 0;
+	z-index: 220;
+	background: var(--color-flash);
+	opacity: 0;
+	pointer-events: none;
+}
+/* Thumbnail stack — mirrors ThumbnailStackManager.swift: 200px wide panels,
+   16px from the corner, newest on top, a Combine pill in each 36px gap. */
+.capture-thumbs {
+	position: fixed;
+	right: 16px;
+	bottom: 16px;
+	z-index: 190;
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+}
+.capture-thumb {
+	position: relative;
+	overflow: hidden;
+	border-radius: 8px;
+	border: 1px solid var(--color-rule-2);
+	box-shadow: 0 1px 2px oklch(20% 0.01 255 / 0.1);
+	background: var(--color-paper);
+	will-change: transform;
+}
+.capture-thumb-img {
+	overflow: hidden;
+}
+.capture-gap {
+	width: 200px;
+	height: 36px;
+	display: grid;
+	place-items: center;
+}
+.capture-thumb-btn {
+	position: absolute;
+	top: 4px;
+	display: grid;
+	place-items: center;
+	width: 20px;
+	height: 20px;
+	background: var(--color-thumb-btn);
+	border: none;
+	border-radius: 9999px;
+	color: var(--color-accent-ink);
+	font-size: 13px;
+	line-height: 1;
+	transition: background-color var(--dur-micro) var(--ease-out);
+}
+.capture-thumb-btn:hover {
+	background: var(--color-thumb-btn-hover);
+}
+.capture-thumb-btn--close {
+	right: 4px;
+}
+.capture-thumb-btn--trash {
+	left: 4px;
+}
+.capture-combine {
+	width: 100px;
+	height: 28px;
+	border-radius: 14px;
+	border: none;
+	background: var(--color-thumb-btn);
+	backdrop-filter: blur(8px);
+	color: var(--color-accent-ink);
+	font-size: 11px;
+	font-weight: 500;
+	transition: background-color var(--dur-micro) var(--ease-out);
+}
+.capture-combine:hover {
+	background: var(--color-thumb-btn-hover);
+}
+body.capturing {
+	user-select: none;
+	-webkit-user-select: none;
+	cursor: crosshair;
 }

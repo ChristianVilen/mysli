@@ -1,108 +1,59 @@
-<!--
 ---
--->
+// Conversational Q&A — bold question, brief answer. No cards, no emoji.
+// Answer text is HTML (inline <code>/<strong>), rendered with set:html.
+const cmdBlock = (label: string, lines: string[]) =>
+	`<div class="mt-3 rounded-[6px] border border-rule bg-paper-2"><div class="border-b border-rule px-3 py-1.5"><span class="mono-label">${label}</span></div><pre class="overflow-x-auto px-3 py-2.5 font-mono text-[0.8rem] leading-relaxed">${lines.join("\n")}</pre></div>`;
 
-<section class="py-24 px-6 opacity-0" data-animate="troubleshooting">
-  <div class="max-w-4xl mx-auto">
-    <div class="text-center mb-12">
-      <h2 class="text-3xl md:text-4xl font-bold mb-4 text-gray-100">Troubleshooting</h2>
-      <p class="text-gray-400">Common issues and solutions</p>
-    </div>
+const items = [
+	{
+		q: "Ku-Ka won't open.",
+		a: `Ku-Ka is unsigned, so Gatekeeper blocks the first launch. Clear the quarantine flag:${cmdBlock("Terminal", ["sudo xattr -d com.apple.quarantine /Applications/Ku-Ka.app"])}<p class="mt-3">Or go to <strong>System Settings → Privacy &amp; Security</strong> and click <strong>"Open Anyway"</strong>.</p>`,
+	},
+	{
+		q: "The shortcut does nothing.",
+		a: `Ku-Ka needs <strong>Accessibility</strong> permission to intercept <code>⇧⌘4</code> — the same permission also powers window tiling. Go to <strong>System Settings → Privacy &amp; Security → Accessibility</strong>, enable Ku-Ka, then restart it from the menu bar.`,
+	},
+	{
+		q: "Captures come out black, or fail.",
+		a: `That's the <strong>Screen Recording</strong> permission. Go to <strong>System Settings → Privacy &amp; Security → Screen Recording</strong>, enable Ku-Ka, and capture again.`,
+	},
+	{
+		q: "Screenshots aren't saving.",
+		a: `Check that the folder exists and is writable:${cmdBlock("Terminal", ["mkdir -p ~/Screenshots", "chmod 755 ~/Screenshots"])}<p class="mt-3">Files are named <code>Screenshot_YYYY-MM-DD_at_HH-MM-SS.png</code>.</p>`,
+	},
+	{
+		q: "⌃⌥ keys stopped working in another app.",
+		a: `While Window Tiling is on, Ku-Ka takes <code>⌃⌥←/→/↩</code> globally, even in apps that use those keys themselves. Untick <strong>Window Tiling</strong> in the menu bar menu to give them back; Ku-Ka remembers the choice across restarts.`,
+	},
+	{
+		q: "The Mac still sleeps with Keep Awake on.",
+		a: `Closing a laptop's lid still sleeps the Mac unless it's plugged in with an external display attached. No app can get around that, so keep the lid open or run docked. The display turning off is normal; tick <strong>Keep display awake</strong> if you want the screen on too.`,
+	},
+	{
+		q: "A window won't tile.",
+		a: `Some apps refuse to let anything move their windows through the Accessibility API, so the hotkey silently does nothing. With more than one display, the window tiles on the screen it overlaps the most, so check the other display before assuming it didn't work.`,
+	},
+	{
+		q: "A permission looks granted, but Ku-Ka still doesn't work.",
+		a: `Reset both permissions so you can grant them again from scratch. These commands <strong>remove</strong> Ku-Ka from the permission lists:${cmdBlock("Terminal", ["tccutil reset Accessibility com.christianvilen.Ku-Ka", "tccutil reset ScreenCapture com.christianvilen.Ku-Ka"])}<p class="mt-3">Then re-enable Accessibility and Screen Recording in System Settings and restart Ku-Ka.</p>`,
+	},
+];
+---
+<section class="px-6 py-24">
+  <div class="mx-auto max-w-2xl">
+    <h2 class="font-display text-[clamp(1.85rem,3vw+0.5rem,2.75rem)] font-medium tracking-[-0.02em] text-ink">
+      When something doesn't work.
+    </h2>
 
-    <div class="grid md:grid-cols-2 gap-8">
-      <div class="bg-surface-100 border border-surface-300 rounded-xl p-6">
-        <h3 class="font-semibold text-gray-200 mb-3">🔒 App won't open / blocked by macOS</h3>
-        <p class="text-gray-400 text-sm mb-4">
-          Ku-Ka is unsigned, so macOS blocks it by default.
-        </p>
-        <div class="bg-surface-50 border border-surface-200 rounded-lg p-3 font-mono text-sm mb-3">
-          <code class="text-accent-light">sudo xattr -d com.apple.quarantine /Applications/Ku-Ka.app</code>
-        </div>
-        <p class="text-gray-500 text-sm">
-          Or go to <strong>System Settings → Privacy & Security</strong> and click <strong>"Open Anyway"</strong>.
-        </p>
-      </div>
-
-      <div class="bg-surface-100 border border-surface-300 rounded-xl p-6">
-        <h3 class="font-semibold text-gray-200 mb-3">🚫 Shortcut doesn't work</h3>
-        <p class="text-gray-400 text-sm mb-4">
-          Ku-Ka needs Accessibility permission to intercept <code class="bg-surface-200 px-1 rounded">Shift+Command+4</code>.
-        </p>
-        <ol class="text-gray-500 text-sm space-y-2">
-          <li>1. Go to <strong>System Settings → Privacy & Security → Accessibility</strong></li>
-          <li>2. Enable Ku-Ka in the list</li>
-          <li>3. Restart Ku-Ka from the menu bar</li>
-        </ol>
-      </div>
-
-      <div class="bg-surface-100 border border-surface-300 rounded-xl p-6">
-        <h3 class="font-semibold text-gray-200 mb-3">📸 Black screenshot or capture fails</h3>
-        <p class="text-gray-400 text-sm mb-4">
-          Screen Recording permission is required.
-        </p>
-        <ol class="text-gray-500 text-sm space-y-2">
-          <li>1. Go to <strong>System Settings → Privacy & Security → Screen Recording</strong></li>
-          <li>2. Enable Ku-Ka</li>
-          <li>3. Try capturing again</li>
-        </ol>
-      </div>
-
-      <div class="bg-surface-100 border border-surface-300 rounded-xl p-6">
-        <h3 class="font-semibold text-gray-200 mb-3">🖼️ Screenshots not saving</h3>
-        <p class="text-gray-400 text-sm mb-4">
-          Check if the Screenshots folder exists and is writable.
-        </p>
-        <div class="bg-surface-50 border border-surface-200 rounded-lg p-3 font-mono text-sm mb-3">
-          <code class="text-accent-light">mkdir -p ~/Screenshots</code>
-          <code class="text-accent-light">chmod 755 ~/Screenshots</code>
-        </div>
-        <p class="text-gray-500 text-sm">
-          Files are saved as <code class="bg-surface-200 px-1 rounded">Screenshot_YYYY-MM-DD_at_HH-MM-SS.png</code>
-        </p>
-      </div>
-
-      <div class="bg-surface-100 border border-surface-300 rounded-xl p-6 md:col-span-2">
-        <h3 class="font-semibold text-gray-200 mb-3">🔧 Both Accessibility AND Screen Recording Required</h3>
-        <p class="text-gray-400 text-sm mb-4">
-          Ku-Ka needs <strong>two separate permissions</strong> to work properly. Missing either will cause partial functionality.
-        </p>
-
-        <div class="grid md:grid-cols-2 gap-4 mb-4">
-          <div class="bg-surface-50 border border-surface-200 rounded-lg p-3">
-            <h4 class="font-medium text-gray-200 mb-2">✅ Accessibility Permission</h4>
-            <p class="text-gray-500 text-sm mb-2">Required for keyboard shortcut interception</p>
-            <ol class="text-gray-500 text-sm space-y-1">
-              <li>1. <strong>System Settings → Privacy & Security</strong></li>
-              <li>2. Click <strong>Accessibility</strong></li>
-              <li>3. Enable <strong>Ku-Ka</strong> in the app list</li>
-              <li>4. Restart Ku-Ka from menu bar</li>
-            </ol>
-          </div>
-
-          <div class="bg-surface-50 border border-surface-200 rounded-lg p-3">
-            <h4 class="font-medium text-gray-200 mb-2">📸 Screen Recording Permission</h4>
-            <p class="text-gray-500 text-sm mb-2">Required for actual screen capture</p>
-            <ol class="text-gray-500 text-sm space-y-1">
-              <li>1. <strong>System Settings → Privacy & Security</strong></li>
-              <li>2. Click <strong>Screen Recording</strong></li>
-              <li>3. Enable <strong>Ku-Ka</strong> in the app list</li>
-              <li>4. Try capturing again</li>
-            </ol>
-          </div>
-        </div>
-
-        <div class="bg-surface-50 border border-surface-200 rounded-lg p-3">
-          <h4 class="font-medium text-gray-200 mb-2">🔍 Quick Permission Check</h4>
-          <p class="text-gray-500 text-sm mb-2">Run these commands in Terminal to check current status:</p>
-          <div class="font-mono text-sm space-y-1">
-            <code class="block text-accent-light">tccutil reset Accessibility com.christianvilen.Ku-Ka</code>
-            <code class="block text-accent-light">tccutil reset ScreenCapture com.christianvilen.Ku-Ka</code>
-          </div>
-          <p class="text-gray-500 text-sm mt-2">
-            Then re-enable both permissions in System Settings. Replace <code class="bg-surface-200 px-1 rounded">com.christianvilen.Ku-Ka</code> with your actual bundle ID if different.
-          </p>
-        </div>
-      </div>
+    <div class="mt-10">
+      {items.map((item) => (
+        <details class="group border-t border-rule py-4 last:border-b">
+          <summary class="cursor-pointer list-none font-display text-base font-medium text-ink [&::-webkit-details-marker]:hidden">
+            <span class="mr-2 inline-block text-muted transition-transform duration-200 group-open:rotate-90" aria-hidden="true">›</span>{item.q}
+          </summary>
+          <div class="max-w-[62ch] pb-2 pl-6 pt-3 text-sm text-neutral" set:html={item.a} />
+        </details>
+      ))}
     </div>
   </div>
 </section>

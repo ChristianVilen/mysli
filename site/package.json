@@ -1,7 +1,12 @@
 {
 	"name": "ku-ka-site",
 	"type": "module",
+	"packageManager": "pnpm@11.20.0",
+	"engines": {
+		"pnpm": ">=9"
+	},
 	"scripts": {
+		"preinstall": "npx only-allow pnpm",
 		"dev": "astro dev",
 		"build": "astro build",
 		"preview": "astro preview",
@@ -11,10 +16,9 @@
 		"format:fix": "biome check --write ."
 	},
 	"dependencies": {
-		"@astrojs/tailwind": "^6.0.2",
-		"astro": "^5.3.0",
-		"motion": "^11.18.0",
-		"tailwindcss": "^3.4.17"
+		"@tailwindcss/vite": "^4.3.3",
+		"astro": "^7.2.0",
+		"tailwindcss": "^4.3.3"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^2.4.5"

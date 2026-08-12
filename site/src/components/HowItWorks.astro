@@ -1,49 +1,41 @@
 ---
-const steps = [
+const stages = [
 	{
-		num: "1",
-		title: "Press ⇧⌘3 or ⇧⌘4",
-		description: "⇧⌘3 captures the full screen instantly. ⇧⌘4 lets you select an area.",
+		num: "1.0",
+		title: "Press.",
+		body: "⇧⌘3 captures the whole screen where your cursor is. ⇧⌘4 starts a selection, or tap Space and click a window to grab just that window.",
 	},
 	{
-		num: "2",
-		title: "Select Area",
-		description: "Drag to select. All screens dim, dimensions shown in real time.",
+		num: "2.0",
+		title: "Select.",
+		body: "Drag across exactly what you need. Every screen dims, and the selection's dimensions read out live as you move.",
 	},
 	{
-		num: "3",
-		title: "Captured & Copied",
-		description: "PNG saved to ~/Screenshots/ and copied to clipboard instantly.",
+		num: "3.0",
+		title: "Saved.",
+		body: "The capture lands in ~/Screenshots/ as a timestamped PNG, and it's already on your clipboard.",
 	},
 	{
-		num: "4",
-		title: "Annotate",
-		description: "Click the floating thumbnail to draw on your screenshot.",
+		num: "4.0",
+		title: "Annotate, or delete.",
+		body: "A thumbnail floats in the corner. Stack up to five, click one to draw on it, combine them into a single image, or trash a bad shot and clear the clipboard with it.",
 	},
 ];
 ---
-<section class="py-24 px-6" data-animate="steps">
-  <div class="max-w-6xl mx-auto">
-    <h2 class="text-3xl md:text-4xl font-bold text-center mb-4 text-gray-100">How it works</h2>
-    <p class="text-gray-400 text-center mb-16 max-w-xl mx-auto">Four steps. Under two seconds. That's it.</p>
+<section class="px-6 py-28">
+  <div class="mx-auto max-w-4xl">
+    <h2 class="font-display text-[clamp(1.85rem,3vw+0.5rem,2.75rem)] font-medium tracking-[-0.02em] text-ink">
+      From keypress to clipboard.
+    </h2>
 
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-8 relative">
-      <!-- Connecting line (desktop only) -->
-      <div class="hidden md:block absolute top-12 left-[12.5%] right-[12.5%] h-px bg-gradient-to-r from-accent/0 via-accent/40 to-accent/0"></div>
-
-      {steps.map((s) => (
-        <div class="flex flex-col items-center text-center opacity-0" data-animate="step-item">
-          <div class="w-14 h-14 rounded-full bg-accent/15 border border-accent/30 flex items-center justify-center text-accent-light font-bold text-lg mb-6 relative z-10">
-            {s.num}
-          </div>
-          <h3 class="text-lg font-semibold text-gray-100 mb-2">{s.title}</h3>
-          <p class="text-sm text-gray-400 leading-relaxed max-w-[200px]">{s.description}</p>
-          <!-- Placeholder image area -->
-          <div class="mt-6 w-full aspect-[4/3] rounded-xl bg-surface-50 border border-surface-200 flex items-center justify-center">
-            <span class="text-xs text-gray-600 font-mono">screenshot</span>
-          </div>
-        </div>
+    <ol class="mt-14">
+      {stages.map((s) => (
+        <li class="border-t border-rule pb-10 pt-7 last:pb-0">
+          <span class="mono-label text-accent!" aria-hidden="true">{s.num}</span>
+          <h3 class="mt-2 font-display text-xl font-medium text-ink">{s.title}</h3>
+          <p class="mt-2 max-w-[55ch] text-neutral">{s.body}</p>
+        </li>
       ))}
-    </div>
+    </ol>
   </div>
 </section>

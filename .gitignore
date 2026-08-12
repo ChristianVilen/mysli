@@ -19,3 +19,6 @@ DerivedData/
 node_modules/
 site/dist/
 site/.astro/
+
+# Design-skill project memory
+site/.hallmark/

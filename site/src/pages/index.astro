@@ -1,19 +1,22 @@
 ---
-import Layout from "../layouts/Layout.astro";
-import Hero from "../components/Hero.astro";
-import Install from "../components/Install.astro";
-import Features from "../components/Features.astro";
-import HowItWorks from "../components/HowItWorks.astro";
 import Comparison from "../components/Comparison.astro";
-import Troubleshooting from "../components/Troubleshooting.astro";
+import Features from "../components/Features.astro";
 import Footer from "../components/Footer.astro";
+import Hero from "../components/Hero.astro";
+import HowItWorks from "../components/HowItWorks.astro";
+import Install from "../components/Install.astro";
+import Nav from "../components/Nav.astro";
+import Troubleshooting from "../components/Troubleshooting.astro";
+import Layout from "../layouts/Layout.astro";
 ---
 <Layout>
+  <div id="top"></div>
+  <Nav />
   <Hero />
-  <Install />
-  <Features />
   <HowItWorks />
+  <Features />
   <Comparison />
+  <Install />
   <Troubleshooting />
   <Footer />
 </Layout>
