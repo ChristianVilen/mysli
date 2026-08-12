@@ -1,7 +1,7 @@
 import Cocoa
 
 class FlashView: NSWindow {
-    static func flash(on screen: NSScreen) {
+    static func flash(on screen: ScreenGeometry) {
         let window = FlashView(
             contentRect: screen.frame,
             styleMask: .borderless,

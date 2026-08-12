@@ -67,7 +67,7 @@ struct TilingLayoutEngine {
     /// Fraction of `visibleFrame.height` reserved at the top, bottom, and
     /// right (each) when maximizing with Stage Manager active. Height-based
     /// for all three so the gaps come out equal in points.
-    private static let stageManagerEdgeInsetFraction: CGFloat = 0.02
+    private static let stageManagerEdgeInsetFraction: CGFloat = 0.01
 
     /// Tolerance, in points, for judging whether a window "is" at some
     /// target frame. The Accessibility API doesn't position windows with

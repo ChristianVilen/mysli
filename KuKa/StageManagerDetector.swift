@@ -1,5 +1,9 @@
 import Foundation
 
+// This seam costs more lines than the one read behind it — accepted as the
+// price of testing WindowTilingController. If a second macOS-environment
+// probe ever appears, widen this into one DesktopEnvironment interface
+// rather than adding another single-property seam.
 protocol StageManagerDetecting {
     var isStageManagerEnabled: Bool { get }
 }

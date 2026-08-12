@@ -1,24 +1,29 @@
 import Cocoa
 
 class EditorWindow: NSPanel, NSWindowDelegate {
-    var onSave: ((NSImage) -> Void)?
-    var onDelete: (() -> Void)?
     var onClose: (() -> Void)?
     private let drawingView: DrawingView
+    private let fileURL: URL
+    private let store: ImageStoring
 
-    init(image: NSImage) {
+    init(image: NSImage, fileURL: URL, store: ImageStoring, screens: Screens = SystemScreens()) {
         drawingView = DrawingView(image: image)
+        self.fileURL = fileURL
+        self.store = store
 
-        // Size to fit image, capped at 80% of screen
-        let screen = NSScreen.main ?? NSScreen.screens[0]
-        let maxW = screen.visibleFrame.width * 0.8
-        let maxH = screen.visibleFrame.height * 0.8
-        let aspect = image.size.width / image.size.height
-        var w = min(image.size.width, maxW)
-        var h = w / aspect
-        if h > maxH {
-            h = maxH
-            w = h * aspect
+        // Size to fit image, capped at 80% of screen (uncapped without screens)
+        var w = image.size.width
+        var h = image.size.height
+        if let visible = screens.mainOrPrimary?.visibleFrame {
+            let maxW = visible.width * 0.8
+            let maxH = visible.height * 0.8
+            let aspect = image.size.width / image.size.height
+            w = min(image.size.width, maxW)
+            h = w / aspect
+            if h > maxH {
+                h = maxH
+                w = h * aspect
+            }
         }
 
         let toolbarHeight: CGFloat = 44
@@ -65,14 +70,13 @@ class EditorWindow: NSPanel, NSWindowDelegate {
         drawingView.undo()
     }
 
-    @objc private func doneTapped() {
-        let composited = drawingView.compositeImage()
-        onSave?(composited)
+    @objc func doneTapped() {
+        store.saveAnnotated(image: drawingView.compositeImage(), to: fileURL)
         close()
     }
 
-    @objc private func deleteTapped() {
-        onDelete?()
+    @objc func deleteTapped() {
+        store.delete(at: fileURL)
         close()
     }
 

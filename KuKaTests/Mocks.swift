@@ -20,6 +20,10 @@ class MockFileManager: FileManaging {
     func removeItem(at url: URL) throws {
         removedItems.append(url)
     }
+
+    func fileExists(at url: URL) -> Bool {
+        writtenFiles.contains { $0.url == url } && !removedItems.contains(url)
+    }
 }
 
 // MARK: - Mock Clipboard
@@ -136,4 +140,54 @@ class FakeSleepPreventer: SleepPreventing {
         isPreventing = false
         endCount += 1
     }
+}
+
+// MARK: - Fake ImageStore
+
+class FakeImageStore: ImageStoring {
+    private(set) var storedImages: [CGImage] = []
+    private(set) var combinedCalls: [(top: NSImage, bottom: NSImage)] = []
+    private(set) var annotatedCalls: [(image: NSImage, url: URL)] = []
+    private(set) var deletedURLs: [URL] = []
+    var combinedResultToReturn: CaptureResult?
+
+    func store(cgImage: CGImage) -> CaptureResult {
+        storedImages.append(cgImage)
+        let image = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
+        return CaptureResult(image: image, fileURL: URL(fileURLWithPath: "/tmp/kuka-test/stored-\(storedImages.count).png"))
+    }
+
+    func storeCombined(top: NSImage, bottom: NSImage) -> CaptureResult? {
+        combinedCalls.append((top, bottom))
+        return combinedResultToReturn
+    }
+
+    func saveAnnotated(image: NSImage, to url: URL) {
+        annotatedCalls.append((image, url))
+    }
+
+    func delete(at url: URL) {
+        deletedURLs.append(url)
+    }
+}
+
+// MARK: - Fake LoginItem
+
+class FakeLoginItem: LoginItemManaging {
+    var isEnabled = false
+    var errorToThrow: Error?
+    private(set) var setCalls: [Bool] = []
+
+    func setEnabled(_ enabled: Bool) throws {
+        if let errorToThrow { throw errorToThrow }
+        setCalls.append(enabled)
+        isEnabled = enabled
+    }
+}
+
+// MARK: - Fake Screens
+
+struct FakeScreens: Screens {
+    var all: [ScreenGeometry] = []
+    var mainIndex: Int?
 }

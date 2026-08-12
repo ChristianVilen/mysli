@@ -57,8 +57,15 @@ class HotkeyManager {
             place: .headInsertEventTap,
             options: .defaultTap,
             eventsOfInterest: mask,
-            callback: { _, _, event, refcon in
+            callback: { _, type, event, refcon in
                 let manager = Unmanaged<HotkeyManager>.fromOpaque(refcon!).takeUnretainedValue()
+                // The system disables a tap it considers slow or during
+                // certain secure-input transitions; re-enable right away
+                // instead of waiting for the watchdog's next tick.
+                if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+                    manager.reenableTap()
+                    return Unmanaged.passUnretained(event)
+                }
                 return manager.handleEvent(event)
             },
             userInfo: Unmanaged.passUnretained(self).toOpaque()
@@ -84,6 +91,12 @@ class HotkeyManager {
             NSLog("Ku-Ka: Event tap was disabled by the system, re-enabling")
             CGEvent.tapEnable(tap: tap, enable: true)
         }
+    }
+
+    private func reenableTap() {
+        guard let tap = eventTap else { return }
+        NSLog("Ku-Ka: Event tap disabled mid-stream, re-enabling")
+        CGEvent.tapEnable(tap: tap, enable: true)
     }
 
     // Internal (not private) so tests can feed synthetic events through the

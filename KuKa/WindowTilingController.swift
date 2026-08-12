@@ -12,6 +12,7 @@ final class WindowTilingController {
     private let stageManager: StageManagerDetecting
     private let windowList: WindowListProvider
     private let engine: TilingLayoutEngine
+    private let screens: Screens
 
     private var savedFrames: [WindowHandle: TilingRestoreState] = [:]
 
@@ -19,17 +20,19 @@ final class WindowTilingController {
         windowControl: WindowControlling = AccessibilityWindowControl(),
         stageManager: StageManagerDetecting = StageManagerDetector(),
         windowList: WindowListProvider = CGWindowListProvider(),
-        engine: TilingLayoutEngine = TilingLayoutEngine()
+        engine: TilingLayoutEngine = TilingLayoutEngine(),
+        screens: Screens = SystemScreens()
     ) {
         self.windowControl = windowControl
         self.stageManager = stageManager
         self.windowList = windowList
         self.engine = engine
+        self.screens = screens
     }
 
     func tile(_ action: TilingAction) {
         guard let focused = windowControl.focusedWindow() else { return }
-        let screens = NSScreen.screens
+        let screens = self.screens.all
         guard let screenIndex = targetScreenIndex(for: focused.frame, screens: screens) else { return }
         let screen = screens[screenIndex]
 
@@ -69,19 +72,19 @@ final class WindowTilingController {
     /// Index (into `screens`) of the screen `windowFrame` overlaps the most,
     /// with main-screen and first-screen fallbacks. Nil only when there are
     /// no screens.
-    private func targetScreenIndex(for windowFrame: CGRect, screens: [NSScreen]) -> Int? {
-        if let index = TilingScreenRules.bestScreenIndex(for: windowFrame, screenFrames: screens.map(\.frame)) {
+    private func targetScreenIndex(for windowFrame: CGRect, screens: [ScreenGeometry]) -> Int? {
+        if let index = ScreenCoordinates.bestScreenIndex(for: windowFrame, screenFrames: screens.map(\.frame)) {
             return index
         }
-        if let main = NSScreen.main, let index = screens.firstIndex(of: main) {
-            return index
+        if let mainIndex = self.screens.mainIndex, screens.indices.contains(mainIndex) {
+            return mainIndex
         }
         return screens.isEmpty ? nil : 0
     }
 
     /// Visible frame of the screen a second half-press should hop to, or nil
     /// for actions without a direction and when there's no other screen.
-    private func adjacentVisibleFrame(for action: TilingAction, screenIndex: Int, screens: [NSScreen]) -> CGRect? {
+    private func adjacentVisibleFrame(for action: TilingAction, screenIndex: Int, screens: [ScreenGeometry]) -> CGRect? {
         guard let direction = action.horizontalDirection else { return nil }
         guard let index = TilingScreenRules.adjacentScreenIndex(
             of: screenIndex,

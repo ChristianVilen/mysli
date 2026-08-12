@@ -15,6 +15,9 @@ DerivedData/
 *.app
 *.zip
 
+# Coverage artifacts from running binaries outside Xcode
+*.profraw
+
 # Node
 node_modules/
 site/dist/

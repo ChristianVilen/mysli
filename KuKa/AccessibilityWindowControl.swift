@@ -54,24 +54,23 @@ struct AccessibilityWindowControl: WindowControlling {
             return nil
         }
 
-        let systemWide = AXUIElementCreateSystemWide()
-        AXUIElementSetMessagingTimeout(systemWide, Self.messagingTimeout)
-
-        guard let app = Self.axElement(kAXFocusedApplicationAttribute as CFString, from: systemWide, label: "focused application") else {
+        // Resolve the frontmost app through NSWorkspace, not the system-wide
+        // AX focused-application attribute. That attribute read has to
+        // round-trip through the focused app's accessibility server, and
+        // Electron/WebView2 apps (Microsoft Teams) leave theirs unresponsive
+        // until first contact, so the read fails with kAXErrorCannotComplete
+        // and tiling silently does nothing. NSWorkspace answers locally.
+        guard let frontmost = NSWorkspace.shared.frontmostApplication else {
+            NSLog("Ku-Ka: No frontmost application; cannot resolve focused window")
             return nil
         }
-        AXUIElementSetMessagingTimeout(app, Self.messagingTimeout)
-
-        var pid: pid_t = 0
-        let pidError = AXUIElementGetPid(app, &pid)
-        guard pidError == .success else {
-            NSLog("Ku-Ka: Failed to read focused application's pid (AXError \(pidError.rawValue))")
-            return nil
-        }
-        guard pid != ProcessInfo.processInfo.processIdentifier else {
+        guard frontmost.processIdentifier != ProcessInfo.processInfo.processIdentifier else {
             // Never tile Ku-Ka's own panels.
             return nil
         }
+
+        let app = AXUIElementCreateApplication(frontmost.processIdentifier)
+        AXUIElementSetMessagingTimeout(app, Self.messagingTimeout)
 
         guard let window = Self.axElement(kAXFocusedWindowAttribute as CFString, from: app, label: "focused window") else {
             return nil

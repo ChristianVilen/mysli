@@ -84,50 +84,8 @@ final class TilingAdaptersTests: XCTestCase {
         XCTAssertEqual(TilingScreenRules.windowCount(on: offsetScreen, windows: windows), 1)
     }
 
-    // MARK: - TilingScreenRules.bestScreenIndex(for:screenFrames:)
-
     private let screenA = CGRect(x: 0, y: 0, width: 1000, height: 1000)
     private let screenB = CGRect(x: 1000, y: 0, width: 1200, height: 1000)
-
-    func testBestScreenIndexPicksScreenWindowIsClearlyOn() {
-        let window = CGRect(x: 1100, y: 100, width: 200, height: 200) // fully within screenB
-        XCTAssertEqual(TilingScreenRules.bestScreenIndex(for: window, screenFrames: [screenA, screenB]), 1)
-    }
-
-    func testBestScreenIndexPicksScreenWithLargerShareWhenStraddling() {
-        // Straddles the x=1000 boundary: 700pt of width on screenA, 100pt on screenB.
-        let window = CGRect(x: 700, y: 100, width: 400, height: 200)
-        XCTAssertEqual(TilingScreenRules.bestScreenIndex(for: window, screenFrames: [screenA, screenB]), 0)
-    }
-
-    func testBestScreenIndexReturnsNilWhenNoScreenIntersects() {
-        let window = CGRect(x: 5000, y: 5000, width: 100, height: 100)
-        XCTAssertNil(TilingScreenRules.bestScreenIndex(for: window, screenFrames: [screenA, screenB]))
-    }
-
-    func testBestScreenIndexReturnsNilForEmptyScreenList() {
-        let window = CGRect(x: 0, y: 0, width: 100, height: 100)
-        XCTAssertNil(TilingScreenRules.bestScreenIndex(for: window, screenFrames: []))
-    }
-
-    func testBestScreenIndexWithNonZeroOriginScreens() {
-        let screens = [
-            CGRect(x: -500, y: 25, width: 1000, height: 900),
-            CGRect(x: 500, y: 25, width: 1600, height: 975)
-        ]
-        let window = CGRect(x: 600, y: 100, width: 300, height: 300) // within the second screen
-        XCTAssertEqual(TilingScreenRules.bestScreenIndex(for: window, screenFrames: screens), 1)
-    }
-
-    func testBestScreenIndexTiesBreakTowardLowestIndex() {
-        let screens = [
-            CGRect(x: 0, y: 0, width: 200, height: 200),
-            CGRect(x: 200, y: 0, width: 200, height: 200)
-        ]
-        // Straddles exactly in the middle: 100pt of overlap with each screen.
-        let window = CGRect(x: 100, y: 0, width: 200, height: 200)
-        XCTAssertEqual(TilingScreenRules.bestScreenIndex(for: window, screenFrames: screens), 0)
-    }
 
     // MARK: - TilingScreenRules.adjacentScreenIndex(of:direction:screenFrames:)
 

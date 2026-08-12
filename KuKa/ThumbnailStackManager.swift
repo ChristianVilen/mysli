@@ -3,17 +3,21 @@ import Cocoa
 class ThumbnailStackManager {
     private(set) var entries: [(panel: ThumbnailPanel, result: CaptureResult)] = []
     var onEdit: ((CaptureResult) -> Void)?
-    var onCombine: ((NSImage, NSImage) -> CaptureResult?)?
-    var onDelete: ((CaptureResult) -> Void)?
-    var onStackEmptied: (() -> Void)?
+    private let store: ImageStoring
+    private let screens: Screens
     private var combineButtons: [CombineButton] = []
     private var currentDuration: TimeInterval = 5.0
-    private var currentScreen: NSScreen?
+    private var currentVisibleFrame: CGRect?
     private static let maxCount = 5
 
-    func add(image: NSImage, result: CaptureResult, screen: NSScreen, duration: TimeInterval) {
+    init(store: ImageStoring, screens: Screens = SystemScreens()) {
+        self.store = store
+        self.screens = screens
+    }
+
+    func add(image: NSImage, result: CaptureResult, screen: ScreenGeometry, duration: TimeInterval) {
         currentDuration = duration
-        currentScreen = screen
+        currentVisibleFrame = screen.visibleFrame
 
         let panel = makePanel(image: image)
         entries.insert((panel: panel, result: result), at: 0)
@@ -47,7 +51,10 @@ class ThumbnailStackManager {
         }
 
         if entries.isEmpty {
-            onStackEmptied?()
+            // The stack holds the full-resolution captures; once the last
+            // panel closes they deallocate, so hand the freed pages back
+            // to the OS.
+            MemoryReclaim.schedule()
         }
 
         repositionAll(animated: true)
@@ -61,7 +68,7 @@ class ThumbnailStackManager {
         let olderEntry = entries[max(upperIndex, lowerIndex)]
         let newerEntry = entries[min(upperIndex, lowerIndex)]
 
-        guard let combinedResult = onCombine?(olderEntry.result.image, newerEntry.result.image) else { return }
+        guard let combinedResult = store.storeCombined(top: olderEntry.result.image, bottom: newerEntry.result.image) else { return }
 
         // Remove both source panels
         for p in [olderEntry.panel, newerEntry.panel] {
@@ -86,11 +93,11 @@ class ThumbnailStackManager {
     // MARK: - Private
 
     private func makePanel(image: NSImage) -> ThumbnailPanel {
-        let screen = currentScreen ?? NSScreen.main!
+        let visible = currentVisibleFrame ?? screens.mainOrPrimary?.visibleFrame ?? .zero
         let size = ThumbnailPanel.thumbSize(for: image)
         let frame = NSRect(
-            x: screen.visibleFrame.maxX - size.width - ThumbnailPanel.padding,
-            y: screen.visibleFrame.minY + ThumbnailPanel.padding,
+            x: visible.maxX - size.width - ThumbnailPanel.padding,
+            y: visible.minY + ThumbnailPanel.padding,
             width: size.width,
             height: size.height
         )
@@ -112,21 +119,21 @@ class ThumbnailStackManager {
             guard let self, let panel else { return }
             let result = self.entries.first(where: { $0.panel === panel })?.result
             self.remove(panel: panel)
-            if let result { self.onDelete?(result) }
+            if let result { self.store.delete(at: result.fileURL) }
         }
 
         return panel
     }
 
     private func repositionAll(animated: Bool) {
-        guard let screen = currentScreen else { return }
+        guard let visible = currentVisibleFrame else { return }
 
         // Remove old combine buttons
         for btn in combineButtons { btn.close() }
         combineButtons.removeAll()
 
-        let baseX = screen.visibleFrame.maxX - ThumbnailPanel.thumbWidth - ThumbnailPanel.padding
-        var y = screen.visibleFrame.minY + ThumbnailPanel.padding
+        let baseX = visible.maxX - ThumbnailPanel.thumbWidth - ThumbnailPanel.padding
+        var y = visible.minY + ThumbnailPanel.padding
 
         // Stack from bottom: oldest (last) at bottom, newest (first) at top
         let reversed = Array(entries.enumerated()).reversed()

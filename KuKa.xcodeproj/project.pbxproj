@@ -31,8 +31,14 @@
 		A10000106 /* TilingScreenRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000029 /* TilingScreenRules.swift */; };
 		A10000107 /* ScreenCoordinates.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000002A /* ScreenCoordinates.swift */; };
 		A10000108 /* WindowTilingController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000002B /* WindowTilingController.swift */; };
+		A10000112 /* SelectionSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000002C /* SelectionSession.swift */; };
+		A10000113 /* CaptureFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000002D /* CaptureFlow.swift */; };
+		A10000114 /* ImageStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000002E /* ImageStore.swift */; };
+		A10000120 /* Settings.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000121 /* Settings.swift */; };
+		A10000122 /* StatusMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000123 /* StatusMenu.swift */; };
+		A10000124 /* Screens.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000125 /* Screens.swift */; };
+		A10000126 /* ScreenRecordingPermission.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000127 /* ScreenRecordingPermission.swift */; };
 		B20000001 /* CaptureManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000011 /* CaptureManagerTests.swift */; };
-		B20000003 /* WindowListProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000013 /* WindowListProviderTests.swift */; };
 		B20000005 /* WakeSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000015 /* WakeSessionTests.swift */; };
 		B20000002 /* Mocks.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000012 /* Mocks.swift */; };
 		B20000006 /* WakeManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000016 /* WakeManagerTests.swift */; };
@@ -43,6 +49,13 @@
 		B2000000B /* TilingAdaptersTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000001B /* TilingAdaptersTests.swift */; };
 		B2000000C /* WindowTilingControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000001C /* WindowTilingControllerTests.swift */; };
 		B2000000D /* HotkeyManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000001D /* HotkeyManagerTests.swift */; };
+		B2000000E /* SelectionSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000001E /* SelectionSessionTests.swift */; };
+		B2000000F /* CaptureFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000001F /* CaptureFlowTests.swift */; };
+		B20000101 /* ImageStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000111 /* ImageStoreTests.swift */; };
+		B20000102 /* EditorWindowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000112 /* EditorWindowTests.swift */; };
+		B20000103 /* SettingsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000113 /* SettingsTests.swift */; };
+		B20000104 /* StatusMenuTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000114 /* StatusMenuTests.swift */; };
+		B20000105 /* ScreenCoordinatesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000115 /* ScreenCoordinatesTests.swift */; };
 		E227F2EA2F51CF630032905B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E28DFEF72F4C8D93001B8D91 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
@@ -84,11 +97,17 @@
 		A10000029 /* TilingScreenRules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TilingScreenRules.swift; sourceTree = "<group>"; };
 		A1000002A /* ScreenCoordinates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenCoordinates.swift; sourceTree = "<group>"; };
 		A1000002B /* WindowTilingController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowTilingController.swift; sourceTree = "<group>"; };
+		A1000002C /* SelectionSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectionSession.swift; sourceTree = "<group>"; };
+		A1000002D /* CaptureFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureFlow.swift; sourceTree = "<group>"; };
+		A1000002E /* ImageStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageStore.swift; sourceTree = "<group>"; };
+		A10000121 /* Settings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Settings.swift; sourceTree = "<group>"; };
+		A10000123 /* StatusMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusMenu.swift; sourceTree = "<group>"; };
+		A10000125 /* Screens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Screens.swift; sourceTree = "<group>"; };
+		A10000127 /* ScreenRecordingPermission.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenRecordingPermission.swift; sourceTree = "<group>"; };
 		B20000015 /* WakeSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WakeSessionTests.swift; sourceTree = "<group>"; };
 		B20000010 /* KuKaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KuKaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B20000011 /* CaptureManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureManagerTests.swift; sourceTree = "<group>"; };
 		B20000012 /* Mocks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Mocks.swift; sourceTree = "<group>"; };
-		B20000013 /* WindowListProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowListProviderTests.swift; sourceTree = "<group>"; };
 		B20000016 /* WakeManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WakeManagerTests.swift; sourceTree = "<group>"; };
 		B20000017 /* KeepAwakeControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeepAwakeControllerTests.swift; sourceTree = "<group>"; };
 		B20000018 /* ThumbnailStackManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThumbnailStackManagerTests.swift; sourceTree = "<group>"; };
@@ -97,6 +116,13 @@
 		B2000001B /* TilingAdaptersTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TilingAdaptersTests.swift; sourceTree = "<group>"; };
 		B2000001C /* WindowTilingControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowTilingControllerTests.swift; sourceTree = "<group>"; };
 		B2000001D /* HotkeyManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeyManagerTests.swift; sourceTree = "<group>"; };
+		B2000001E /* SelectionSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectionSessionTests.swift; sourceTree = "<group>"; };
+		B2000001F /* CaptureFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureFlowTests.swift; sourceTree = "<group>"; };
+		B20000111 /* ImageStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageStoreTests.swift; sourceTree = "<group>"; };
+		B20000112 /* EditorWindowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorWindowTests.swift; sourceTree = "<group>"; };
+		B20000113 /* SettingsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsTests.swift; sourceTree = "<group>"; };
+		B20000114 /* StatusMenuTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusMenuTests.swift; sourceTree = "<group>"; };
+		B20000115 /* ScreenCoordinatesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenCoordinatesTests.swift; sourceTree = "<group>"; };
 		E28DFEF72F4C8D93001B8D91 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -135,6 +161,13 @@
 				A10000013 /* HotkeyManager.swift */,
 				A10000014 /* OverlayWindow.swift */,
 				A10000015 /* SelectionView.swift */,
+				A1000002C /* SelectionSession.swift */,
+				A1000002D /* CaptureFlow.swift */,
+				A1000002E /* ImageStore.swift */,
+				A10000121 /* Settings.swift */,
+				A10000123 /* StatusMenu.swift */,
+				A10000125 /* Screens.swift */,
+				A10000127 /* ScreenRecordingPermission.swift */,
 				A10000016 /* CaptureManager.swift */,
 				A10000019 /* ThumbnailPanel.swift */,
 				A1000001C /* ThumbnailStackManager.swift */,
@@ -174,7 +207,6 @@
 			isa = PBXGroup;
 			children = (
 				B20000011 /* CaptureManagerTests.swift */,
-				B20000013 /* WindowListProviderTests.swift */,
 				B20000015 /* WakeSessionTests.swift */,
 				B20000016 /* WakeManagerTests.swift */,
 				B20000017 /* KeepAwakeControllerTests.swift */,
@@ -184,6 +216,13 @@
 				B2000001B /* TilingAdaptersTests.swift */,
 				B2000001C /* WindowTilingControllerTests.swift */,
 				B2000001D /* HotkeyManagerTests.swift */,
+				B2000001E /* SelectionSessionTests.swift */,
+				B2000001F /* CaptureFlowTests.swift */,
+				B20000111 /* ImageStoreTests.swift */,
+				B20000112 /* EditorWindowTests.swift */,
+				B20000113 /* SettingsTests.swift */,
+				B20000114 /* StatusMenuTests.swift */,
+				B20000115 /* ScreenCoordinatesTests.swift */,
 				B20000012 /* Mocks.swift */,
 			);
 			path = KuKaTests;
@@ -276,6 +315,13 @@
 				A10000003 /* HotkeyManager.swift in Sources */,
 				A10000004 /* OverlayWindow.swift in Sources */,
 				A10000005 /* SelectionView.swift in Sources */,
+				A10000112 /* SelectionSession.swift in Sources */,
+				A10000113 /* CaptureFlow.swift in Sources */,
+				A10000114 /* ImageStore.swift in Sources */,
+				A10000120 /* Settings.swift in Sources */,
+				A10000122 /* StatusMenu.swift in Sources */,
+				A10000124 /* Screens.swift in Sources */,
+				A10000126 /* ScreenRecordingPermission.swift in Sources */,
 				A10000006 /* CaptureManager.swift in Sources */,
 				A10000007 /* ThumbnailPanel.swift in Sources */,
 				A10000008 /* DrawingView.swift in Sources */,
@@ -303,7 +349,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				B20000001 /* CaptureManagerTests.swift in Sources */,
-				B20000003 /* WindowListProviderTests.swift in Sources */,
 				B20000005 /* WakeSessionTests.swift in Sources */,
 				B20000006 /* WakeManagerTests.swift in Sources */,
 				B20000007 /* KeepAwakeControllerTests.swift in Sources */,
@@ -313,6 +358,13 @@
 				B2000000B /* TilingAdaptersTests.swift in Sources */,
 				B2000000C /* WindowTilingControllerTests.swift in Sources */,
 				B2000000D /* HotkeyManagerTests.swift in Sources */,
+				B2000000E /* SelectionSessionTests.swift in Sources */,
+				B2000000F /* CaptureFlowTests.swift in Sources */,
+				B20000101 /* ImageStoreTests.swift in Sources */,
+				B20000102 /* EditorWindowTests.swift in Sources */,
+				B20000103 /* SettingsTests.swift in Sources */,
+				B20000104 /* StatusMenuTests.swift in Sources */,
+				B20000105 /* ScreenCoordinatesTests.swift in Sources */,
 				B20000002 /* Mocks.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

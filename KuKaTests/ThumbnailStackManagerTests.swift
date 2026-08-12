@@ -2,11 +2,13 @@ import XCTest
 @testable import KuKa
 
 final class ThumbnailStackManagerTests: XCTestCase {
+    var fakeStore: FakeImageStore!
     var sut: ThumbnailStackManager!
 
     override func setUp() {
         super.setUp()
-        sut = ThumbnailStackManager()
+        fakeStore = FakeImageStore()
+        sut = ThumbnailStackManager(store: fakeStore)
     }
 
     override func tearDown() {
@@ -22,7 +24,9 @@ final class ThumbnailStackManagerTests: XCTestCase {
     }
 
     private func add(_ result: CaptureResult) {
-        sut.add(image: result.image, result: result, screen: NSScreen.main!, duration: 0)
+        let screen = ScreenGeometry(frame: CGRect(x: 0, y: 0, width: 1440, height: 900),
+                                    visibleFrame: CGRect(x: 0, y: 25, width: 1440, height: 875))
+        sut.add(image: result.image, result: result, screen: screen, duration: 0)
     }
 
     // MARK: - add()
@@ -58,19 +62,6 @@ final class ThumbnailStackManagerTests: XCTestCase {
         XCTAssertEqual(sut.entries[0].result.fileURL.lastPathComponent, "keep.png")
     }
 
-    func testRemoveLastPanelNotifiesStackEmptied() {
-        add(makeResult(name: "a.png"))
-        add(makeResult(name: "b.png"))
-        var emptiedCount = 0
-        sut.onStackEmptied = { emptiedCount += 1 }
-
-        sut.remove(panel: sut.entries[0].panel)
-        XCTAssertEqual(emptiedCount, 0)
-
-        sut.remove(panel: sut.entries[0].panel)
-        XCTAssertEqual(emptiedCount, 1)
-    }
-
     // MARK: - combine()
 
     func testCombinePassesOlderImageAsTopAndReplacesBothEntries() {
@@ -79,27 +70,22 @@ final class ThumbnailStackManagerTests: XCTestCase {
         add(older)
         add(newer)
 
-        var combinedTop: NSImage?
-        var combinedBottom: NSImage?
         let combinedResult = makeResult(name: "combined.png")
-        sut.onCombine = { top, bottom in
-            combinedTop = top
-            combinedBottom = bottom
-            return combinedResult
-        }
+        fakeStore.combinedResultToReturn = combinedResult
 
         sut.combine(upperIndex: 0, lowerIndex: 1)
 
-        XCTAssertTrue(combinedTop === older.image, "chronologically older capture goes on top")
-        XCTAssertTrue(combinedBottom === newer.image)
+        XCTAssertEqual(fakeStore.combinedCalls.count, 1)
+        XCTAssertTrue(fakeStore.combinedCalls[0].top === older.image, "chronologically older capture goes on top")
+        XCTAssertTrue(fakeStore.combinedCalls[0].bottom === newer.image)
         XCTAssertEqual(sut.entries.count, 1)
         XCTAssertEqual(sut.entries[0].result.fileURL, combinedResult.fileURL)
     }
 
-    func testCombineKeepsEntriesWhenCallbackFails() {
+    func testCombineKeepsEntriesWhenStoreFails() {
         add(makeResult(name: "a.png"))
         add(makeResult(name: "b.png"))
-        sut.onCombine = { _, _ in nil }
+        fakeStore.combinedResultToReturn = nil
 
         sut.combine(upperIndex: 0, lowerIndex: 1)
 
@@ -108,10 +94,10 @@ final class ThumbnailStackManagerTests: XCTestCase {
 
     func testCombineIgnoresOutOfRangeIndices() {
         add(makeResult(name: "only.png"))
-        sut.onCombine = { _, _ in XCTFail("should not be called"); return nil }
 
         sut.combine(upperIndex: 0, lowerIndex: 1)
 
+        XCTAssertTrue(fakeStore.combinedCalls.isEmpty)
         XCTAssertEqual(sut.entries.count, 1)
     }
 
@@ -125,15 +111,13 @@ final class ThumbnailStackManagerTests: XCTestCase {
         XCTAssertTrue(sut.entries.isEmpty)
     }
 
-    func testDeleteCallbackNotifiesOwnerAndRemovesPanel() {
+    func testDeleteCallbackDeletesStoredFileAndRemovesPanel() {
         let result = makeResult(name: "deleted.png")
         add(result)
-        var deleted: CaptureResult?
-        sut.onDelete = { deleted = $0 }
 
         sut.entries[0].panel.onDelete?()
 
-        XCTAssertEqual(deleted?.fileURL, result.fileURL)
+        XCTAssertEqual(fakeStore.deletedURLs, [result.fileURL])
         XCTAssertTrue(sut.entries.isEmpty)
     }
 

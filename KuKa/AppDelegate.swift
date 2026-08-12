@@ -1,20 +1,22 @@
 import Cocoa
-import ServiceManagement
 
 @MainActor
-class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private let hotkeyManager = HotkeyManager()
-    private let captureManager = CaptureManager()
-    private var overlayWindows: [OverlayWindow] = []
-    private let thumbnailStack = ThumbnailStackManager()
+    private let settings = Settings()
+    private let imageStore = ImageStore()
+    private lazy var captureFlow = CaptureFlow(
+        selection: SelectionSession(),
+        capture: CaptureManager(store: imageStore),
+        thumbnails: thumbnailStack,
+        thumbnailDuration: { [settings] in settings.thumbnailDuration }
+    )
+    private lazy var thumbnailStack = ThumbnailStackManager(store: imageStore)
     private var editorWindow: EditorWindow?
-    private var launchAtLoginItem: NSMenuItem!
-    private var windowTilingItem: NSMenuItem!
-    private static let windowTilingEnabledKey = "windowTilingEnabled"
-    private var durationItems: [NSMenuItem] = []
     private let keepAwake = KeepAwakeController()
     private let windowTiling = WindowTilingController()
+    private lazy var statusMenu = StatusMenu(settings: settings, keepAwake: keepAwake)
 
     func applicationWillTerminate(_ notification: Notification) {
         keepAwake.deactivate()
@@ -36,84 +38,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func setupMenuBar() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         updateStatusItemIcon()
-
-        let menu = NSMenu()
-
-        // --- Settings ---
-        let settingsLabel = NSMenuItem(title: "Settings", action: nil, keyEquivalent: "")
-        settingsLabel.isEnabled = false
-        menu.addItem(settingsLabel)
-
-        launchAtLoginItem = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
-        launchAtLoginItem.target = self
-        launchAtLoginItem.state = SMAppService.mainApp.status == .enabled ? .on : .off
-        menu.addItem(launchAtLoginItem)
-
-        windowTilingItem = NSMenuItem(title: "Window Tiling", action: #selector(toggleWindowTiling), keyEquivalent: "")
-        windowTilingItem.target = self
-        windowTilingItem.state = Self.isWindowTilingEnabled ? .on : .off
-        menu.addItem(windowTilingItem)
-
-        menu.addItem(.separator())
-
-        let durationLabel = NSMenuItem(title: "Thumbnail Duration", action: nil, keyEquivalent: "")
-        durationLabel.isEnabled = false
-        menu.addItem(durationLabel)
-
-        let currentDuration = UserDefaults.standard.object(forKey: "thumbnailDuration") as? Double ?? 5.0
-        for (title, tag) in [("3 Seconds", 3), ("5 Seconds", 5), ("15 Seconds", 15), ("Forever", 0)] {
-            let item = NSMenuItem(title: title, action: #selector(changeDuration(_:)), keyEquivalent: "")
-            item.target = self
-            item.tag = tag
-            item.state = Double(tag) == currentDuration ? .on : .off
-            menu.addItem(item)
-            durationItems.append(item)
+        statusMenu.onTilingToggled = { [weak self] enabled in
+            self?.hotkeyManager.tilingEnabled = enabled
         }
-
-        menu.addItem(.separator())
-
-        // --- Keep Awake ---
-        keepAwake.buildMenuSection(into: menu)
-
-        menu.addItem(.separator())
-
-        // --- Features ---
-        let featuresLabel = NSMenuItem(title: "Features", action: nil, keyEquivalent: "")
-        featuresLabel.isEnabled = false
-        menu.addItem(featuresLabel)
-
-        for feature in [
-            "⌘⇧3 to capture full screen",
-            "⌘⇧4 to capture selected area",
-            "Multi-monitor support",
-            "Auto-save to ~/Screenshots/",
-            "Copy to clipboard",
-            "Thumbnail preview & annotation"
-        ] {
-            let item = NSMenuItem(title: feature, action: nil, keyEquivalent: "")
-            item.isEnabled = false
-            item.indentationLevel = 1
-            menu.addItem(item)
-        }
-
-        menu.addItem(.separator())
-
-        // --- Links ---
-        let reportBug = NSMenuItem(title: "Report a Bug…", action: #selector(openReportBug), keyEquivalent: "")
-        reportBug.target = self
-        menu.addItem(reportBug)
-
-        let suggestFeature = NSMenuItem(title: "Suggest a Feature…", action: #selector(openSuggestFeature), keyEquivalent: "")
-        suggestFeature.target = self
-        menu.addItem(suggestFeature)
-
-        menu.addItem(.separator())
-
-        let quitItem = NSMenuItem(title: "Quit Ku-Ka", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
-        menu.addItem(quitItem)
-
-        menu.delegate = self
-        statusItem.menu = menu
+        statusItem.menu = statusMenu.menu
     }
 
     // MARK: - Hotkey
@@ -127,94 +55,26 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             guard let self else { return }
             MainActor.assumeIsolated {
                 switch action {
-                case .captureArea: self.startCapture()
-                case .captureFullScreen: self.startFullScreenCapture()
+                case .captureArea: self.startCapture(.interactive)
+                case .captureFullScreen: self.startCapture(.fullScreen)
                 case .tile(let tilingAction): self.windowTiling.tile(tilingAction)
                 }
             }
         }
-        hotkeyManager.tilingEnabled = Self.isWindowTilingEnabled
+        hotkeyManager.tilingEnabled = settings.windowTilingEnabled
         hotkeyManager.start()
     }
 
     // MARK: - Capture Flow
 
-    private func startCapture() {
-        guard overlayWindows.isEmpty else { return }
-
+    private func startCapture(_ mode: CaptureFlow.Mode) {
+        guard ScreenRecordingPermission.ensureGranted() else { return }
+        // Read the ambient state at press time, before the Task hop
+        let layout = SystemScreens().all
         let mouseLocation = NSEvent.mouseLocation
-        var cursorScreenOverlay: OverlayWindow?
-
-        for screen in NSScreen.screens {
-            let overlay = OverlayWindow(screen: screen)
-
-            overlay.selectionView.onSelection = { [weak self] rect in
-                self?.finishCapture(rect: rect, screen: screen)
-            }
-            overlay.selectionView.onCancel = { [weak self] in
-                self?.dismissOverlay()
-            }
-            overlay.selectionView.onWindowSelection = { [weak self] windowID in
-                self?.finishWindowCapture(windowID: windowID, screen: screen)
-            }
-
-            overlayWindows.append(overlay)
-
-            if screen.frame.contains(mouseLocation) {
-                cursorScreenOverlay = overlay
-            }
-        }
-
-        NSApp.activate(ignoringOtherApps: true)
-
-        for overlay in overlayWindows {
-            if overlay === cursorScreenOverlay {
-                overlay.makeKeyAndOrderFront(nil)
-                overlay.makeFirstResponder(overlay.selectionView)
-            } else {
-                overlay.orderFront(nil)
-            }
-        }
-    }
-
-    private func startFullScreenCapture() {
-        let mouseLocation = NSEvent.mouseLocation
-        guard let screen = NSScreen.screens.first(where: { $0.frame.contains(mouseLocation) }) ?? NSScreen.main else { return }
         Task { @MainActor in
-            guard let result = await self.captureManager.captureFullScreen(screen: screen) else { return }
-            FlashView.flash(on: screen)
-            self.showThumbnail(result: result, screen: screen)
+            await self.captureFlow.start(mode, layout: layout, mouseLocation: mouseLocation)
         }
-    }
-
-    private func finishCapture(rect: CGRect, screen: NSScreen) {
-        captureAfterOverlayDismiss(screen: screen) {
-            await self.captureManager.capture(rect: rect, screen: screen)
-        }
-    }
-
-    private func finishWindowCapture(windowID: CGWindowID, screen: NSScreen) {
-        captureAfterOverlayDismiss(screen: screen) {
-            await self.captureManager.captureWindow(windowID: windowID)
-        }
-    }
-
-    private func captureAfterOverlayDismiss(screen: NSScreen, _ capture: @escaping () async -> CaptureResult?) {
-        dismissOverlay()
-        Task { @MainActor in
-            // Give the overlay a moment to disappear before capturing
-            try? await Task.sleep(nanoseconds: 50_000_000)
-            guard let result = await capture() else { return }
-            self.showThumbnail(result: result, screen: screen)
-        }
-    }
-
-    private func dismissOverlay() {
-        NSCursor.pop()
-        for overlay in overlayWindows {
-            overlay.close()
-        }
-        overlayWindows.removeAll()
     }
 
     // MARK: - Thumbnail & Editor
@@ -223,135 +83,35 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         thumbnailStack.onEdit = { [weak self] result in
             self?.openEditor(result: result)
         }
-        thumbnailStack.onCombine = { [weak self] topImage, bottomImage in
-            self?.captureManager.saveCombined(topImage: topImage, bottomImage: bottomImage)
-        }
-        thumbnailStack.onDelete = { [weak self] result in
-            self?.captureManager.deleteScreenshot(at: result.fileURL)
-        }
-        // The stack holds the full-resolution captures; once the last panel
-        // closes they deallocate, so hand the freed pages back to the OS.
-        thumbnailStack.onStackEmptied = { MemoryReclaim.schedule() }
     }
 
     private func setupKeepAwake() {
         keepAwake.onStateChange = { [weak self] in self?.updateStatusItemIcon() }
     }
 
-    private func showThumbnail(result: CaptureResult, screen: NSScreen) {
-        let duration = UserDefaults.standard.object(forKey: "thumbnailDuration") as? Double ?? 5.0
-        thumbnailStack.add(image: result.image, result: result, screen: screen, duration: duration)
-    }
-
     private func openEditor(result: CaptureResult) {
         NSApp.activate(ignoringOtherApps: true)
 
-        let editor = EditorWindow(image: result.image)
+        let editor = EditorWindow(image: result.image, fileURL: result.fileURL, store: imageStore)
         editorWindow = editor
 
-        editor.onSave = { [weak self] annotatedImage in
-            self?.captureManager.saveAnnotated(image: annotatedImage, to: result.fileURL)
-        }
-
-        editor.onDelete = { [weak self] in
-            self?.captureManager.deleteScreenshot(at: result.fileURL)
-        }
-
         // Drop our reference once the window closes (Done/Delete/close button/Escape)
-        // so the editor and its full-resolution image deallocate. Closing only
-        // ever replaces this one editor, so clear it unconditionally.
-        editor.onClose = { [weak self] in
-            self?.editorWindow = nil
+        // so the editor and its full-resolution image deallocate. A second
+        // editor can be opened while one is up, so only clear the reference
+        // if it still points at the editor that closed. `editor` must be
+        // weak here: a strong capture in its own stored closure would be a
+        // retain cycle.
+        editor.onClose = { [weak self, weak editor] in
+            if let editor, self?.editorWindow === editor {
+                self?.editorWindow = nil
+            }
             MemoryReclaim.schedule()
         }
 
         editor.makeKeyAndOrderFront(nil)
     }
 
-    // MARK: - Thumbnail Duration
-
-    @objc private func changeDuration(_ sender: NSMenuItem) {
-        UserDefaults.standard.set(Double(sender.tag), forKey: "thumbnailDuration")
-        for item in durationItems { item.state = .off }
-        sender.state = .on
-    }
-
-    // MARK: - Keep Awake (menu delegate forwarding)
-
-    func menuWillOpen(_ menu: NSMenu) {
-        keepAwake.menuWillOpen()
-    }
-
-    func menuDidClose(_ menu: NSMenu) {
-        keepAwake.menuDidClose()
-    }
-
-    @objc private func openReportBug() {
-        NSWorkspace.shared.open(URL(string: "https://github.com/ChristianVilen/ku-ka/issues/new?labels=bug")!)
-    }
-
-    @objc private func openSuggestFeature() {
-        NSWorkspace.shared.open(URL(string: "https://github.com/ChristianVilen/ku-ka/issues/new?labels=enhancement")!)
-    }
-
-    // MARK: - Window Tiling
-
-    private static var isWindowTilingEnabled: Bool {
-        UserDefaults.standard.object(forKey: windowTilingEnabledKey) as? Bool ?? true
-    }
-
-    @objc private func toggleWindowTiling() {
-        let enabled = !Self.isWindowTilingEnabled
-        UserDefaults.standard.set(enabled, forKey: Self.windowTilingEnabledKey)
-        hotkeyManager.tilingEnabled = enabled
-        windowTilingItem.state = enabled ? .on : .off
-    }
-
-    // MARK: - Launch at Login
-
-    @objc private func toggleLaunchAtLogin() {
-        let isCurrentlyEnabled = SMAppService.mainApp.status == .enabled
-        do {
-            if isCurrentlyEnabled {
-                try SMAppService.mainApp.unregister()
-            } else {
-                try SMAppService.mainApp.register()
-            }
-            launchAtLoginItem.state = SMAppService.mainApp.status == .enabled ? .on : .off
-        } catch {
-            NSLog("Launch at login toggle failed: \(error)")
-        }
-    }
-
     private func updateStatusItemIcon() {
-        guard let button = statusItem.button else { return }
-        guard let base = NSImage(named: "MenuBarIcon") else {
-            button.image = NSImage(systemSymbolName: "camera.viewfinder", accessibilityDescription: "Ku-Ka")
-            return
-        }
-        let size = NSSize(width: 18, height: 18)
-
-        guard keepAwake.isActive else {
-            let icon = (base.copy() as? NSImage) ?? base
-            icon.size = size
-            icon.isTemplate = false
-            button.image = icon
-            return
-        }
-
-        // Active: keep the normal icon and add a small accent dot (with a light
-        // ring for contrast) in the bottom-right corner.
-        let badged = NSImage(size: size, flipped: false) { rect in
-            base.draw(in: rect)
-            let dot = NSRect(x: rect.maxX - 8, y: rect.minY + 1, width: 7, height: 7)
-            let ring = dot.insetBy(dx: -1.5, dy: -1.5)
-            NSColor.white.setFill()
-            NSBezierPath(ovalIn: ring).fill()
-            NSColor.controlAccentColor.setFill()
-            NSBezierPath(ovalIn: dot).fill()
-            return true
-        }
-        badged.isTemplate = false
-        button.image = badged
+        statusItem.button?.image = statusMenu.icon(keepAwakeActive: keepAwake.isActive)
     }
 }

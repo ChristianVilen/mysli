@@ -25,11 +25,6 @@ enum TilingScreenRules {
         }.count
     }
 
-    /// Index of the screen `windowFrame` overlaps the most; ties break
-    /// toward the lowest index. Nil when there's no overlap at all — the
-    /// caller falls back to a default screen. Deliberately not
-    /// `windowCount`'s 50% rule: a window has to be tiled somewhere, so even
-    /// a sliver of overlap makes that screen the answer.
     /// Index of the screen next to `currentIndex` in `direction`, ordered by
     /// horizontal center with wrap-around — so with two screens, either
     /// direction gives the other one. Returns nil when there is no other
@@ -44,21 +39,5 @@ enum TilingScreenRules {
         guard let position = ordered.firstIndex(of: currentIndex) else { return nil }
         let step = direction == .left ? -1 : 1
         return ordered[(position + step + ordered.count) % ordered.count]
-    }
-
-    static func bestScreenIndex(for windowFrame: CGRect, screenFrames: [CGRect]) -> Int? {
-        var bestIndex: Int?
-        var bestArea: CGFloat = 0
-        for (index, screenFrame) in screenFrames.enumerated() {
-            let intersection = screenFrame.intersection(windowFrame)
-            guard !intersection.isNull else { continue }
-            let area = intersection.width * intersection.height
-            guard area > 0 else { continue }
-            if bestIndex == nil || area > bestArea {
-                bestIndex = index
-                bestArea = area
-            }
-        }
-        return bestIndex
     }
 }

@@ -10,24 +10,27 @@ final class WindowTilingControllerTests: XCTestCase {
     // single real window being tiled repeatedly.
     private let handleElement = AXUIElementCreateApplication(424_242)
 
-    override func setUpWithError() throws {
-        try XCTSkipIf(NSScreen.screens.isEmpty, "No screen available in this environment")
-    }
-
-    private var mainScreen: NSScreen {
-        NSScreen.main ?? NSScreen.screens[0]
-    }
+    // Synthetic layout — no real display needed.
+    private let screen = ScreenGeometry(
+        frame: CGRect(x: 0, y: 0, width: 1920, height: 1080),
+        visibleFrame: CGRect(x: 0, y: 25, width: 1920, height: 1055)
+    )
 
     private func focusedWindow(frame: CGRect) -> FocusedWindow {
         FocusedWindow(element: handleElement, frame: frame)
     }
 
-    private func makeController(_ windowControl: MockWindowControlling) -> WindowTilingController {
+    private func makeController(
+        _ windowControl: MockWindowControlling,
+        screens: [ScreenGeometry]? = nil,
+        mainIndex: Int? = 0
+    ) -> WindowTilingController {
         WindowTilingController(
             windowControl: windowControl,
             stageManager: MockStageManagerDetecting(),
             windowList: MockWindowListProvider(),
-            engine: TilingLayoutEngine()
+            engine: TilingLayoutEngine(),
+            screens: FakeScreens(all: screens ?? [screen], mainIndex: mainIndex)
         )
     }
 
@@ -36,7 +39,6 @@ final class WindowTilingControllerTests: XCTestCase {
     func testMaximizeThenSecondPressRestoresRecordedPreviousFrame() {
         let mock = MockWindowControlling()
         let controller = makeController(mock)
-        let screen = mainScreen
         let idealTarget = screen.visibleFrame
         let originalFrame = CGRect(x: screen.frame.minX + 10, y: screen.frame.minY + 10, width: 300, height: 300)
         // Simulates an app that snaps the requested maximize frame to
@@ -68,7 +70,6 @@ final class WindowTilingControllerTests: XCTestCase {
     func testFailedSetFrameDuringMaximizeSavesNothing() {
         let mock = MockWindowControlling()
         let controller = makeController(mock)
-        let screen = mainScreen
         let idealTarget = screen.visibleFrame
         let originalFrame = CGRect(x: screen.frame.minX + 10, y: screen.frame.minY + 10, width: 300, height: 300)
 
@@ -108,7 +109,6 @@ final class WindowTilingControllerTests: XCTestCase {
     func testEntryIsRemovedAfterRestoreSoThirdPressMaximizesAgain() {
         let mock = MockWindowControlling()
         let controller = makeController(mock)
-        let screen = mainScreen
         let idealTarget = screen.visibleFrame
         let originalFrame = CGRect(x: screen.frame.minX + 10, y: screen.frame.minY + 10, width: 300, height: 300)
         let achievedFrame = CGRect(x: screen.frame.minX + 5, y: screen.frame.minY + 5, width: 400, height: 400)
@@ -139,7 +139,6 @@ final class WindowTilingControllerTests: XCTestCase {
     func testFailedRestoreKeepsEntrySoSecondAttemptStillRestores() {
         let mock = MockWindowControlling()
         let controller = makeController(mock)
-        let screen = mainScreen
         let originalFrame = CGRect(x: screen.frame.minX + 10, y: screen.frame.minY + 10, width: 300, height: 300)
         let achievedFrame = CGRect(x: screen.frame.minX + 5, y: screen.frame.minY + 5, width: 400, height: 400)
 
@@ -173,7 +172,6 @@ final class WindowTilingControllerTests: XCTestCase {
     func testHalfTilingNeverTouchesSavedFrameMap() {
         let mock = MockWindowControlling()
         let controller = makeController(mock)
-        let screen = mainScreen
         let idealTarget = screen.visibleFrame
         let leftHalfTarget = CGRect(
             x: screen.visibleFrame.minX,
@@ -207,7 +205,7 @@ final class WindowTilingControllerTests: XCTestCase {
     func testCenterMovesWindowToScreenCenterKeepingItsSize() {
         let mock = MockWindowControlling()
         let controller = makeController(mock)
-        let visible = mainScreen.visibleFrame
+        let visible = screen.visibleFrame
         let original = CGRect(x: visible.minX + 10, y: visible.minY + 10, width: 400, height: 300)
 
         mock.focusedWindowToReturn = focusedWindow(frame: original)
@@ -227,10 +225,45 @@ final class WindowTilingControllerTests: XCTestCase {
     func testCenterDoesNothingWhenWindowIsAtMaximizeSize() {
         let mock = MockWindowControlling()
         let controller = makeController(mock)
-        let visible = mainScreen.visibleFrame
+        let visible = screen.visibleFrame
 
         mock.focusedWindowToReturn = focusedWindow(frame: visible)
         controller.tile(.center)
+
+        XCTAssertTrue(mock.setFrameCalls.isEmpty)
+    }
+
+    // MARK: - Multi-display hop (synthetic two-screen layout)
+
+    func testSecondHalfPressHopsToSameHalfOfAdjacentScreen() {
+        let screenA = ScreenGeometry(
+            frame: CGRect(x: 0, y: 0, width: 1920, height: 1080),
+            visibleFrame: CGRect(x: 0, y: 25, width: 1920, height: 1055)
+        )
+        let screenB = ScreenGeometry(
+            frame: CGRect(x: 1920, y: 0, width: 1440, height: 900),
+            visibleFrame: CGRect(x: 1920, y: 25, width: 1440, height: 875)
+        )
+        let mock = MockWindowControlling()
+        let controller = makeController(mock, screens: [screenA, screenB])
+
+        // The window is already snapped to A's left half; pressing left again
+        // hops to the left half of the next screen leftward, wrapping to B.
+        let leftHalfOfA = TilingLayoutEngine.halfFrame(.left, of: screenA.visibleFrame)
+        mock.focusedWindowToReturn = focusedWindow(frame: leftHalfOfA)
+        mock.achievedFrameToReturn = leftHalfOfA
+        controller.tile(.leftHalf)
+
+        XCTAssertEqual(mock.setFrameCalls.count, 1)
+        XCTAssertEqual(mock.setFrameCalls[0].frame, TilingLayoutEngine.halfFrame(.left, of: screenB.visibleFrame))
+    }
+
+    func testNoScreensDoesNothing() {
+        let mock = MockWindowControlling()
+        let controller = makeController(mock, screens: [], mainIndex: nil)
+
+        mock.focusedWindowToReturn = focusedWindow(frame: CGRect(x: 0, y: 0, width: 300, height: 300))
+        controller.tile(.maximize)
 
         XCTAssertTrue(mock.setFrameCalls.isEmpty)
     }
