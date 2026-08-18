@@ -37,7 +37,8 @@
 		A10000120 /* Settings.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000121 /* Settings.swift */; };
 		A10000122 /* StatusMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000123 /* StatusMenu.swift */; };
 		A10000124 /* Screens.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000125 /* Screens.swift */; };
-		A10000126 /* ScreenRecordingPermission.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000127 /* ScreenRecordingPermission.swift */; };
+		A10000130 /* PermissionsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000132 /* PermissionsManager.swift */; };
+		A10000131 /* OnboardingWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000133 /* OnboardingWindowController.swift */; };
 		B20000001 /* CaptureManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000011 /* CaptureManagerTests.swift */; };
 		B20000005 /* WakeSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000015 /* WakeSessionTests.swift */; };
 		B20000002 /* Mocks.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000012 /* Mocks.swift */; };
@@ -56,6 +57,7 @@
 		B20000103 /* SettingsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000113 /* SettingsTests.swift */; };
 		B20000104 /* StatusMenuTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000114 /* StatusMenuTests.swift */; };
 		B20000105 /* ScreenCoordinatesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000115 /* ScreenCoordinatesTests.swift */; };
+		B20000106 /* PermissionsManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000116 /* PermissionsManagerTests.swift */; };
 		E227F2EA2F51CF630032905B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E28DFEF72F4C8D93001B8D91 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
@@ -103,7 +105,8 @@
 		A10000121 /* Settings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Settings.swift; sourceTree = "<group>"; };
 		A10000123 /* StatusMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusMenu.swift; sourceTree = "<group>"; };
 		A10000125 /* Screens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Screens.swift; sourceTree = "<group>"; };
-		A10000127 /* ScreenRecordingPermission.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenRecordingPermission.swift; sourceTree = "<group>"; };
+		A10000132 /* PermissionsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionsManager.swift; sourceTree = "<group>"; };
+		A10000133 /* OnboardingWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingWindowController.swift; sourceTree = "<group>"; };
 		B20000015 /* WakeSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WakeSessionTests.swift; sourceTree = "<group>"; };
 		B20000010 /* KuKaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KuKaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B20000011 /* CaptureManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureManagerTests.swift; sourceTree = "<group>"; };
@@ -123,6 +126,7 @@
 		B20000113 /* SettingsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsTests.swift; sourceTree = "<group>"; };
 		B20000114 /* StatusMenuTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusMenuTests.swift; sourceTree = "<group>"; };
 		B20000115 /* ScreenCoordinatesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenCoordinatesTests.swift; sourceTree = "<group>"; };
+		B20000116 /* PermissionsManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionsManagerTests.swift; sourceTree = "<group>"; };
 		E28DFEF72F4C8D93001B8D91 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -167,7 +171,6 @@
 				A10000121 /* Settings.swift */,
 				A10000123 /* StatusMenu.swift */,
 				A10000125 /* Screens.swift */,
-				A10000127 /* ScreenRecordingPermission.swift */,
 				A10000016 /* CaptureManager.swift */,
 				A10000019 /* ThumbnailPanel.swift */,
 				A1000001C /* ThumbnailStackManager.swift */,
@@ -185,6 +188,8 @@
 				A10000029 /* TilingScreenRules.swift */,
 				A1000002A /* ScreenCoordinates.swift */,
 				A1000002B /* WindowTilingController.swift */,
+				A10000132 /* PermissionsManager.swift */,
+				A10000133 /* OnboardingWindowController.swift */,
 				A1000001A /* DrawingView.swift */,
 				A1000001B /* EditorWindow.swift */,
 				A10000017 /* Info.plist */,
@@ -223,6 +228,7 @@
 				B20000113 /* SettingsTests.swift */,
 				B20000114 /* StatusMenuTests.swift */,
 				B20000115 /* ScreenCoordinatesTests.swift */,
+				B20000116 /* PermissionsManagerTests.swift */,
 				B20000012 /* Mocks.swift */,
 			);
 			path = KuKaTests;
@@ -321,7 +327,6 @@
 				A10000120 /* Settings.swift in Sources */,
 				A10000122 /* StatusMenu.swift in Sources */,
 				A10000124 /* Screens.swift in Sources */,
-				A10000126 /* ScreenRecordingPermission.swift in Sources */,
 				A10000006 /* CaptureManager.swift in Sources */,
 				A10000007 /* ThumbnailPanel.swift in Sources */,
 				A10000008 /* DrawingView.swift in Sources */,
@@ -341,6 +346,8 @@
 				A10000106 /* TilingScreenRules.swift in Sources */,
 				A10000107 /* ScreenCoordinates.swift in Sources */,
 				A10000108 /* WindowTilingController.swift in Sources */,
+				A10000130 /* PermissionsManager.swift in Sources */,
+				A10000131 /* OnboardingWindowController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -365,6 +372,7 @@
 				B20000103 /* SettingsTests.swift in Sources */,
 				B20000104 /* StatusMenuTests.swift in Sources */,
 				B20000105 /* ScreenCoordinatesTests.swift in Sources */,
+				B20000106 /* PermissionsManagerTests.swift in Sources */,
 				B20000002 /* Mocks.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

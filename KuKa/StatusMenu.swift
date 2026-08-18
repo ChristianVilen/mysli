@@ -7,6 +7,11 @@ import Cocoa
 final class StatusMenu: NSObject, NSMenuDelegate {
     let menu = NSMenu()
     var onTilingToggled: ((Bool) -> Void)?
+    /// Fired when the user picks "Permissions…" — AppDelegate opens the
+    /// onboarding window.
+    var onShowPermissions: (() -> Void)?
+    /// Fired every time the menu opens, before it is shown.
+    var onMenuWillOpen: (() -> Void)?
 
     private let settings: Settings
     private let keepAwake: KeepAwakeController
@@ -21,31 +26,38 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         build()
     }
 
-    /// The status-item image: the app icon, with an accent dot in the corner
-    /// while a keep-awake session is active.
-    func icon(keepAwakeActive: Bool) -> NSImage {
+    /// The status-item image: the app icon, plus a small dot (with a light
+    /// ring for contrast) per active state — Keep Awake gets the accent dot
+    /// in the bottom-right, a missing permission gets an orange warning dot
+    /// in the bottom-left. Separate corners so both can show at once.
+    func icon(keepAwakeActive: Bool, permissionMissing: Bool) -> NSImage {
         guard let base = NSImage(named: "MenuBarIcon") else {
             return NSImage(systemSymbolName: "camera.viewfinder", accessibilityDescription: "Ku-Ka") ?? NSImage()
         }
         let size = NSSize(width: 18, height: 18)
 
-        guard keepAwakeActive else {
+        guard keepAwakeActive || permissionMissing else {
             let icon = (base.copy() as? NSImage) ?? base
             icon.size = size
             icon.isTemplate = false
             return icon
         }
 
-        // Active: keep the normal icon and add a small accent dot (with a light
-        // ring for contrast) in the bottom-right corner.
         let badged = NSImage(size: size, flipped: false) { rect in
             base.draw(in: rect)
-            let dot = NSRect(x: rect.maxX - 8, y: rect.minY + 1, width: 7, height: 7)
-            let ring = dot.insetBy(dx: -1.5, dy: -1.5)
-            NSColor.white.setFill()
-            NSBezierPath(ovalIn: ring).fill()
-            NSColor.controlAccentColor.setFill()
-            NSBezierPath(ovalIn: dot).fill()
+            func drawDot(_ dot: NSRect, color: NSColor) {
+                let ring = dot.insetBy(dx: -1.5, dy: -1.5)
+                NSColor.white.setFill()
+                NSBezierPath(ovalIn: ring).fill()
+                color.setFill()
+                NSBezierPath(ovalIn: dot).fill()
+            }
+            if keepAwakeActive {
+                drawDot(NSRect(x: rect.maxX - 8, y: rect.minY + 1, width: 7, height: 7), color: .controlAccentColor)
+            }
+            if permissionMissing {
+                drawDot(NSRect(x: rect.minX + 1, y: rect.minY + 1, width: 7, height: 7), color: .systemOrange)
+            }
             return true
         }
         badged.isTemplate = false
@@ -114,6 +126,10 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         menu.addItem(.separator())
 
         // --- Links ---
+        let permissionsItem = NSMenuItem(title: "Permissions…", action: #selector(showPermissions), keyEquivalent: "")
+        permissionsItem.target = self
+        menu.addItem(permissionsItem)
+
         let reportBug = NSMenuItem(title: "Report a Bug…", action: #selector(openReportBug), keyEquivalent: "")
         reportBug.target = self
         menu.addItem(reportBug)
@@ -150,6 +166,10 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         launchAtLoginItem.state = settings.launchAtLogin ? .on : .off
     }
 
+    @objc private func showPermissions() {
+        onShowPermissions?()
+    }
+
     @objc private func openReportBug() {
         NSWorkspace.shared.open(URL(string: "https://github.com/ChristianVilen/ku-ka/issues/new?labels=bug")!)
     }
@@ -161,6 +181,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     // MARK: - Menu delegate (keep-awake countdown updates)
 
     func menuWillOpen(_ menu: NSMenu) {
+        onMenuWillOpen?()
         keepAwake.menuWillOpen()
     }
 

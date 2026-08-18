@@ -17,6 +17,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private let keepAwake = KeepAwakeController()
     private let windowTiling = WindowTilingController()
     private lazy var statusMenu = StatusMenu(settings: settings, keepAwake: keepAwake)
+    private let permissions = PermissionsManager()
+    private var onboardingController: OnboardingWindowController?
+    /// False in UI-test runs, where permission handling is skipped entirely
+    /// (also keeps the warning badge off the status icon there).
+    private var permissionHandlingEnabled = false
 
     func applicationWillTerminate(_ notification: Notification) {
         keepAwake.deactivate()
@@ -25,12 +30,47 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         let isTesting = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
             || CommandLine.arguments.contains("--uitesting")
-        if !isTesting {
-            setupHotkey()
-        }
         setupMenuBar()
         setupThumbnailStack()
         setupKeepAwake()
+        if !isTesting {
+            setupPermissions()
+        }
+    }
+
+    // MARK: - Permissions
+
+    /// Wires `PermissionsManager` in as the single source of truth: the event
+    /// tap starts the moment Accessibility is granted (no relaunch), and the
+    /// onboarding window opens on launch while anything is missing.
+    private func setupPermissions() {
+        permissionHandlingEnabled = true
+        permissions.onChange = { [weak self] in self?.permissionsChanged() }
+        permissions.startMonitoring()
+        // An accessory app rarely becomes active, so also re-check every time
+        // the status menu opens — otherwise a revocation made in System
+        // Settings would leave the warning badge stale until onboarding opens.
+        statusMenu.onMenuWillOpen = { [weak self] in self?.permissions.refresh() }
+        permissions.refresh()
+        permissionsChanged()
+        if !permissions.allGranted {
+            showOnboarding(.welcome)
+        }
+    }
+
+    private func permissionsChanged() {
+        if permissions.accessibility && !hotkeyManager.isRunning {
+            setupHotkey()
+        }
+        updateStatusItemIcon()
+        onboardingController?.refreshRows()
+    }
+
+    private func showOnboarding(_ page: OnboardingWindowController.Page = .checklist) {
+        if onboardingController == nil {
+            onboardingController = OnboardingWindowController(permissions: permissions)
+        }
+        onboardingController?.show(page)
     }
 
     // MARK: - Menu Bar
@@ -41,6 +81,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusMenu.onTilingToggled = { [weak self] enabled in
             self?.hotkeyManager.tilingEnabled = enabled
         }
+        statusMenu.onShowPermissions = { [weak self] in self?.showOnboarding() }
         statusItem.menu = statusMenu.menu
     }
 
@@ -68,7 +109,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Capture Flow
 
     private func startCapture(_ mode: CaptureFlow.Mode) {
-        guard ScreenRecordingPermission.ensureGranted() else { return }
+        // Screen Recording can be revoked at any time, so re-check at press
+        // time. A missing grant routes to the onboarding window (explanation
+        // + Grant button) instead of capturing a black frame.
+        permissions.refresh()
+        guard permissions.screenRecording else {
+            showOnboarding()
+            return
+        }
         // Read the ambient state at press time, before the Task hop
         let layout = SystemScreens().all
         let mouseLocation = NSEvent.mouseLocation
@@ -112,6 +160,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func updateStatusItemIcon() {
-        statusItem.button?.image = statusMenu.icon(keepAwakeActive: keepAwake.isActive)
+        statusItem.button?.image = statusMenu.icon(
+            keepAwakeActive: keepAwake.isActive,
+            permissionMissing: permissionHandlingEnabled && !permissions.allGranted
+        )
     }
 }

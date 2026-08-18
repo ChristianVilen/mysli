@@ -82,21 +82,21 @@ Alternatively, you can use the GUI method:
 
 ## Permissions
 
-On first launch, Ku-Ka needs two permissions:
+Ku-Ka needs two permissions. On first launch (and whenever one is missing) a setup window opens — a short welcome page, then one row per permission with a Grant button and a live ❌/✅ status. Grant each one in System Settings and the row flips to ✅ by itself, no relaunch needed. The window can be reopened anytime from the menu bar via **Permissions…**, and the menu-bar icon shows a small orange dot while a permission is missing.
 
 ### Accessibility (required)
-The app intercepts `Shift+Command+4` via a `CGEvent` tap, which requires Accessibility access. The same permission also lets Ku-Ka move and resize windows, which is what the window tiling hotkeys use — no separate permission is needed for that.
+The app intercepts `Shift+Command+3/4` via a `CGEvent` tap, which requires Accessibility access. The same permission also lets Ku-Ka move and resize windows, which is what the window tiling hotkeys use — no separate permission is needed for that.
 
 **System Settings → Privacy & Security → Accessibility** → Enable Ku-Ka
 
-If permission is missing, the app will show an alert and offer to open System Settings for you.
+The hotkeys start working the moment the permission is granted.
 
 ### Screen Recording (required)
-`CGWindowListCreateImage` requires screen recording permission to capture screen content.
+ScreenCaptureKit requires screen recording permission to capture screen content.
 
 **System Settings → Privacy & Security → Screen Recording** → Enable Ku-Ka
 
-macOS will prompt you automatically on the first capture attempt.
+Two macOS quirks to expect: the first capture can require one quit-and-reopen of Ku-Ka before the grant takes effect, and roughly every month macOS makes every screenshot app ask again for screen recording. Neither is something Ku-Ka can turn off.
 
 ## Usage
 

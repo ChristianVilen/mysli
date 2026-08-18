@@ -46,6 +46,8 @@ KuKa/
 ├── StageManagerDetector.swift # Reads the system Stage Manager on/off setting, fresh on every access
 ├── AccessibilityWindowControl.swift # AX-API glue: reads/moves the focused window, NS-space coordinates
 ├── ScreenCoordinates.swift   # Shared top-left (CG/AX) <-> bottom-left (NS) coordinate flip
+├── PermissionsManager.swift  # Single source of truth for Accessibility + Screen Recording status, polling, deep links
+├── OnboardingWindowController.swift # Permission onboarding window: per-permission row with live ❌/✅ + Grant button
 ├── Info.plist           # LSUIElement=true, NSScreenCaptureUsageDescription
 └── KuKa.entitlements    # Sandbox disabled (required for CGEvent tap + screen capture)
 ```
@@ -76,6 +78,8 @@ KuKa/
 | `AccessibilityWindowControl` | Accessibility-API glue: reads the focused window's frame and moves/resizes it; converts between AX (top-left origin) and NS (bottom-left origin) coordinates |
 | `WindowListProvider` | Lists on-screen, layer-0 windows (excluding Ku-Ka's own) via `CGWindowListCopyWindowInfo`, converted to NS coordinates |
 | `ScreenCoordinates` | Shared vertical-flip math used by both `WindowListProvider` and `AccessibilityWindowControl` for CG/AX ↔ NS coordinate conversion |
+| `PermissionsManager` | `@MainActor` single source of truth for the two TCC permissions: `refresh()` re-reads `AXIsProcessTrusted()`/`CGPreflightScreenCaptureAccess()`, request methods trigger the system prompts + deep-link into the right System Settings pane, 0.5s polling while onboarding is open |
+| `OnboardingWindowController` | Dedicated `NSWindow` (AppKit, no storyboard) shown at launch while a permission is missing — a welcome page first, then the permission checklist. The menu's "Permissions…" and a capture blocked on a missing grant open it straight on the checklist. Flips the app to `.regular` activation policy while open, back to `.accessory` on close |
 
 ### Flow
 
@@ -135,7 +139,7 @@ Ctrl+Opt+Left/Right/Return/C → HotkeyManager (suppresses event; skipped entire
 - All matches route through one `onAction` closure with the `HotkeyAction` enum (`.captureArea`, `.captureFullScreen`, `.tile(TilingAction)`).
 - The `tilingEnabled` flag gates the tiling combos: while off they are not matched at all and pass through to other apps. Screenshot combos are unaffected by the flag.
 - Returns `nil` to suppress the system screenshot tool.
-- Requires Accessibility permission; prompts user if missing.
+- Requires Accessibility permission. `HotkeyManager` no longer checks or prompts for it — `AppDelegate` starts the tap (via `PermissionsManager` status) as soon as Accessibility is granted, with no relaunch needed; the onboarding window handles the prompting.
 
 ### Screen Capture
 - Overlay window is dismissed before capture to exclude it from the screenshot.
@@ -178,6 +182,7 @@ KuKaTests/                    # Unit tests (XCTest, macOS 14.0+)
 ├── TilingAdaptersTests.swift # TilingScreenRules screen-membership + screen-picking rules, AX/NS coordinate conversion
 ├── WindowTilingControllerTests.swift # Saved-frame map behavior: save-then-restore, failed moves, entry lifecycle
 ├── HotkeyManagerTests.swift  # Event routing: tiling combos swallowed/passed through per the tilingEnabled flag, screenshot combos always work
+├── PermissionsManagerTests.swift # Permission status via injected probes: refresh + change detection, poll-timer pickup, Settings deep-link fallback order
 └── Mocks.swift               # MockFileManager, MockClipboard, MockScreenCapture, MockWindowListProvider, MockWindowControlling, MockStageManagerDetecting, FakeSleepPreventer
 
 KuKaUITests/                  # UI tests (XCUITest, macOS 14.0+)
@@ -186,7 +191,7 @@ KuKaUITests/                  # UI tests (XCUITest, macOS 14.0+)
 
 ### Test-Mode Guard
 
-When running under XCTest, `AppDelegate` skips hotkey registration and notification authorization to avoid permission prompts:
+When running under XCTest, `AppDelegate` skips `setupPermissions()` entirely to avoid permission prompts — no TCC checks, no onboarding window, no warning badge on the status icon, and (because the event tap only starts once Accessibility reports granted) no hotkey registration either:
 - Unit tests: detected via `XCTestConfigurationFilePath` environment variable
 - UI tests: detected via `--uitesting` launch argument passed by `MenuBarTests.setUp()`
 
@@ -208,6 +213,7 @@ When running under XCTest, `AppDelegate` skips hotkey registration and notificat
 - Tiling layout math, the maximize/restore toggle (including apps that snap window sizes), the second-press screen hop, and center's move/no-op decision (`TilingLayoutEngine`)
 - Screen-membership, screen-picking, and adjacent-screen (hop) rules (`TilingScreenRules`), and the controller's saved-frame map behavior across save/restore/failure plus center pass-through (`WindowTilingController`)
 - Hotkey routing (`HotkeyManager`): tiling combos swallowed while enabled, passed through while disabled; screenshot combos work in both states
+- Permissions (`PermissionsManager`): `refresh()` reads the injected probes; `onChange` fires only on a real status change; the 0.5s poll and the app-activation monitor pick up a grant without a manual refresh; the Settings deep link tries the modern pane id first and falls back to the legacy one
 
 ### Keep Awake implementation
 
