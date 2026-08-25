@@ -137,17 +137,12 @@ class SelectionView: NSView {
         path.stroke()
 
         let text = "\(Int(selectionRect.width)) × \(Int(selectionRect.height))"
-        let attrs: [NSAttributedString.Key: Any] = [
-            .font: NSFont.monospacedSystemFont(ofSize: 12, weight: .medium),
-            .foregroundColor: NSColor.white,
-            .backgroundColor: NSColor.black.withAlphaComponent(0.7)
-        ]
-        let size = (text as NSString).size(withAttributes: attrs)
+        let size = (text as NSString).size(withAttributes: SizeLabel.attributes)
         let labelOrigin = NSPoint(
             x: selectionRect.midX - size.width / 2,
             y: selectionRect.minY - size.height - 6
         )
-        (text as NSString).draw(at: labelOrigin, withAttributes: attrs)
+        (text as NSString).draw(at: labelOrigin, withAttributes: SizeLabel.attributes)
     }
 
     private func drawWindowHighlight() {

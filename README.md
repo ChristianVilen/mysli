@@ -12,7 +12,7 @@ A lightweight macOS menu bar app that replaces the default `Shift+Command+4` scr
 - macOS-style selection overlay with dimmed background and real-time dimensions display
 - Saves screenshots as PNG to `~/Screenshots/`
 - Automatically copies the screenshot to the clipboard
-- Floating thumbnail preview after capture — click to annotate with freehand drawing
+- Floating thumbnail preview after capture — click to annotate with freehand drawing or crop
 - Delete screenshots from thumbnail or editor — removes file and clears clipboard
 - Launch at Login toggle
 - Keep Awake — stop the Mac from sleeping while a long task (such as an AI coding agent) runs, with a menu-bar toggle and timed sessions
@@ -106,8 +106,8 @@ Two macOS quirks to expect: the first capture can require one quit-and-reopen of
 3. Click and drag to select the area you want to capture
 4. Release the mouse — the screenshot is saved and copied
 5. A thumbnail preview appears in the bottom-right corner for 5 seconds
-6. Click the thumbnail to open the annotation editor — draw on the screenshot with freehand red lines
-7. Click **Done** to save the annotated version (overwrites the file and updates the clipboard)
+6. Click the thumbnail to open the editor — draw on the screenshot with freehand red lines, or press **Crop** and drag a box over the part you want to keep (drag the handles to resize, drag inside to move, click outside to remove the box)
+7. Click **Done** to save the edited version (overwrites the file and updates the clipboard)
 8. Click the **trash icon** on a thumbnail or **Delete** in the editor to delete the screenshot file and clear the clipboard
 9. Press `Escape` to cancel a selection
 
@@ -181,6 +181,7 @@ Tests cover:
 - Coordinate conversion (NSView → CGDisplay)
 - Screenshot file naming format
 - Annotated image save
+- Crop box geometry (draw, move, resize, flip, clear) and the crop's pixel mapping
 - Screenshot deletion (file removal + clipboard clear)
 - Tiling layout math and the maximize/restore toggle, including apps that snap window sizes
 - Screen-picking and windows-per-screen rules, plus the tiling controller's saved-frame handling

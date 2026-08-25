@@ -5,6 +5,13 @@ class DrawingView: NSView {
     private var strokes: [NSBezierPath] = []
     private var currentStroke: NSBezierPath?
 
+    /// Pixel size of the capture. Falls back to the point size when the
+    /// image has no bitmap, in which case nothing can be composited anyway.
+    var imagePixelSize: CGSize {
+        guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return image.size }
+        return CGSize(width: cgImage.width, height: cgImage.height)
+    }
+
     init(image: NSImage) {
         self.image = image
         super.init(frame: .zero)
@@ -20,9 +27,10 @@ class DrawingView: NSView {
     }
 
     /// Flatten the strokes onto the screenshot in a CGBitmapContext at the
-    /// source's pixel dimensions. Compositing via NSImage.lockFocus would
+    /// source's pixel dimensions, then cut out `rect` (view points, origin
+    /// bottom-left) when one is given. Compositing via NSImage.lockFocus would
     /// re-render at the screen's backing scale, doubling the pixel size.
-    func compositeImage() -> NSImage {
+    func compositeImage(croppedTo rect: CGRect? = nil) -> NSImage {
         guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil),
               let context = CGContext(
                 data: nil,
@@ -53,7 +61,24 @@ class DrawingView: NSView {
         NSGraphicsContext.restoreGraphicsState()
 
         guard let composited = context.makeImage() else { return image }
-        return NSImage(cgImage: composited, size: NSSize(width: composited.width, height: composited.height))
+        let output = rect.flatMap {
+            composited.cropping(to: Self.pixelRect(for: $0, in: bounds, imagePixelSize: CGSize(width: cgImage.width, height: cgImage.height)))
+        } ?? composited
+        return NSImage(cgImage: output, size: NSSize(width: output.width, height: output.height))
+    }
+
+    /// Map a rect in view points (origin bottom-left, inside `bounds`) to
+    /// image pixels (origin top-left, which is what CGImage.cropping expects).
+    /// Edges are rounded, not origin and size, so the far edge can't drift
+    /// a pixel. The crop overlay uses the same mapping for its size label.
+    static func pixelRect(for rect: CGRect, in bounds: CGRect, imagePixelSize: CGSize) -> CGRect {
+        let scaleX = imagePixelSize.width / bounds.width
+        let scaleY = imagePixelSize.height / bounds.height
+        let left = (rect.minX * scaleX).rounded()
+        let right = (rect.maxX * scaleX).rounded()
+        let top = ((bounds.height - rect.maxY) * scaleY).rounded()
+        let bottom = ((bounds.height - rect.minY) * scaleY).rounded()
+        return CGRect(x: left, y: top, width: right - left, height: bottom - top)
     }
 
     override func draw(_ dirtyRect: NSRect) {

@@ -15,6 +15,9 @@
 		A10000006 /* CaptureManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000016 /* CaptureManager.swift */; };
 		A10000007 /* ThumbnailPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000019 /* ThumbnailPanel.swift */; };
 		A10000008 /* DrawingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001A /* DrawingView.swift */; };
+		A10000141 /* CropBox.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000140 /* CropBox.swift */; };
+		A10000143 /* CropOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000142 /* CropOverlayView.swift */; };
+		A10000145 /* SizeLabel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000144 /* SizeLabel.swift */; };
 		A10000009 /* EditorWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001B /* EditorWindow.swift */; };
 		A100000A /* ThumbnailStackManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001C /* ThumbnailStackManager.swift */; };
 		A100000B /* CombineButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001D /* CombineButton.swift */; };
@@ -46,6 +49,7 @@
 		B20000007 /* KeepAwakeControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000017 /* KeepAwakeControllerTests.swift */; };
 		B20000008 /* ThumbnailStackManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000018 /* ThumbnailStackManagerTests.swift */; };
 		B20000009 /* DrawingViewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000019 /* DrawingViewTests.swift */; };
+		B20000121 /* CropBoxTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000120 /* CropBoxTests.swift */; };
 		B2000000A /* TilingLayoutEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000001A /* TilingLayoutEngineTests.swift */; };
 		B2000000B /* TilingAdaptersTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000001B /* TilingAdaptersTests.swift */; };
 		B2000000C /* WindowTilingControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000001C /* WindowTilingControllerTests.swift */; };
@@ -83,6 +87,9 @@
 		A10000018 /* KuKa.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = KuKa.entitlements; sourceTree = "<group>"; };
 		A10000019 /* ThumbnailPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThumbnailPanel.swift; sourceTree = "<group>"; };
 		A1000001A /* DrawingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrawingView.swift; sourceTree = "<group>"; };
+		A10000140 /* CropBox.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CropBox.swift; sourceTree = "<group>"; };
+		A10000142 /* CropOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CropOverlayView.swift; sourceTree = "<group>"; };
+		A10000144 /* SizeLabel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SizeLabel.swift; sourceTree = "<group>"; };
 		A1000001B /* EditorWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorWindow.swift; sourceTree = "<group>"; };
 		A1000001C /* ThumbnailStackManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThumbnailStackManager.swift; sourceTree = "<group>"; };
 		A1000001D /* CombineButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CombineButton.swift; sourceTree = "<group>"; };
@@ -115,6 +122,7 @@
 		B20000017 /* KeepAwakeControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeepAwakeControllerTests.swift; sourceTree = "<group>"; };
 		B20000018 /* ThumbnailStackManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThumbnailStackManagerTests.swift; sourceTree = "<group>"; };
 		B20000019 /* DrawingViewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrawingViewTests.swift; sourceTree = "<group>"; };
+		B20000120 /* CropBoxTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CropBoxTests.swift; sourceTree = "<group>"; };
 		B2000001A /* TilingLayoutEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TilingLayoutEngineTests.swift; sourceTree = "<group>"; };
 		B2000001B /* TilingAdaptersTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TilingAdaptersTests.swift; sourceTree = "<group>"; };
 		B2000001C /* WindowTilingControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowTilingControllerTests.swift; sourceTree = "<group>"; };
@@ -191,6 +199,9 @@
 				A10000132 /* PermissionsManager.swift */,
 				A10000133 /* OnboardingWindowController.swift */,
 				A1000001A /* DrawingView.swift */,
+				A10000140 /* CropBox.swift */,
+				A10000142 /* CropOverlayView.swift */,
+				A10000144 /* SizeLabel.swift */,
 				A1000001B /* EditorWindow.swift */,
 				A10000017 /* Info.plist */,
 				A10000018 /* KuKa.entitlements */,
@@ -217,6 +228,7 @@
 				B20000017 /* KeepAwakeControllerTests.swift */,
 				B20000018 /* ThumbnailStackManagerTests.swift */,
 				B20000019 /* DrawingViewTests.swift */,
+				B20000120 /* CropBoxTests.swift */,
 				B2000001A /* TilingLayoutEngineTests.swift */,
 				B2000001B /* TilingAdaptersTests.swift */,
 				B2000001C /* WindowTilingControllerTests.swift */,
@@ -330,6 +342,9 @@
 				A10000006 /* CaptureManager.swift in Sources */,
 				A10000007 /* ThumbnailPanel.swift in Sources */,
 				A10000008 /* DrawingView.swift in Sources */,
+				A10000141 /* CropBox.swift in Sources */,
+				A10000143 /* CropOverlayView.swift in Sources */,
+				A10000145 /* SizeLabel.swift in Sources */,
 				A10000009 /* EditorWindow.swift in Sources */,
 				A100000A /* ThumbnailStackManager.swift in Sources */,
 				A100000B /* CombineButton.swift in Sources */,
@@ -361,6 +376,7 @@
 				B20000007 /* KeepAwakeControllerTests.swift in Sources */,
 				B20000008 /* ThumbnailStackManagerTests.swift in Sources */,
 				B20000009 /* DrawingViewTests.swift in Sources */,
+				B20000121 /* CropBoxTests.swift in Sources */,
 				B2000000A /* TilingLayoutEngineTests.swift in Sources */,
 				B2000000B /* TilingAdaptersTests.swift in Sources */,
 				B2000000C /* WindowTilingControllerTests.swift in Sources */,
