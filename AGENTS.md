@@ -78,7 +78,7 @@ KuKa/
 | `AccessibilityWindowControl` | Accessibility-API glue: reads the focused window's frame and moves/resizes it; converts between AX (top-left origin) and NS (bottom-left origin) coordinates |
 | `WindowListProvider` | Lists on-screen, layer-0 windows (excluding Ku-Ka's own) via `CGWindowListCopyWindowInfo`, converted to NS coordinates |
 | `ScreenCoordinates` | Shared vertical-flip math used by both `WindowListProvider` and `AccessibilityWindowControl` for CG/AX ↔ NS coordinate conversion |
-| `PermissionsManager` | `@MainActor` single source of truth for the two TCC permissions: `refresh()` re-reads `AXIsProcessTrusted()`/`CGPreflightScreenCaptureAccess()`, request methods trigger the system prompts + deep-link into the right System Settings pane, 0.5s polling while onboarding is open |
+| `PermissionsManager` | `@MainActor` single source of truth for the two TCC permissions: `refresh()` re-reads `AXIsProcessTrusted()`/`CGPreflightScreenCaptureAccess()`, request methods deep-link into the right System Settings pane (and trigger the system prompt — for Accessibility only on the first request, see below), 0.5s polling while onboarding is open |
 | `OnboardingWindowController` | Dedicated `NSWindow` (AppKit, no storyboard) shown at launch while a permission is missing — a welcome page first, then the permission checklist. The menu's "Permissions…" and a capture blocked on a missing grant open it straight on the checklist. Flips the app to `.regular` activation policy while open, back to `.accessory` on close |
 
 ### Flow
@@ -213,7 +213,7 @@ When running under XCTest, `AppDelegate` skips `setupPermissions()` entirely to 
 - Tiling layout math, the maximize/restore toggle (including apps that snap window sizes), the second-press screen hop, and center's move/no-op decision (`TilingLayoutEngine`)
 - Screen-membership, screen-picking, and adjacent-screen (hop) rules (`TilingScreenRules`), and the controller's saved-frame map behavior across save/restore/failure plus center pass-through (`WindowTilingController`)
 - Hotkey routing (`HotkeyManager`): tiling combos swallowed while enabled, passed through while disabled; screenshot combos work in both states
-- Permissions (`PermissionsManager`): `refresh()` reads the injected probes; `onChange` fires only on a real status change; the 0.5s poll and the app-activation monitor pick up a grant without a manual refresh; the Settings deep link tries the modern pane id first and falls back to the legacy one
+- Permissions (`PermissionsManager`): `refresh()` reads the injected probes; `onChange` fires only on a real status change; the 0.5s poll and the app-activation monitor pick up a grant without a manual refresh; the Settings deep link tries the modern pane id first and falls back to the legacy one; the Accessibility prompt is shown on the first request only, in this run and in later ones, while the Settings pane opens every time
 
 ### Keep Awake implementation
 
@@ -221,6 +221,13 @@ When running under XCTest, `AppDelegate` skips `setupPermissions()` entirely to 
 - Lid-close sleep is never prevented; the menu hint says so.
 - The display-awake preference lives in `UserDefaults` under `keepDisplayAwake`, default on.
 - The menu UI is an inline custom-view panel (no submenu): one row of duration chips plus the checkbox; Turn Off appears below while a session is active.
+
+### Permissions implementation
+
+- The Accessibility grant needs the system prompt (`AXIsProcessTrustedWithOptions` with `kAXTrustedCheckOptionPrompt`) at least once: that call is what puts Ku-Ka in the Accessibility list. Opening the pane by itself adds nothing, and the user would find no row to switch on.
+- After that first time the prompt only repeats what the onboarding window says, as a modal on top of it, so `requestAccessibility()` shows it once and then only deep-links. The flag lives in `UserDefaults` under `didPromptForAccessibility`.
+- Screen Recording keeps prompting on every request: `CGRequestScreenCaptureAccess()` is not a modal of the same kind, and macOS re-asks for this grant about once a month anyway.
+- To test the first-run path again: `tccutil reset Accessibility com.kuka.screenshot` and `defaults delete com.kuka.screenshot didPromptForAccessibility`.
 
 ### Window tiling implementation
 

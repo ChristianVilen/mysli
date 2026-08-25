@@ -3,6 +3,20 @@ import XCTest
 
 @MainActor
 final class PermissionsManagerTests: XCTestCase {
+    private static let defaultsSuite = "PermissionsManagerTests"
+    private var defaults: UserDefaults!
+
+    override func setUp() {
+        super.setUp()
+        defaults = UserDefaults(suiteName: Self.defaultsSuite)!
+        defaults.removePersistentDomain(forName: Self.defaultsSuite)
+    }
+
+    override func tearDown() {
+        defaults.removePersistentDomain(forName: Self.defaultsSuite)
+        super.tearDown()
+    }
+
     func testRefreshReadsProbesAndUpdatesStatuses() {
         let sut = PermissionsManager(
             isAccessibilityTrusted: { true },
@@ -118,5 +132,43 @@ final class PermissionsManagerTests: XCTestCase {
         wait(for: [changed], timeout: 2)
         sut.stopPolling()
         XCTAssertTrue(sut.accessibility)
+    }
+
+    // MARK: - Accessibility prompt
+
+    func testAccessibilityPromptShowsOnlyOnTheFirstRequest() {
+        var prompts = 0
+        var opened = 0
+        let sut = PermissionsManager(
+            isAccessibilityTrusted: { false },
+            hasScreenCaptureAccess: { false },
+            openURL: { _ in opened += 1; return true },
+            showAccessibilityPrompt: { prompts += 1 },
+            defaults: defaults
+        )
+
+        sut.requestAccessibility()
+        sut.requestAccessibility()
+
+        XCTAssertEqual(prompts, 1)
+        XCTAssertEqual(opened, 2, "The Settings pane should open on every request")
+    }
+
+    func testAccessibilityPromptIsNotShownAgainInALaterRun() {
+        var prompts = 0
+        func makeSUT() -> PermissionsManager {
+            PermissionsManager(
+                isAccessibilityTrusted: { false },
+                hasScreenCaptureAccess: { false },
+                openURL: { _ in true },
+                showAccessibilityPrompt: { prompts += 1 },
+                defaults: defaults
+            )
+        }
+
+        makeSUT().requestAccessibility()
+        makeSUT().requestAccessibility()
+
+        XCTAssertEqual(prompts, 1)
     }
 }

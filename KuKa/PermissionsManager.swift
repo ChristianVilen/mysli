@@ -33,6 +33,10 @@ enum SettingsPane {
 /// short timer while the onboarding window is open (`startPolling()`).
 @MainActor
 final class PermissionsManager {
+    /// Marks that the system Accessibility prompt has been shown once. See
+    /// `requestAccessibility()`.
+    private static let didPromptForAccessibilityKey = "didPromptForAccessibility"
+
     private(set) var accessibility = false
     private(set) var screenRecording = false
 
@@ -42,20 +46,30 @@ final class PermissionsManager {
     private let isAccessibilityTrusted: () -> Bool
     private let hasScreenCaptureAccess: () -> Bool
     private let openURL: (URL) -> Bool
+    private let showAccessibilityPrompt: () -> Void
+    private let defaults: UserDefaults
     private var timer: Timer?
 
     var allGranted: Bool { accessibility && screenRecording }
 
-    /// The probes and opener default to the real system calls; tests inject
-    /// stand-ins.
+    /// The probes, the opener and the prompt default to the real system
+    /// calls; tests inject stand-ins.
     init(
         isAccessibilityTrusted: @escaping () -> Bool = { AXIsProcessTrusted() },
         hasScreenCaptureAccess: @escaping () -> Bool = { CGPreflightScreenCaptureAccess() },
-        openURL: @escaping (URL) -> Bool = { NSWorkspace.shared.open($0) }
+        openURL: @escaping (URL) -> Bool = { NSWorkspace.shared.open($0) },
+        showAccessibilityPrompt: @escaping () -> Void = {
+            _ = AXIsProcessTrustedWithOptions(
+                [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+            )
+        },
+        defaults: UserDefaults = .standard
     ) {
         self.isAccessibilityTrusted = isAccessibilityTrusted
         self.hasScreenCaptureAccess = hasScreenCaptureAccess
         self.openURL = openURL
+        self.showAccessibilityPrompt = showAccessibilityPrompt
+        self.defaults = defaults
     }
 
     /// Re-read both statuses without prompting the user.
@@ -68,12 +82,18 @@ final class PermissionsManager {
         onChange?()
     }
 
-    /// Show the system Accessibility prompt (which also lists the app in the
-    /// Accessibility pane) and open that pane.
+    /// Open the Accessibility pane, and show the system prompt on the first
+    /// request only.
+    ///
+    /// That prompt is what puts Ku-Ka in the Accessibility list — opening the
+    /// pane alone does not — so it must run at least once, or the user finds
+    /// no row to switch on. After that it only repeats what the onboarding
+    /// window already says, as a modal on top of it, so we stay quiet.
     func requestAccessibility() {
-        _ = AXIsProcessTrustedWithOptions(
-            [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
-        )
+        if !defaults.bool(forKey: Self.didPromptForAccessibilityKey) {
+            defaults.set(true, forKey: Self.didPromptForAccessibilityKey)
+            showAccessibilityPrompt()
+        }
         openSettings(.accessibility)
     }
 
