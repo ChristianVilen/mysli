@@ -6,6 +6,7 @@ enum HotkeyAction: Equatable {
     case captureArea
     case captureFullScreen
     case tile(TilingAction)
+    case showClipboardHistory
 }
 
 class HotkeyManager {
@@ -18,6 +19,12 @@ class HotkeyManager {
     /// of being swallowed. Screenshot hotkeys are unaffected. Read from the
     /// tap callback and written from the menu — both on the main thread.
     var tilingEnabled = true
+    /// Off by default, so a build with no settings/menu wiring yet never
+    /// swallows Shift+Cmd+C app-wide. `AppDelegate` sets this from Settings
+    /// once that wiring exists (Task 9; the settings default is true).
+    /// Read from the tap callback and written from `AppDelegate` — both on
+    /// the main thread.
+    var clipboardHistoryEnabled = false
 
     /// True while the event tap is installed. `AppDelegate` uses this to
     /// start the tap exactly once when Accessibility is granted.
@@ -111,6 +118,19 @@ class HotkeyManager {
         if flags.contains(.maskShift), flags.contains(.maskCommand) {
             if keyCode == 0x14 { return .captureFullScreen }
             if keyCode == 0x15 { return .captureArea }
+        }
+
+        // Clipboard history shortcut: Shift+Command+C. This branch and the
+        // tiling "center" combo below (Ctrl+Option+C) share the same key
+        // code but already can't both match — each requires modifiers the
+        // other forbids — so ruling out Control/Option here isn't what
+        // keeps them from colliding. It's here to reject extra-modifier
+        // chords like Ctrl+Shift+Cmd+C, which should pass through rather
+        // than be treated as ours.
+        if clipboardHistoryEnabled,
+            flags.contains(.maskShift), flags.contains(.maskCommand),
+            !flags.contains(.maskControl), !flags.contains(.maskAlternate) {
+            if keyCode == 0x08 { return .showClipboardHistory }
         }
 
         // Tiling shortcuts: Ctrl+Option+Left/Right/Return/C. Arrow key

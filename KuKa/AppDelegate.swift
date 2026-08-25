@@ -16,6 +16,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var editorWindow: EditorWindow?
     private let keepAwake = KeepAwakeController()
     private let windowTiling = WindowTilingController()
+    private let clipboardHistory = ClipboardHistoryController()
+    private lazy var clipboardPanel = ClipboardPanel(controller: clipboardHistory)
     private lazy var statusMenu = StatusMenu(settings: settings, keepAwake: keepAwake)
     private let permissions = PermissionsManager()
     private var onboardingController: OnboardingWindowController?
@@ -25,6 +27,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         keepAwake.deactivate()
+        clipboardHistory.disable()
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -33,8 +36,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupMenuBar()
         setupThumbnailStack()
         setupKeepAwake()
+        setupClipboardHistory()
         if !isTesting {
             setupPermissions()
+            // Polling the real pasteboard during unit/UI test runs would
+            // ingest whatever the developer happens to have copied, so this
+            // stays behind the same isTesting gate as setupPermissions().
+            if settings.clipboardHistoryEnabled {
+                clipboardHistory.enable()
+            }
         }
     }
 
@@ -85,6 +95,36 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem.menu = statusMenu.menu
     }
 
+    // MARK: - Clipboard History
+
+    /// Binds the panel to the controller's callback slots and wires the menu
+    /// toggle and screenshot-deletion hook. Called unconditionally from
+    /// `applicationDidFinishLaunching` — unlike `clipboardHistory.enable()`,
+    /// none of this touches the real pasteboard, so it doesn't need the
+    /// `isTesting` gate. Binding here (rather than leaving `clipboardPanel`
+    /// as an untouched lazy var) guarantees `bindController()` runs exactly
+    /// once, before the panel could ever be shown.
+    private func setupClipboardHistory() {
+        clipboardPanel.bindController()
+
+        statusMenu.onClipboardHistoryToggled = { [weak self] enabled in
+            guard let self else { return }
+            hotkeyManager.clipboardHistoryEnabled = enabled
+            if enabled {
+                clipboardHistory.enable()
+            } else {
+                clipboardHistory.disable()
+                if clipboardPanel.isVisible {
+                    clipboardPanel.dismiss()
+                }
+            }
+        }
+
+        imageStore.onDeletedHash = { [weak self] hash in
+            self?.clipboardHistory.removeItem(hash: hash)
+        }
+    }
+
     // MARK: - Hotkey
 
     private func setupHotkey() {
@@ -99,11 +139,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 case .captureArea: self.startCapture(.interactive)
                 case .captureFullScreen: self.startCapture(.fullScreen)
                 case .tile(let tilingAction): self.windowTiling.tile(tilingAction)
+                case .showClipboardHistory: self.toggleClipboardPanel()
                 }
             }
         }
         hotkeyManager.tilingEnabled = settings.windowTilingEnabled
+        hotkeyManager.clipboardHistoryEnabled = settings.clipboardHistoryEnabled
         hotkeyManager.start()
+    }
+
+    /// Shows the panel on the cursor's screen, or dismisses it if a second
+    /// hotkey press catches it already open.
+    private func toggleClipboardPanel() {
+        if clipboardPanel.isVisible {
+            clipboardPanel.dismiss()
+        } else {
+            clipboardPanel.show()
+        }
     }
 
     // MARK: - Capture Flow

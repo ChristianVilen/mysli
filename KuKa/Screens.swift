@@ -8,6 +8,25 @@ struct ScreenGeometry: Equatable {
     let visibleFrame: CGRect
 }
 
+extension ScreenGeometry {
+    /// The screen the pointer is on, or nil when the layout is empty or the
+    /// point falls in a gap between displays — the caller picks its own
+    /// fallback.
+    ///
+    /// Two rules, not one. A cursor parked in the menu bar sits exactly on
+    /// its screen's top edge, and `contains` treats maxY as outside the
+    /// frame; without the second rule the answer would jump to the primary
+    /// screen every time the pointer is up there.
+    static func under(_ point: CGPoint, in layout: [ScreenGeometry]) -> ScreenGeometry? {
+        layout.first { $0.frame.contains(point) }
+            ?? layout.first {
+                point.x >= $0.frame.minX
+                    && point.x < $0.frame.maxX
+                    && abs(point.y - $0.frame.maxY) < 1
+            }
+    }
+}
+
 /// Test seam for the screen layout. Ambient NSScreen reads live only in
 /// system adapters — this one, and the AppKit/CG/AX-facing adapters that are
 /// themselves the system edge.

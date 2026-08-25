@@ -70,13 +70,9 @@ protocol ImageStoring {
 
 /// Owns everything that happens to a produced image: disk writes, clipboard,
 /// file naming, the Screenshots directory, and handing freed memory back to
-/// the OS after each persistence moment.
+/// the OS after each persistence moment. It also tracks content hashes per
+/// saved file and reports them on deletion.
 final class ImageStore: ImageStoring {
-    /// Images above this pixel count go on the pasteboard as PNG only. An
-    /// uncompressed TIFF costs ~4 bytes per pixel of transient allocation,
-    /// and every modern app reads PNG from the pasteboard.
-    static let defaultClipboardTIFFMaxPixels = 30_000_000
-
     let fileManager: FileManaging
     let clipboard: ClipboardManaging
     let clipboardTIFFMaxPixels: Int
@@ -84,10 +80,32 @@ final class ImageStore: ImageStoring {
     /// The stored file whose image was last copied to the clipboard. Deleting
     /// any other file leaves the clipboard alone.
     private var lastCopiedURL: URL?
+    /// Content hashes (via the shared `ContentHash`) of every PNG
+    /// this session copied to the clipboard for a given file URL — a set,
+    /// not a single value, because `saveAnnotated` re-saving to an existing
+    /// URL adds a hash rather than replacing one: the pre-annotation capture
+    /// is almost always already its own clipboard-history row by the time
+    /// annotating finishes, so deleting the file must report both hashes or
+    /// the original row is orphaned. Session-scoped: an entry accumulates
+    /// until its URL is deleted (same accepted trade-off as
+    /// `WindowTilingController.savedFrames`).
+    private var contentHashes: [URL: Set<String>] = [:]
+    /// Fires with a content hash of a deleted file's clipboard bytes, so a
+    /// caller (AppDelegate) can drop the matching clipboard-history entry.
+    /// Fires once per recorded hash — a file annotated after capture reports
+    /// two. Not called when the deleted URL was never stored or re-saved
+    /// here.
+    ///
+    /// Typed `@MainActor` so the rule is checked rather than commented: the
+    /// consumer is main-actor state, and `delete(at:)` is only ever reached
+    /// from the thumbnail stack and the editor, both on the main thread.
+    /// `delete(at:)` states that assumption once, in `assumeIsolated`,
+    /// instead of leaving each consumer to make it again.
+    var onDeletedHash: (@MainActor (String) -> Void)?
 
     init(fileManager: FileManaging = FileManager.default,
          clipboard: ClipboardManaging = SystemClipboard(),
-         clipboardTIFFMaxPixels: Int = ImageStore.defaultClipboardTIFFMaxPixels,
+         clipboardTIFFMaxPixels: Int = PasteboardImage.defaultTIFFMaxPixels,
          now: @escaping () -> Date = { Date() }) {
         self.fileManager = fileManager
         self.clipboard = clipboard
@@ -133,13 +151,7 @@ final class ImageStore: ImageStoring {
 
     func saveAnnotated(image: NSImage, to url: URL) {
         guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return }
-        autoreleasepool {
-            let bitmap = NSBitmapImageRep(cgImage: cgImage)
-            if let png = bitmap.representation(using: .png, properties: [:]) {
-                try? fileManager.writeImageData(png, to: url)
-            }
-        }
-        copyToClipboard(cgImage: cgImage)
+        writeAndCopy(cgImage: cgImage, to: url)
         lastCopiedURL = url
         MemoryReclaim.schedule()
     }
@@ -150,16 +162,12 @@ final class ImageStore: ImageStoring {
             clipboard.clearClipboard()
             lastCopiedURL = nil
         }
-    }
-
-    func copyToClipboard(cgImage: CGImage) {
-        autoreleasepool {
-            let bitmap = NSBitmapImageRep(cgImage: cgImage)
-            guard let png = bitmap.representation(using: .png, properties: [:]) else { return }
-            let tiff: Data? = cgImage.width * cgImage.height <= clipboardTIFFMaxPixels
-                ? bitmap.representation(using: .tiff, properties: [:])
-                : nil
-            clipboard.copyImage(tiffData: tiff, pngData: png)
+        if let hashes = contentHashes.removeValue(forKey: url), let onDeletedHash {
+            // See `onDeletedHash`: delete(at:) runs on the main thread, but
+            // ImageStore isn't @MainActor, so the compiler can't see it.
+            MainActor.assumeIsolated {
+                hashes.forEach(onDeletedHash)
+            }
         }
     }
 
@@ -179,11 +187,44 @@ final class ImageStore: ImageStoring {
 
     private func store(cgImage: CGImage, fileName: String) -> CaptureResult {
         let image = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
-        let fileURL = saveToDisk(cgImage: cgImage, fileName: fileName)
-        copyToClipboard(cgImage: cgImage)
+        let fileURL = destinationURL(for: fileName)
+
+        writeAndCopy(cgImage: cgImage, to: fileURL)
         lastCopiedURL = fileURL
         MemoryReclaim.schedule()
         return CaptureResult(image: image, fileURL: fileURL)
+    }
+
+    /// Ensures the Screenshots directory exists and picks a free file name
+    /// in it.
+    private func destinationURL(for fileName: String) -> URL {
+        let dir = screenshotsDirectory()
+        try? fileManager.createDirectory(at: dir, withIntermediateDirectories: true, attributes: nil)
+        return uniqueURL(for: fileName, in: dir)
+    }
+
+    /// Encodes a CGImage to PNG exactly once, writes those bytes to disk,
+    /// copies them (plus an optional TIFF rep) to the clipboard, and adds
+    /// their content hash to the set recorded against `url`. Two independent NSBitmapImageRep
+    /// PNG encodings of the same CGImage are not guaranteed byte-identical,
+    /// and the hash that matters is the one for the bytes the clipboard
+    /// received — the poller reads those back into clipboard history — so
+    /// disk and clipboard must share one encoding rather than each making
+    /// their own.
+    private func writeAndCopy(cgImage: CGImage, to url: URL) {
+        autoreleasepool {
+            let bitmap = NSBitmapImageRep(cgImage: cgImage)
+            // Exits the closure, not writeAndCopy itself — harmless today
+            // since nothing follows this autoreleasepool call, but keep it
+            // that way if you add code after it.
+            guard let png = bitmap.representation(using: .png, properties: [:]) else { return }
+
+            try? fileManager.writeImageData(png, to: url)
+            contentHashes[url, default: []].insert(ContentHash.of(png))
+
+            let tiff = PasteboardImage.tiffFlavor(for: bitmap, maxPixels: clipboardTIFFMaxPixels)
+            clipboard.copyImage(tiffData: tiff, pngData: png)
+        }
     }
 
     /// File names have one-second resolution, so rapid captures can collide;
@@ -206,20 +247,5 @@ final class ImageStore: ImageStoring {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd'_at_'HH-mm-ss"
         return formatter.string(from: date)
-    }
-
-    private func saveToDisk(cgImage: CGImage, fileName: String) -> URL {
-        let dir = screenshotsDirectory()
-        try? fileManager.createDirectory(at: dir, withIntermediateDirectories: true, attributes: nil)
-
-        let url = uniqueURL(for: fileName, in: dir)
-
-        autoreleasepool {
-            let bitmapRep = NSBitmapImageRep(cgImage: cgImage)
-            if let pngData = bitmapRep.representation(using: .png, properties: [:]) {
-                try? fileManager.writeImageData(pngData, to: url)
-            }
-        }
-        return url
     }
 }

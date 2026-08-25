@@ -71,7 +71,7 @@ final class CaptureFlow {
             }
 
         case .fullScreen:
-            guard let screen = layout.first(where: { $0.frame.contains(mouseLocation) }) ?? layout.first else { return }
+            guard let screen = ScreenGeometry.under(mouseLocation, in: layout) ?? layout.first else { return }
             guard let result = await capture.captureFullScreen(screenFrame: screen.frame, primaryHeight: primaryHeight) else { return }
             flash(screen)
             show(result: result, screen: screen)

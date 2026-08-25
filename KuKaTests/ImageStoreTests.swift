@@ -166,6 +166,16 @@ final class ImageStoreTests: XCTestCase {
         XCTAssertTrue(result!.fileURL.lastPathComponent.hasSuffix("_combined.png"))
         XCTAssertEqual(mockFileManager.writtenFiles[0].url, result!.fileURL)
         XCTAssertEqual(mockClipboard.copiedCount, 1)
+
+        // storeCombined must go through the same content-hash tracking as a
+        // plain store(), or deleting a combined screenshot would never clear
+        // its clipboard-history row.
+        let pngData = mockClipboard.lastPngData!
+
+        var reportedHash: String?
+        sut.onDeletedHash = { reportedHash = $0 }
+        sut.delete(at: result!.fileURL)
+        XCTAssertEqual(reportedHash, ContentHash.of(pngData))
     }
 
     // MARK: - Clipboard TIFF threshold
@@ -176,14 +186,14 @@ final class ImageStoreTests: XCTestCase {
 
     func testClipboardIncludesTiffAtOrBelowThreshold() {
         let sut = makeStore(tiffMaxPixels: 100)
-        sut.copyToClipboard(cgImage: MockScreenCapture.makeImage(width: 10, height: 10))
+        _ = sut.store(cgImage: MockScreenCapture.makeImage(width: 10, height: 10))
         XCTAssertNotNil(mockClipboard.lastTiffData)
         XCTAssertNotNil(mockClipboard.lastPngData)
     }
 
     func testClipboardSkipsTiffAboveThreshold() {
         let sut = makeStore(tiffMaxPixels: 100)
-        sut.copyToClipboard(cgImage: MockScreenCapture.makeImage(width: 11, height: 10))
+        _ = sut.store(cgImage: MockScreenCapture.makeImage(width: 11, height: 10))
         XCTAssertEqual(mockClipboard.copiedCount, 1)
         XCTAssertNil(mockClipboard.lastTiffData)
         XCTAssertNotNil(mockClipboard.lastPngData)
@@ -218,5 +228,76 @@ final class ImageStoreTests: XCTestCase {
         sut.saveAnnotated(image: makeCaptureImage(width: 4, height: 4), to: url)
         sut.delete(at: url)
         XCTAssertEqual(mockClipboard.clearedCount, 1)
+    }
+
+    // MARK: - Content hash tracking
+
+    func testDeleteReportsHashOfDeletedFile() {
+        let result = sut.store(cgImage: MockScreenCapture.make1x1Image())
+        let pngData = mockClipboard.lastPngData!
+
+        var reportedHash: String?
+        sut.onDeletedHash = { reportedHash = $0 }
+
+        sut.delete(at: result.fileURL)
+
+        XCTAssertEqual(reportedHash, ContentHash.of(pngData))
+    }
+
+    func testStoreRemembersContentHashPerFile() {
+        let first = sut.store(cgImage: MockScreenCapture.makeImage(width: 4, height: 4, red: 1, green: 0, blue: 0))
+        let firstPngData = mockClipboard.lastPngData!
+        let second = sut.store(cgImage: MockScreenCapture.makeImage(width: 4, height: 4, red: 0, green: 0, blue: 1))
+        let secondPngData = mockClipboard.lastPngData!
+
+        var reportedHashes: [String] = []
+        sut.onDeletedHash = { reportedHashes.append($0) }
+
+        // Delete out of order so this can't pass by coincidentally reporting
+        // whichever hash was stored last.
+        sut.delete(at: second.fileURL)
+        sut.delete(at: first.fileURL)
+
+        XCTAssertEqual(reportedHashes, [
+            ContentHash.of(secondPngData),
+            ContentHash.of(firstPngData)
+        ])
+    }
+
+    func testDeleteOfUnknownURLReportsNothing() {
+        // The map must be non-empty for this to be a meaningful check —
+        // otherwise it would also pass with delete(at:) always silent.
+        _ = sut.store(cgImage: MockScreenCapture.make1x1Image())
+
+        var callCount = 0
+        sut.onDeletedHash = { _ in callCount += 1 }
+
+        sut.delete(at: URL(fileURLWithPath: "/tmp/kuka-test/Screenshots/unknown.png"))
+
+        XCTAssertEqual(callCount, 0)
+    }
+
+    func testDeleteAfterAnnotationReportsBothHashes() {
+        // The pre-annotation capture is nearly always already its own
+        // clipboard-history row by the time annotating (which can take
+        // seconds) finishes and re-saves to the same URL — the 0.5s poller
+        // will have already read the original PNG off the clipboard. So
+        // deleting the file must report both hashes, or the original row is
+        // left behind with no file backing it.
+        let captured = sut.store(cgImage: MockScreenCapture.makeImage(width: 4, height: 4, red: 1, green: 0, blue: 0))
+        let capturedPngData = mockClipboard.lastPngData!
+
+        sut.saveAnnotated(image: makeCaptureImage(width: 4, height: 4, red: 0, green: 1, blue: 0), to: captured.fileURL)
+        let annotatedPngData = mockClipboard.lastPngData!
+
+        var reportedHashes: Set<String> = []
+        sut.onDeletedHash = { reportedHashes.insert($0) }
+
+        sut.delete(at: captured.fileURL)
+
+        XCTAssertEqual(reportedHashes, [
+            ContentHash.of(capturedPngData),
+            ContentHash.of(annotatedPngData)
+        ])
     }
 }

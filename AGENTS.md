@@ -13,6 +13,7 @@ A lightweight macOS app to replace the default `Shift+Command+4` selected area s
 - Delete screenshots from thumbnail or editor — removes file and clears clipboard.
 - Keep Awake — prevent the Mac from idle-sleeping from the menu bar, for a preset time (30m/1h/2h/4h) or until turned off, with an optional "keep display awake" preference.
 - Window tiling — `Ctrl+Option+Left/Right/Return/C` snaps the active window to the left half, right half, full screen, or center of its display (maximize toggles back to the previous frame; center keeps the window's size and does nothing when it's already maximize-sized). Pressing Left/Right again on an already-snapped window sends it to the same half of the next screen in that direction (wrapping — with two monitors, either direction reaches the other one). Stage Manager-aware, with a menu toggle to turn the hotkeys off.
+- Clipboard history — `Shift+Command+C` opens a glass panel listing recorded clipboard items, newest first; typing filters, arrow keys select, Enter pastes into whatever app had focus. For rich text (RTF/HTML), Enter opens a chooser: paste with formatting or without, with "without" pre-selected. Records plain text, rich text, and images, including Ku-Ka's own screenshots — deleting a screenshot removes its history entry too. In-memory only, capped at 100 items and ~100 MB of image bytes; concealed/transient/auto-generated pasteboard content (password managers) is never recorded. A menu toggle stops polling, clears the history, and releases the hotkey.
 
 ---
 
@@ -48,6 +49,15 @@ KuKa/
 ├── ScreenCoordinates.swift   # Shared top-left (CG/AX) <-> bottom-left (NS) coordinate flip
 ├── PermissionsManager.swift  # Single source of truth for Accessibility + Screen Recording status, polling, deep links
 ├── OnboardingWindowController.swift # Permission onboarding window: per-permission row with live ❌/✅ + Grant button
+├── ClipboardItem.swift       # Pure value type: text (plain/RTF/HTML) or image (PNG + pixel size), content hash, preview label
+├── ClipboardHistory.swift    # Pure model: ordered list, dedupe-to-top, item/byte caps with eviction, filter, remove-by-hash
+├── ClipboardPasteboard.swift # SystemPasteboard (NSPasteboard.general read/write, marker-type skip) + CGEventKeystrokeSender (synthetic Cmd+V)
+├── ClipboardHistoryController.swift # @MainActor: poll timer, owns ClipboardHistory + panel state, paste hand-off, enable/disable
+├── ClipboardPanel.swift      # NSGlassEffectView panel: search field + NSTableView list, formatting chooser
+├── ClipboardRowViews.swift   # Metrics (every size/inset the panel draws with) + the panel's row and cell views
+├── ClipboardThumbnails.swift # ClipboardThumbnailCache: ImageIO decode at thumbnail size, keyed by content hash
+├── PasteboardImage.swift     # The one image-write rule shared by ImageStore and SystemPasteboard: PNG always, TIFF while small enough
+├── ContentHash.swift         # SHA-256 hex digest shared by ClipboardItem (dedupe key) and ImageStore (per-file tracking)
 ├── Info.plist           # LSUIElement=true, NSScreenCaptureUsageDescription
 └── KuKa.entitlements    # Sandbox disabled (required for CGEvent tap + screen capture)
 ```
@@ -61,8 +71,8 @@ To keep a file out of the build, put it outside these two folders.
 
 | Class | Responsibility |
 |-------|---------------|
-| `AppDelegate` | Menu bar icon, launch-at-login toggle, Window Tiling toggle (persisted as `windowTilingEnabled`), thumbnail duration setting, orchestrates the capture flow, multi-monitor overlay management |
-| `HotkeyManager` | `CGEvent.tapCreate` to intercept the screenshot combos (`Shift+Command+3/4`) and, while tiling is enabled, the tiling combos (`Ctrl+Option+Left/Right/Return/C`); routes everything through a single `onAction` callback with the `HotkeyAction` enum |
+| `AppDelegate` | Menu bar icon, launch-at-login toggle, Window Tiling toggle (persisted as `windowTilingEnabled`), thumbnail duration setting, orchestrates the capture flow, multi-monitor overlay management; owns `ClipboardHistoryController` and `ClipboardPanel`, wires the Clipboard History menu toggle (persisted as `clipboardHistoryEnabled`) to enable/disable and dismiss the panel; and wires `ImageStore.onDeletedHash` to `controller.removeItem(hash:)` so deleting a screenshot drops its history row |
+| `HotkeyManager` | `CGEvent.tapCreate` to intercept the screenshot combos (`Shift+Command+3/4`), the clipboard history combo (`Shift+Command+C`) while clipboard history is enabled, and, while tiling is enabled, the tiling combos (`Ctrl+Option+Left/Right/Return/C`); routes everything through a single `onAction` callback with the `HotkeyAction` enum |
 | `OverlayWindow` | Full-screen borderless `NSWindow` covering each display |
 | `SelectionView` | Mouse drag selection, dimmed background, real-time dimensions label |
 | `CaptureManager` | Protocol-based DI (`FileManaging`, `ClipboardManaging`, `ScreenCapturing`), PNG save to `~/Screenshots/`, clipboard copy, screenshot deletion |
@@ -85,6 +95,15 @@ To keep a file out of the build, put it outside these two folders.
 | `ScreenCoordinates` | Shared vertical-flip math used by both `WindowListProvider` and `AccessibilityWindowControl` for CG/AX ↔ NS coordinate conversion |
 | `PermissionsManager` | `@MainActor` single source of truth for the two TCC permissions: `refresh()` re-reads `AXIsProcessTrusted()`/`CGPreflightScreenCaptureAccess()`, request methods deep-link into the right System Settings pane (and trigger the system prompt — for Accessibility only on the first request, see below), 0.5s polling while onboarding is open |
 | `OnboardingWindowController` | Dedicated `NSWindow` (AppKit, no storyboard) shown at launch while a permission is missing — a welcome page first, then the permission checklist. The menu's "Permissions…" and a capture blocked on a missing grant open it straight on the checklist. Flips the app to `.regular` activation policy while open, back to `.accessory` on close |
+| `ClipboardItem` | Pure value type: kind is `.text(plain, rtf: Data?, html: Data?)` or `.image(png: Data, pixelSize)`, plus a content hash from the shared `ContentHash` — the same one `ImageStore` records per file, so the two agree on identity — copy date, `hasRichFlavors`, `byteCost`, and a one-line `previewLabel` built once up front |
+| `ContentHash` | Neutral namespace for the SHA-256 hex digest (CryptoKit) that `ClipboardItem` uses as its dedupe key and `ImageStore` records for each PNG it copies |
+| `PasteboardImage` | Neutral namespace holding the one image-write rule — PNG always, a TIFF representation alongside it only under a pixel ceiling — plus that ceiling's default. `ImageStore` and `SystemPasteboard` both write images to `NSPasteboard.general` and both call this instead of carrying their own copy |
+| `ClipboardHistory` | Pure model, no AppKit: ordered list (newest first), dedupe-to-top on a matching content hash, a 100-item cap and a ~100 MB image-byte cap (each evicts oldest-first, text is never evicted by the byte cap), a single-item 50 MB refusal, case-insensitive filter, remove-by-hash, clear |
+| `ClipboardPasteboard` | `SystemPasteboard` adapts `NSPasteboard.general` to `PasteboardReading`/`PasteboardWriting`: skips content carrying an `org.nspasteboard` concealed/transient/auto-generated marker, reads an image (`.png`, else `.tiff` re-encoded) or text plus `.rtf`/`.html`, writes plain-only or plain-plus-rich flavors and returns the change count the write itself produced (for self-write suppression). `CGEventKeystrokeSender` sends the synthetic Cmd+V (`kVK_ANSI_V`, `.maskCommand` only). The TIFF ceiling is an init parameter defaulting to `PasteboardImage.defaultTIFFMaxPixels` |
+| `ClipboardHistoryController` | `@MainActor`. Runs a 0.5s main-queue poll against `PasteboardReading`, owns the `ClipboardHistory` and every piece of state the panel renders (visible items, selection, list/chooser mode). Handles Enter (paste, or open the formatting chooser for rich text), Esc, filtering, the paste hand-off (close panel → write → keystroke after a short settle delay, adopting the write's own change count as the new baseline), `enable()`/`disable()` (stop polling + clear), and `removeItem(hash:)` for screenshot deletions. Every panel entry point is mode-aware here — the panel forwards Enter, Esc, arrows, clicks and typing blindly and never second-guesses what the current mode allows |
+| `ClipboardPanel` | Subclass of `FloatingPanel`, `.nonactivatingPanel` + `canBecomeKey` so it takes keystrokes without activating Ku-Ka. `NSGlassEffectView` background, a search field over an `NSTableView` list; renders whatever `ClipboardHistoryController` currently says to show and forwards key events back to it. View only — no history, no `NSPasteboard` access |
+| `Metrics` / `ClipboardHistoryRowView` / `ClipboardHistoryCellView` | `ClipboardRowViews.swift`: every size and inset the panel draws with, the inset rounded selection bar (the full-width system band fights glass), and one row's icon + one-line label + trailing image thumbnail |
+| `ClipboardThumbnailCache` | Decodes an item's PNG at thumbnail size through ImageIO — the full-resolution bitmap is never built — and keeps only the small result, keyed by content hash. Cleared on dismiss, so a deleted screenshot can't come back |
 
 ### Flow
 
@@ -104,6 +123,13 @@ Ctrl+Opt+Left/Right/Return/C → HotkeyManager (suppresses event; skipped entire
 "Window Tiling" menu toggle is off — keys pass through) → WindowTilingController.tile(action)
 → TilingLayoutEngine.resolve(action, ...) decides move-and-save, restore, screen hop, or nothing
 → AccessibilityWindowControl.setFrame(...) moves the window
+
+Shift+Cmd+C → HotkeyManager (suppresses event; skipped entirely when the "Clipboard History"
+menu toggle is off — key passes through) → AppDelegate.toggleClipboardPanel()
+→ ClipboardPanel.show() (non-activating panel; the previously focused app keeps focus)
+→ type to filter / arrows to select / Enter to paste (or open the with/without-formatting
+chooser for rich text) → panel closes → ClipboardHistoryController writes the pasteboard
+→ synthetic Cmd+V sent after a ~50ms delay
 ```
 
 ---
@@ -120,10 +146,10 @@ Ctrl+Opt+Left/Right/Return/C → HotkeyManager (suppresses event; skipped entire
 
 ### Technical Requirements
 
-- **Language**: Swift 5, macOS 14.0+
+- **Language**: Swift 5, macOS 26.0+ (raised for `NSGlassEffectView`, used by the clipboard history panel)
 - **Project format**: Xcode 16 synchronized folders (object version 77) — opening the project needs Xcode 16 or later
-- **Frameworks**: AppKit, CoreGraphics, ScreenCaptureKit, ServiceManagement, ApplicationServices (Accessibility API for window tiling)
-- **Permissions**: Accessibility (covers both the CGEvent tap and AX window move/resize — no extra grant for tiling), Screen Recording (ScreenCaptureKit)
+- **Frameworks**: AppKit, CoreGraphics, ScreenCaptureKit, ServiceManagement, ApplicationServices (Accessibility API for window tiling), ImageIO (clipboard-panel thumbnails), CryptoKit (SHA-256 content hashing, via `ContentHash`)
+- **Permissions**: Accessibility (covers the CGEvent tap, AX window move/resize, and the clipboard history hotkey + synthetic paste — no extra grant for any of them), Screen Recording (ScreenCaptureKit)
 - **Launch at Login**: `SMAppService.mainApp.register()` / `unregister()`
 - **Build flag**: the KuKa app target sets `OTHER_SWIFT_FLAGS = "-enable-upcoming-feature IsolatedDefaultValues"`. This exists because `WindowTilingController`'s init has default argument values (`AccessibilityWindowControl()`, etc.) that construct `@MainActor` types, and under Swift 5 language mode the compiler otherwise treats those defaults as evaluated outside the actor. The flag becomes redundant once the project moves to Swift 6 language mode, where this is the default behavior.
 
@@ -141,9 +167,10 @@ Ctrl+Opt+Left/Right/Return/C → HotkeyManager (suppresses event; skipped entire
 ### Keyboard Shortcut
 - Uses `CGEvent.tapCreate` at `.cgSessionEventTap` to intercept key-down events globally.
 - Screenshot combos: keyCode `0x14` (3 key) and `0x15` (4 key) with `.maskShift` + `.maskCommand`.
+- Clipboard history combo: keyCode `0x08` (C) with `.maskShift` + `.maskCommand`, and `.maskControl`/`.maskAlternate` both absent. The tiling "center" combo below uses the same key code (`Ctrl+Option+C`), but the two can never both match, because each one requires a modifier the other forbids. Control and Option are ruled out here for a different reason: to let chords with extra modifiers, such as Ctrl+Shift+Cmd+C, pass through instead of counting as ours.
 - Tiling combos: keyCode `0x7B` (Left), `0x7C` (Right), `0x24` (Return), `0x08` (C) with `.maskControl` + `.maskAlternate`. Command and Shift must be absent so these can't collide with the screenshot combos. Arrow keys carry extra flags (`.maskSecondaryFn`, `.maskNumericPad`), so the check is "required flags present, forbidden flags absent" rather than an exact match.
-- All matches route through one `onAction` closure with the `HotkeyAction` enum (`.captureArea`, `.captureFullScreen`, `.tile(TilingAction)`).
-- The `tilingEnabled` flag gates the tiling combos: while off they are not matched at all and pass through to other apps. Screenshot combos are unaffected by the flag.
+- All matches route through one `onAction` closure with the `HotkeyAction` enum (`.captureArea`, `.captureFullScreen`, `.tile(TilingAction)`, `.showClipboardHistory`).
+- The `tilingEnabled` flag gates the tiling combos, and `clipboardHistoryEnabled` gates the clipboard history combo the same way: while off, the combo isn't matched at all and passes through to other apps. Screenshot combos are unaffected by either flag.
 - Returns `nil` to suppress the system screenshot tool.
 - Requires Accessibility permission. `HotkeyManager` no longer checks or prompts for it — `AppDelegate` starts the tap (via `PermissionsManager` status) as soon as Accessibility is granted, with no relaunch needed; the onboarding window handles the prompting.
 
@@ -176,34 +203,41 @@ Ctrl+Opt+Left/Right/Return/C → HotkeyManager (suppresses event; skipped entire
 ### Test Targets
 
 ```
-KuKaTests/                    # Unit tests (XCTest, macOS 14.0+)
+KuKaTests/                    # Unit tests (XCTest, macOS 26.0+)
 ├── CaptureManagerTests.swift # Tests for capture, save, clipboard, coordinate conversion, file naming
+├── CaptureFlowTests.swift    # Selection-to-thumbnail pipeline: rect/window/cancelled selection, full-screen capture and its screen fallback, flash + thumbnail on success, silent no-op on failure
+├── SelectionSessionTests.swift # Selection lifecycle: rect/window results carry the right screen, resume-once semantics, teardown ordering, mouse-driven key-screen election
+├── ImageStoreTests.swift     # File naming/counting, clipboard copy (incl. TIFF size threshold), saveAnnotated, screenshot deletion, and the clipboard-history deletion hook (per-file content-hash tracking, onDeletedHash reporting)
 ├── DrawingViewTests.swift    # Tests for freehand drawing and image compositing
+├── EditorWindowTests.swift   # Done saves the annotated image to its own file, Delete removes it, window size is capped by the injected screen's visible frame
 ├── ThumbnailStackManagerTests.swift # Tests for thumbnail stacking and timer logic
-├── WindowListProviderTests.swift # Tests for window enumeration
+├── ScreenCoordinatesTests.swift # NS/CG/AX vertical-flip math and the "which screen owns this rect" picking rule
 ├── WakeSessionTests.swift    # Tests for the pure keep-awake session model
 ├── WakeManagerTests.swift    # Tests for keep-awake orchestration against a fake preventer
 ├── KeepAwakeControllerTests.swift # Tests for the Keep Awake menu section and persistence
 ├── TilingLayoutEngineTests.swift # Target frame math and move/restore decisions for left/right/maximize
 ├── TilingAdaptersTests.swift # TilingScreenRules screen-membership + screen-picking rules, AX/NS coordinate conversion
 ├── WindowTilingControllerTests.swift # Saved-frame map behavior: save-then-restore, failed moves, entry lifecycle
-├── HotkeyManagerTests.swift  # Event routing: tiling combos swallowed/passed through per the tilingEnabled flag, screenshot combos always work
+├── HotkeyManagerTests.swift  # Event routing: tiling combos swallowed/passed through per the tilingEnabled flag, clipboard history combo per the clipboardHistoryEnabled flag (plus extra-modifier rejection), screenshot combos always work
 ├── PermissionsManagerTests.swift # Permission status via injected probes: refresh + change detection, poll-timer pickup, Settings deep-link fallback order
-└── Mocks.swift               # MockFileManager, MockClipboard, MockScreenCapture, MockWindowListProvider, MockWindowControlling, MockStageManagerDetecting, FakeSleepPreventer
-
-KuKaUITests/                  # UI tests (XCUITest, macOS 14.0+)
-└── MenuBarTests.swift        # Menu bar icon, menu items, thumbnail duration selection
+├── SettingsTests.swift       # Every settings key defaults and round-trips: thumbnail duration, window tiling, clipboard history, launch at login
+├── StatusMenuTests.swift     # Menu structure; the Window Tiling and Clipboard History toggles (write settings, fire a callback, flip their checkmark); duration picking; launch-at-login; the keep-awake status icon badge
+├── ClipboardHistoryTests.swift # Pure-model tests for ClipboardHistory: dedupe-to-top, item/byte caps and eviction, filter, remove-by-hash, clear
+├── ClipboardHistoryControllerTests.swift # Controller tests against a fake pasteboard and keystroke sender: polling, the paste hand-off, the formatting chooser, self-write suppression, enable/disable, screenshot-hash removal
+└── Mocks.swift               # MockFileManager, MockClipboard, MockScreenCapture, MockWindowListProvider, MockWindowControlling, MockStageManagerDetecting, FakeSleepPreventer, FakePasteboard, FakeKeystrokeSender
 ```
+
+No `KuKaUITests` target exists yet; `AppDelegate`'s `--uitesting` guard (below) is ready for one but nothing currently exercises it.
 
 ### Test-Mode Guard
 
-When running under XCTest, `AppDelegate` skips `setupPermissions()` entirely to avoid permission prompts — no TCC checks, no onboarding window, no warning badge on the status icon, and (because the event tap only starts once Accessibility reports granted) no hotkey registration either:
+When running under XCTest, `AppDelegate` skips `setupPermissions()` entirely to avoid permission prompts — no TCC checks, no onboarding window, no warning badge on the status icon, and (because the event tap only starts once Accessibility reports granted) no hotkey registration either. The same `isTesting` check also skips `clipboardHistory.enable()` at startup, so a test run never polls the real pasteboard and never ingests whatever the developer happens to have copied:
 - Unit tests: detected via `XCTestConfigurationFilePath` environment variable
-- UI tests: detected via `--uitesting` launch argument passed by `MenuBarTests.setUp()`
+- UI tests: detected via the `--uitesting` launch argument (no UI-test target currently exists)
 
 ### Running Tests
 
-- **Xcode**: `Cmd+U` runs both unit and UI test suites
+- **Xcode**: `Cmd+U` runs the unit test suite
 - **CLI**: `xcodebuild -project KuKa.xcodeproj -scheme KuKa test`
 
 ### Unit Test Coverage
@@ -218,8 +252,14 @@ When running under XCTest, `AppDelegate` skips `setupPermissions()` entirely to 
 - Keep Awake: activation passes the display-awake flag to the preventer; toggling it mid-session swaps the assertion without ending the session; timed sessions expire and fire callbacks; the menu panel reflects state and the display preference persists across launches
 - Tiling layout math, the maximize/restore toggle (including apps that snap window sizes), the second-press screen hop, and center's move/no-op decision (`TilingLayoutEngine`)
 - Screen-membership, screen-picking, and adjacent-screen (hop) rules (`TilingScreenRules`), and the controller's saved-frame map behavior across save/restore/failure plus center pass-through (`WindowTilingController`)
-- Hotkey routing (`HotkeyManager`): tiling combos swallowed while enabled, passed through while disabled; screenshot combos work in both states
+- Hotkey routing (`HotkeyManager`): tiling combos swallowed while enabled, passed through while disabled; the clipboard history combo swallowed while enabled and passed through while disabled, including with an extra Control or Option held down; screenshot combos work in every state
 - Permissions (`PermissionsManager`): `refresh()` reads the injected probes; `onChange` fires only on a real status change; the 0.5s poll and the app-activation monitor pick up a grant without a manual refresh; the Settings deep link tries the modern pane id first and falls back to the legacy one; the Accessibility prompt is shown on the first request only, in this run and in later ones, while the Settings pane opens every time
+- Clipboard history model (`ClipboardHistory`): adding puts the newest item first; a duplicate content hash moves the existing item to the top instead of growing the list; the 101st item evicts the oldest; the image-byte budget evicts oldest images first and leaves text alone; an item over the single-item byte cap is refused; the filter matches text content and image labels case-insensitively; remove-by-hash and clear both work; `hasRichFlavors` is true only when RTF or HTML is present
+- Clipboard history controller (`ClipboardHistoryController`) polling and state, against a fake pasteboard and a fake keystroke sender: a change-count bump reads and adds one item, an unchanged count reads nothing, marked/oversized/unsupported content from the reader is skipped; `enable()`/`disable()` start and stop the poll and clear the history; a reported screenshot hash drops its item
+- Clipboard history controller paste handling: Enter pastes plain text and images immediately, and opens the formatting chooser for rich text; the chooser's two rows paste with and without formatting; Esc in the chooser restores the prior list selection (clamped if items were removed while it was open); a paste moves the pasted item to the top of the history and keeps its rich flavors even when the paste itself was plain-only; the poll right after our own paste does not re-record it (self-write suppression, via adopting the write's own change count as the new baseline)
+- Settings (`Settings`): `clipboardHistoryEnabled` defaults to true and persists, same as the other toggles
+- Screenshot deletion (`ImageStore`): remembers the content hash of the PNG behind each saved file; `delete(at:)` reports that hash through `onDeletedHash`, nothing for an unknown URL, and both hashes when a screenshot was re-saved after annotation
+- Status menu (`StatusMenu`): the Clipboard History checkbox writes `clipboardHistoryEnabled`, fires its toggle callback, and flips its own checkmark, same as Window Tiling; the Features section lists "⌘⇧C to open clipboard history"
 
 ### Keep Awake implementation
 
@@ -246,9 +286,3 @@ When running under XCTest, `AppDelegate` skips `setupPermissions()` entirely to 
 - AX safety: a 0.5 s `AXUIElementSetMessagingTimeout` cap stops a hung app from stalling the main thread; attributes are checked with `AXUIElementIsAttributeSettable` before writing; position is written before and after size for reliable edge snapping; the achieved frame is re-read and returned. Ku-Ka refuses to tile its own windows (pid check). Failures are only `NSLog`ged — no user feedback.
 - The `windowTilingEnabled` `UserDefaults` key defaults to on. `WindowTilingController.savedFrames` entries for closed windows are never cleaned up (accepted for v1).
 - `StageManagerDetector` reads `com.apple.WindowManager` / `GloballyEnabled` fresh on every access; this works because the app is unsandboxed.
-
-### UI Test Coverage
-
-- Menu bar status item exists
-- Menu contains Launch at Login, Thumbnail Duration label, 3s/5s/Forever options, Quit
-- Selecting a duration option persists across menu re-open

@@ -17,6 +17,7 @@ A lightweight macOS menu bar app that replaces the default `Shift+Command+4` scr
 - Launch at Login toggle
 - Keep Awake — stop the Mac from sleeping while a long task (such as an AI coding agent) runs, with a menu-bar toggle and timed sessions
 - Window tiling — hotkeys to snap the active window to the left half, right half, or full screen of its display
+- Clipboard history — `Shift+Command+C` opens a searchable list of what you've copied, text and images, and pastes the item you choose back into the app you were using
 - Runs as a menu bar agent (no Dock icon)
 
 ## Keep Awake
@@ -39,10 +40,22 @@ With more than one display, the window is tiled on the screen it overlaps the mo
 
 The whole feature can be turned on and off with the **Window Tiling** checkbox in the menu bar menu (under Settings); the choice is remembered across restarts. While it's off, the hotkeys pass through to other apps. The keys themselves aren't configurable.
 
+## Clipboard History
+
+Press `Shift+Command+C` and a panel opens over whatever you're doing, listing what you've copied recently, newest first. Start typing to filter the list, use the arrow keys to move through it, and press `Enter` to paste the selected item into the app you were working in. The panel closes and that app keeps focus.
+
+If the item is formatted text (say, from a web page or a rich-text editor), `Enter` asks first: paste with formatting or without. Without formatting is pre-selected, so pressing `Enter` twice gives you plain text. Plain text and images paste right away, with no second step.
+
+Text and images both get recorded, including screenshots Ku-Ka itself saves to your clipboard. Delete a screenshot from its thumbnail or the editor and its clipboard history entry goes with it.
+
+The history lives in memory only — nothing is written to disk, so it's empty again after a restart. It holds at most 100 items; images are capped at about 100 MB in total, with the oldest images dropped first. A single item over 50 MB is not recorded. Copies that your password manager marks as sensitive are never recorded.
+
+The whole feature can be turned on and off with the **Clipboard History** checkbox in the menu bar menu (under Settings); the choice is remembered across restarts. While it's off, Ku-Ka stops recording, clears the history it collected, and gives `Shift+Command+C` back to other apps. With the feature on, Ku-Ka takes that shortcut from Chrome and Arc (Inspect Element), Xcode (Activate Console), VS Code (Open External Terminal), and Finder (Computer window).
+
 ## Requirements
 
-- macOS 14.0 (Sonoma) or later
-- Xcode 15+ (to build)
+- macOS 26 (Tahoe) or later
+- Xcode 26+ (to build)
 
 ## Installation
 
@@ -125,7 +138,8 @@ The folder is created automatically if it doesn't exist.
 
 - **Launch at Login** — Toggle to start Ku-Ka automatically when you log in
 - **Window Tiling** — Turn the tiling hotkeys on or off (remembered across restarts)
-- **Thumbnail Duration** — Choose how long the floating thumbnail stays visible: 3 Seconds, 5 Seconds, or Forever (until dismissed)
+- **Clipboard History** — Turn clipboard recording and the `Shift+Command+C` hotkey on or off (remembered across restarts)
+- **Thumbnail Duration** — Choose how long the floating thumbnail stays visible: 3 seconds, 5 seconds, 15 seconds, or Forever (until dismissed)
 - **Keep Awake** — Keep the Mac from sleeping for a preset time (30 minutes, 1, 2, or 4 hours, or until turned off), with a "Keep display awake" checkbox
 - **Quit Ku-Ka** — Exit the app
 
@@ -160,7 +174,8 @@ KuKa/
 
 - You must disable or accept that the system `Shift+Command+3` and `Shift+Command+4` are intercepted (the app suppresses the system shortcuts when running)
 - `Ctrl+Option+Left/Right/Return` are intercepted globally while window tiling is enabled, even inside apps that use those same keys for something else. Turn off **Window Tiling** in the menu to give the keys back to other apps.
-- Requires macOS 14+ for ScreenCaptureKit screenshot capture
+- `Shift+Command+C` is intercepted globally while clipboard history is enabled, including in apps that use it for something else. Turn off **Clipboard History** in the menu to give the key back.
+- The automatic paste can't reach password fields or apps that block synthetic key events. The item is still on the clipboard, so pasting it by hand (`Cmd+V`) works.
 - No preferences UI for changing the shortcut keys, including the window tiling hotkeys
 - Some windows can't be tiled — apps that don't let their windows be moved or resized through the Accessibility API, and Ku-Ka's own windows. The hotkey then does nothing; there is no error message.
 
@@ -168,7 +183,7 @@ KuKa/
 
 ### Running Tests
 
-- **Xcode**: `Cmd+U` runs both unit and UI test suites
+- **Xcode**: `Cmd+U` runs the unit test suite
 - **CLI**: `xcodebuild -project KuKa.xcodeproj -scheme KuKa test`
 
 ### Unit Tests (KuKaTests)
@@ -187,13 +202,6 @@ Tests cover:
 - Screen-picking and windows-per-screen rules, plus the tiling controller's saved-frame handling
 - Hotkey routing: tiling keys are swallowed while enabled and pass through while disabled; screenshot keys work either way
 
-### UI Tests (KuKaUITests)
-
-XCUITest suite verifying menu bar interactions:
-- Status item exists
-- Menu contains all expected items (Launch at Login, Thumbnail Duration options, Quit)
-- Duration selection persists across menu re-open
-
 ### Test-Mode Guard
 
-When running under XCTest, the app skips hotkey registration to avoid permission prompts. Detection uses `XCTestConfigurationFilePath` (unit tests) and `--uitesting` launch argument (UI tests).
+When running under XCTest, the app skips hotkey registration to avoid permission prompts. Detection uses `XCTestConfigurationFilePath` (unit tests) and the `--uitesting` launch argument (no UI-test target currently exists).

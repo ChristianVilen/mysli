@@ -34,9 +34,13 @@ final class StatusMenuTests: XCTestCase {
     // MARK: - Structure
 
     func testMenuContainsCoreItems() {
-        for title in ["Launch at Login", "Window Tiling", "3 Seconds", "5 Seconds", "15 Seconds", "Forever", "Quit Ku-Ka"] {
+        for title in ["Launch at Login", "Window Tiling", "Clipboard History", "3 Seconds", "5 Seconds", "15 Seconds", "Forever", "Quit Ku-Ka"] {
             XCTAssertNotNil(item(titled: title), "missing menu item: \(title)")
         }
+    }
+
+    func testFeaturesSectionListsClipboardHistoryShortcut() {
+        XCTAssertNotNil(item(titled: "⌘⇧C to open clipboard history"), "missing clipboard history feature line")
     }
 
     // MARK: - Window tiling
@@ -52,6 +56,21 @@ final class StatusMenuTests: XCTestCase {
         XCTAssertFalse(settings.windowTilingEnabled)
         XCTAssertEqual(callbackValue, false)
         XCTAssertEqual(tiling.state, .off)
+    }
+
+    // MARK: - Clipboard history
+
+    func testClipboardHistoryToggleWritesSettingsFiresCallbackAndFlipsCheckmark() {
+        let clipboardHistory = item(titled: "Clipboard History")!
+        XCTAssertEqual(clipboardHistory.state, .on, "clipboard history defaults to enabled")
+        var callbackValue: Bool?
+        sut.onClipboardHistoryToggled = { callbackValue = $0 }
+
+        click(clipboardHistory)
+
+        XCTAssertFalse(settings.clipboardHistoryEnabled)
+        XCTAssertEqual(callbackValue, false)
+        XCTAssertEqual(clipboardHistory.state, .off)
     }
 
     // MARK: - Thumbnail duration

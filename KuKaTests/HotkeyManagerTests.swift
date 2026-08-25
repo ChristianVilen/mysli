@@ -100,4 +100,91 @@ final class HotkeyManagerTests: XCTestCase {
         XCTAssertTrue(isSwallowed(0x7B, flags: ctrlOption))
         waitForExpectations(timeout: 1)
     }
+
+    // MARK: - Clipboard history (Shift+Cmd+C)
+
+    func testShiftCommandCRoutesToShowClipboardHistoryWhenEnabled() {
+        manager.clipboardHistoryEnabled = true
+
+        let fired = expectation(description: "clipboard history action delivered")
+        manager.onAction = { action in
+            XCTAssertEqual(action, .showClipboardHistory)
+            fired.fulfill()
+        }
+
+        XCTAssertTrue(
+            isSwallowed(0x08, flags: [.maskShift, .maskCommand]),
+            "Shift+Cmd+C should be swallowed while clipboard history is enabled"
+        )
+        waitForExpectations(timeout: 1)
+    }
+
+    func testShiftCommandCPassesThroughWhenDisabled() {
+        manager.clipboardHistoryEnabled = false
+
+        // No expectation/wait needed: handleEvent only dispatches onAction
+        // on the swallowed path, so a false isSwallowed already proves
+        // synchronously that no delivery happens, ever — waiting out the
+        // main-queue async would only prove the same thing more slowly.
+        XCTAssertFalse(
+            isSwallowed(0x08, flags: [.maskShift, .maskCommand]),
+            "Shift+Cmd+C should pass through to other apps while clipboard history is disabled"
+        )
+    }
+
+    func testShiftCommandCWithExtraModifiersPassesThrough() {
+        manager.clipboardHistoryEnabled = true
+
+        let extraModifierFlags: [(CGEventFlags, String)] = [
+            ([.maskShift, .maskCommand, .maskControl], "Control"),
+            ([.maskShift, .maskCommand, .maskAlternate], "Option"),
+        ]
+
+        for (flags, name) in extraModifierFlags {
+            // No expectation/wait needed here either — see
+            // testShiftCommandCPassesThroughWhenDisabled.
+            XCTAssertFalse(
+                isSwallowed(0x08, flags: flags),
+                "Shift+Cmd+C with \(name) also held should pass through, not be treated as ours"
+            )
+        }
+    }
+
+    // MARK: - Existing combos unaffected by the clipboard history flag
+
+    func testExistingCombosUnchangedInBothClipboardHistoryStates() {
+        for clipboardHistoryEnabled in [true, false] {
+            manager.clipboardHistoryEnabled = clipboardHistoryEnabled
+
+            for (code, expected, name) in tilingKeys {
+                let fired = expectation(
+                    description: "tiling action for \(name) delivered (clipboardHistoryEnabled=\(clipboardHistoryEnabled))"
+                )
+                manager.onAction = { action in
+                    XCTAssertEqual(action, expected)
+                    fired.fulfill()
+                }
+
+                XCTAssertTrue(
+                    isSwallowed(code, flags: ctrlOption),
+                    "\(name) should still be swallowed (clipboardHistoryEnabled=\(clipboardHistoryEnabled))"
+                )
+                waitForExpectations(timeout: 1)
+            }
+
+            let screenshotFired = expectation(
+                description: "screenshot action delivered (clipboardHistoryEnabled=\(clipboardHistoryEnabled))"
+            )
+            manager.onAction = { action in
+                XCTAssertEqual(action, .captureArea)
+                screenshotFired.fulfill()
+            }
+
+            XCTAssertTrue(
+                isSwallowed(0x15, flags: [.maskShift, .maskCommand]),
+                "Shift+Cmd+4 should still be swallowed (clipboardHistoryEnabled=\(clipboardHistoryEnabled))"
+            )
+            waitForExpectations(timeout: 1)
+        }
+    }
 }

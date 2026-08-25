@@ -42,7 +42,7 @@ final class SelectionSession {
         isActive = true
         defer { isActive = false }
 
-        let keyScreen = layout.first { $0.frame.contains(mouseLocation) }
+        let keyScreen = ScreenGeometry.under(mouseLocation, in: layout)
 
         return await withCheckedContinuation { continuation in
             self.continuation = continuation

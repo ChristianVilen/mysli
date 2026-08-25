@@ -191,3 +191,49 @@ struct FakeScreens: Screens {
     var all: [ScreenGeometry] = []
     var mainIndex: Int?
 }
+
+// MARK: - Fake Pasteboard
+
+class FakePasteboard: PasteboardReading, PasteboardWriting {
+    var changeCount = 0
+    /// Scripted result for the next `readCurrentItem` call.
+    var currentItem: ClipboardItem?
+    private(set) var readCount = 0
+    private(set) var lastNow: Date?
+    private(set) var writes: [(item: ClipboardItem, withFormatting: Bool)] = []
+    /// Fires synchronously from `write`, before it returns — lets a test
+    /// observe exactly when a write happened relative to other calls.
+    var onWrite: (() -> Void)?
+
+    func readCurrentItem(now: Date) -> ClipboardItem? {
+        readCount += 1
+        lastNow = now
+        return currentItem
+    }
+
+    func write(_ item: ClipboardItem, withFormatting: Bool) -> Int {
+        writes.append((item, withFormatting))
+        // Mimics the real pasteboard: a write becomes what's "currently"
+        // there and bumps changeCount, so a subsequent poll reads it back
+        // as new content.
+        currentItem = item
+        changeCount += 1
+        // Captured immediately, before onWrite fires — mirrors
+        // SystemPasteboard, where clearContents() hands back the change
+        // count before any later step (or, here, a test's onWrite hook
+        // simulating a racing third-party copy) can bump it further.
+        let newChangeCount = changeCount
+        onWrite?()
+        return newChangeCount
+    }
+}
+
+// MARK: - Fake Keystroke Sender
+
+class FakeKeystrokeSender: KeystrokeSending {
+    private(set) var sendCount = 0
+
+    func sendPasteKeystroke() {
+        sendCount += 1
+    }
+}

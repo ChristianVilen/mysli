@@ -40,6 +40,11 @@ final class Settings {
         set { defaults.set(newValue, forKey: "windowTilingEnabled") }
     }
 
+    var clipboardHistoryEnabled: Bool {
+        get { defaults.object(forKey: "clipboardHistoryEnabled") as? Bool ?? true }
+        set { defaults.set(newValue, forKey: "clipboardHistoryEnabled") }
+    }
+
     var launchAtLogin: Bool { loginItem.isEnabled }
 
     func setLaunchAtLogin(_ enabled: Bool) {

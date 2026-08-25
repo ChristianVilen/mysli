@@ -7,6 +7,7 @@ import Cocoa
 final class StatusMenu: NSObject, NSMenuDelegate {
     let menu = NSMenu()
     var onTilingToggled: ((Bool) -> Void)?
+    var onClipboardHistoryToggled: ((Bool) -> Void)?
     /// Fired when the user picks "Permissions…" — AppDelegate opens the
     /// onboarding window.
     var onShowPermissions: (() -> Void)?
@@ -17,6 +18,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     private let keepAwake: KeepAwakeController
     private var launchAtLoginItem: NSMenuItem!
     private var windowTilingItem: NSMenuItem!
+    private var clipboardHistoryItem: NSMenuItem!
     private var durationItems: [NSMenuItem] = []
 
     init(settings: Settings, keepAwake: KeepAwakeController) {
@@ -81,6 +83,11 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         windowTilingItem.state = settings.windowTilingEnabled ? .on : .off
         menu.addItem(windowTilingItem)
 
+        clipboardHistoryItem = NSMenuItem(title: "Clipboard History", action: #selector(toggleClipboardHistory), keyEquivalent: "")
+        clipboardHistoryItem.target = self
+        clipboardHistoryItem.state = settings.clipboardHistoryEnabled ? .on : .off
+        menu.addItem(clipboardHistoryItem)
+
         menu.addItem(.separator())
 
         let durationLabel = NSMenuItem(title: "Thumbnail Duration", action: nil, keyEquivalent: "")
@@ -112,6 +119,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         for feature in [
             "⌘⇧3 to capture full screen",
             "⌘⇧4 to capture selected area",
+            "⌘⇧C to open clipboard history",
             "Multi-monitor support",
             "Auto-save to ~/Screenshots/",
             "Copy to clipboard",
@@ -159,6 +167,13 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         settings.windowTilingEnabled = enabled
         windowTilingItem.state = enabled ? .on : .off
         onTilingToggled?(enabled)
+    }
+
+    @objc private func toggleClipboardHistory() {
+        let enabled = !settings.clipboardHistoryEnabled
+        settings.clipboardHistoryEnabled = enabled
+        clipboardHistoryItem.state = enabled ? .on : .off
+        onClipboardHistoryToggled?(enabled)
     }
 
     @objc private func toggleLaunchAtLogin() {

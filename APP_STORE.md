@@ -9,7 +9,7 @@ Ku-Ka is distributed outside the App Store via Developer ID notarization. This i
 ## Prerequisites
 
 - [ ] Apple Developer Program membership ($99/year)
-- [ ] App builds and runs correctly on macOS 14+
+- [ ] App builds and runs correctly on macOS 26+
 
 ## Step 1: Signing Setup
 
