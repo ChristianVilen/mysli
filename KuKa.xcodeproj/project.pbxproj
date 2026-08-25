@@ -3,67 +3,8 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 77;
 	objects = {
-
-/* Begin PBXBuildFile section */
-		A10000001 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000011 /* main.swift */; };
-		A10000002 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000012 /* AppDelegate.swift */; };
-		A10000003 /* HotkeyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000013 /* HotkeyManager.swift */; };
-		A10000004 /* OverlayWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000014 /* OverlayWindow.swift */; };
-		A10000005 /* SelectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000015 /* SelectionView.swift */; };
-		A10000006 /* CaptureManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000016 /* CaptureManager.swift */; };
-		A10000007 /* ThumbnailPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000019 /* ThumbnailPanel.swift */; };
-		A10000008 /* DrawingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001A /* DrawingView.swift */; };
-		A10000141 /* CropBox.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000140 /* CropBox.swift */; };
-		A10000143 /* CropOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000142 /* CropOverlayView.swift */; };
-		A10000145 /* SizeLabel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000144 /* SizeLabel.swift */; };
-		A10000009 /* EditorWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001B /* EditorWindow.swift */; };
-		A100000A /* ThumbnailStackManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001C /* ThumbnailStackManager.swift */; };
-		A100000B /* CombineButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001D /* CombineButton.swift */; };
-		A100000C /* FlashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001E /* FlashView.swift */; };
-		A100000D /* WindowListProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001F /* WindowListProvider.swift */; };
-		A100000F /* WakeSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000022 /* WakeSession.swift */; };
-		A10000100 /* WakeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000023 /* WakeManager.swift */; };
-		A10000101 /* KeepAwakeController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000024 /* KeepAwakeController.swift */; };
-		A10000102 /* FloatingPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000025 /* FloatingPanel.swift */; };
-		A10000103 /* KeepAwakePanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000026 /* KeepAwakePanelView.swift */; };
-		A10000111 /* TilingLayoutEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000110 /* TilingLayoutEngine.swift */; };
-		A10000104 /* StageManagerDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000027 /* StageManagerDetector.swift */; };
-		A10000105 /* AccessibilityWindowControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000028 /* AccessibilityWindowControl.swift */; };
-		A10000106 /* TilingScreenRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000029 /* TilingScreenRules.swift */; };
-		A10000107 /* ScreenCoordinates.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000002A /* ScreenCoordinates.swift */; };
-		A10000108 /* WindowTilingController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000002B /* WindowTilingController.swift */; };
-		A10000112 /* SelectionSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000002C /* SelectionSession.swift */; };
-		A10000113 /* CaptureFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000002D /* CaptureFlow.swift */; };
-		A10000114 /* ImageStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000002E /* ImageStore.swift */; };
-		A10000120 /* Settings.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000121 /* Settings.swift */; };
-		A10000122 /* StatusMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000123 /* StatusMenu.swift */; };
-		A10000124 /* Screens.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000125 /* Screens.swift */; };
-		A10000130 /* PermissionsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000132 /* PermissionsManager.swift */; };
-		A10000131 /* OnboardingWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000133 /* OnboardingWindowController.swift */; };
-		B20000001 /* CaptureManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000011 /* CaptureManagerTests.swift */; };
-		B20000005 /* WakeSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000015 /* WakeSessionTests.swift */; };
-		B20000002 /* Mocks.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000012 /* Mocks.swift */; };
-		B20000006 /* WakeManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000016 /* WakeManagerTests.swift */; };
-		B20000007 /* KeepAwakeControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000017 /* KeepAwakeControllerTests.swift */; };
-		B20000008 /* ThumbnailStackManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000018 /* ThumbnailStackManagerTests.swift */; };
-		B20000009 /* DrawingViewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000019 /* DrawingViewTests.swift */; };
-		B20000121 /* CropBoxTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000120 /* CropBoxTests.swift */; };
-		B2000000A /* TilingLayoutEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000001A /* TilingLayoutEngineTests.swift */; };
-		B2000000B /* TilingAdaptersTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000001B /* TilingAdaptersTests.swift */; };
-		B2000000C /* WindowTilingControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000001C /* WindowTilingControllerTests.swift */; };
-		B2000000D /* HotkeyManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000001D /* HotkeyManagerTests.swift */; };
-		B2000000E /* SelectionSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000001E /* SelectionSessionTests.swift */; };
-		B2000000F /* CaptureFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000001F /* CaptureFlowTests.swift */; };
-		B20000101 /* ImageStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000111 /* ImageStoreTests.swift */; };
-		B20000102 /* EditorWindowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000112 /* EditorWindowTests.swift */; };
-		B20000103 /* SettingsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000113 /* SettingsTests.swift */; };
-		B20000104 /* StatusMenuTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000114 /* StatusMenuTests.swift */; };
-		B20000105 /* ScreenCoordinatesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000115 /* ScreenCoordinatesTests.swift */; };
-		B20000106 /* PermissionsManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000116 /* PermissionsManagerTests.swift */; };
-		E227F2EA2F51CF630032905B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E28DFEF72F4C8D93001B8D91 /* Assets.xcassets */; };
-/* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
 		B20000020 /* PBXContainerItemProxy */ = {
@@ -77,66 +18,21 @@
 
 /* Begin PBXFileReference section */
 		A10000010 /* KuKa.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = KuKa.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		A10000011 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
-		A10000012 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
-		A10000013 /* HotkeyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeyManager.swift; sourceTree = "<group>"; };
-		A10000014 /* OverlayWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlayWindow.swift; sourceTree = "<group>"; };
-		A10000015 /* SelectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectionView.swift; sourceTree = "<group>"; };
-		A10000016 /* CaptureManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureManager.swift; sourceTree = "<group>"; };
-		A10000017 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		A10000018 /* KuKa.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = KuKa.entitlements; sourceTree = "<group>"; };
-		A10000019 /* ThumbnailPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThumbnailPanel.swift; sourceTree = "<group>"; };
-		A1000001A /* DrawingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrawingView.swift; sourceTree = "<group>"; };
-		A10000140 /* CropBox.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CropBox.swift; sourceTree = "<group>"; };
-		A10000142 /* CropOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CropOverlayView.swift; sourceTree = "<group>"; };
-		A10000144 /* SizeLabel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SizeLabel.swift; sourceTree = "<group>"; };
-		A1000001B /* EditorWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorWindow.swift; sourceTree = "<group>"; };
-		A1000001C /* ThumbnailStackManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThumbnailStackManager.swift; sourceTree = "<group>"; };
-		A1000001D /* CombineButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CombineButton.swift; sourceTree = "<group>"; };
-		A1000001E /* FlashView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlashView.swift; sourceTree = "<group>"; };
-		A1000001F /* WindowListProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowListProvider.swift; sourceTree = "<group>"; };
-		A10000022 /* WakeSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WakeSession.swift; sourceTree = "<group>"; };
-		A10000023 /* WakeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WakeManager.swift; sourceTree = "<group>"; };
-		A10000024 /* KeepAwakeController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeepAwakeController.swift; sourceTree = "<group>"; };
-		A10000025 /* FloatingPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingPanel.swift; sourceTree = "<group>"; };
-		A10000026 /* KeepAwakePanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeepAwakePanelView.swift; sourceTree = "<group>"; };
-		A10000110 /* TilingLayoutEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TilingLayoutEngine.swift; sourceTree = "<group>"; };
-		A10000027 /* StageManagerDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StageManagerDetector.swift; sourceTree = "<group>"; };
-		A10000028 /* AccessibilityWindowControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityWindowControl.swift; sourceTree = "<group>"; };
-		A10000029 /* TilingScreenRules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TilingScreenRules.swift; sourceTree = "<group>"; };
-		A1000002A /* ScreenCoordinates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenCoordinates.swift; sourceTree = "<group>"; };
-		A1000002B /* WindowTilingController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowTilingController.swift; sourceTree = "<group>"; };
-		A1000002C /* SelectionSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectionSession.swift; sourceTree = "<group>"; };
-		A1000002D /* CaptureFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureFlow.swift; sourceTree = "<group>"; };
-		A1000002E /* ImageStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageStore.swift; sourceTree = "<group>"; };
-		A10000121 /* Settings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Settings.swift; sourceTree = "<group>"; };
-		A10000123 /* StatusMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusMenu.swift; sourceTree = "<group>"; };
-		A10000125 /* Screens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Screens.swift; sourceTree = "<group>"; };
-		A10000132 /* PermissionsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionsManager.swift; sourceTree = "<group>"; };
-		A10000133 /* OnboardingWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingWindowController.swift; sourceTree = "<group>"; };
-		B20000015 /* WakeSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WakeSessionTests.swift; sourceTree = "<group>"; };
 		B20000010 /* KuKaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KuKaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		B20000011 /* CaptureManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureManagerTests.swift; sourceTree = "<group>"; };
-		B20000012 /* Mocks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Mocks.swift; sourceTree = "<group>"; };
-		B20000016 /* WakeManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WakeManagerTests.swift; sourceTree = "<group>"; };
-		B20000017 /* KeepAwakeControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeepAwakeControllerTests.swift; sourceTree = "<group>"; };
-		B20000018 /* ThumbnailStackManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThumbnailStackManagerTests.swift; sourceTree = "<group>"; };
-		B20000019 /* DrawingViewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrawingViewTests.swift; sourceTree = "<group>"; };
-		B20000120 /* CropBoxTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CropBoxTests.swift; sourceTree = "<group>"; };
-		B2000001A /* TilingLayoutEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TilingLayoutEngineTests.swift; sourceTree = "<group>"; };
-		B2000001B /* TilingAdaptersTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TilingAdaptersTests.swift; sourceTree = "<group>"; };
-		B2000001C /* WindowTilingControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowTilingControllerTests.swift; sourceTree = "<group>"; };
-		B2000001D /* HotkeyManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeyManagerTests.swift; sourceTree = "<group>"; };
-		B2000001E /* SelectionSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectionSessionTests.swift; sourceTree = "<group>"; };
-		B2000001F /* CaptureFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureFlowTests.swift; sourceTree = "<group>"; };
-		B20000111 /* ImageStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageStoreTests.swift; sourceTree = "<group>"; };
-		B20000112 /* EditorWindowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorWindowTests.swift; sourceTree = "<group>"; };
-		B20000113 /* SettingsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsTests.swift; sourceTree = "<group>"; };
-		B20000114 /* StatusMenuTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusMenuTests.swift; sourceTree = "<group>"; };
-		B20000115 /* ScreenCoordinatesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenCoordinatesTests.swift; sourceTree = "<group>"; };
-		B20000116 /* PermissionsManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionsManagerTests.swift; sourceTree = "<group>"; };
-		E28DFEF72F4C8D93001B8D91 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		7A3E1C4B98D2F05617BE0C31 /* KuKa */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = KuKa;
+			sourceTree = "<group>";
+		};
+		2D9B47F0E1A6C38254FD7B09 /* KuKaTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = KuKaTests;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		A10000020 /* Frameworks */ = {
@@ -159,55 +55,10 @@
 		A10000030 = {
 			isa = PBXGroup;
 			children = (
-				A10000031 /* KuKa */,
-				B20000031 /* KuKaTests */,
+				7A3E1C4B98D2F05617BE0C31 /* KuKa */,
+				2D9B47F0E1A6C38254FD7B09 /* KuKaTests */,
 				A10000032 /* Products */,
 			);
-			sourceTree = "<group>";
-		};
-		A10000031 /* KuKa */ = {
-			isa = PBXGroup;
-			children = (
-				A10000011 /* main.swift */,
-				A10000012 /* AppDelegate.swift */,
-				A10000013 /* HotkeyManager.swift */,
-				A10000014 /* OverlayWindow.swift */,
-				A10000015 /* SelectionView.swift */,
-				A1000002C /* SelectionSession.swift */,
-				A1000002D /* CaptureFlow.swift */,
-				A1000002E /* ImageStore.swift */,
-				A10000121 /* Settings.swift */,
-				A10000123 /* StatusMenu.swift */,
-				A10000125 /* Screens.swift */,
-				A10000016 /* CaptureManager.swift */,
-				A10000019 /* ThumbnailPanel.swift */,
-				A1000001C /* ThumbnailStackManager.swift */,
-				A1000001D /* CombineButton.swift */,
-				A1000001E /* FlashView.swift */,
-				A1000001F /* WindowListProvider.swift */,
-				A10000022 /* WakeSession.swift */,
-				A10000023 /* WakeManager.swift */,
-				A10000024 /* KeepAwakeController.swift */,
-				A10000025 /* FloatingPanel.swift */,
-				A10000026 /* KeepAwakePanelView.swift */,
-				A10000110 /* TilingLayoutEngine.swift */,
-				A10000027 /* StageManagerDetector.swift */,
-				A10000028 /* AccessibilityWindowControl.swift */,
-				A10000029 /* TilingScreenRules.swift */,
-				A1000002A /* ScreenCoordinates.swift */,
-				A1000002B /* WindowTilingController.swift */,
-				A10000132 /* PermissionsManager.swift */,
-				A10000133 /* OnboardingWindowController.swift */,
-				A1000001A /* DrawingView.swift */,
-				A10000140 /* CropBox.swift */,
-				A10000142 /* CropOverlayView.swift */,
-				A10000144 /* SizeLabel.swift */,
-				A1000001B /* EditorWindow.swift */,
-				A10000017 /* Info.plist */,
-				A10000018 /* KuKa.entitlements */,
-				E28DFEF72F4C8D93001B8D91 /* Assets.xcassets */,
-			);
-			path = KuKa;
 			sourceTree = "<group>";
 		};
 		A10000032 /* Products */ = {
@@ -217,33 +68,6 @@
 				B20000010 /* KuKaTests.xctest */,
 			);
 			name = Products;
-			sourceTree = "<group>";
-		};
-		B20000031 /* KuKaTests */ = {
-			isa = PBXGroup;
-			children = (
-				B20000011 /* CaptureManagerTests.swift */,
-				B20000015 /* WakeSessionTests.swift */,
-				B20000016 /* WakeManagerTests.swift */,
-				B20000017 /* KeepAwakeControllerTests.swift */,
-				B20000018 /* ThumbnailStackManagerTests.swift */,
-				B20000019 /* DrawingViewTests.swift */,
-				B20000120 /* CropBoxTests.swift */,
-				B2000001A /* TilingLayoutEngineTests.swift */,
-				B2000001B /* TilingAdaptersTests.swift */,
-				B2000001C /* WindowTilingControllerTests.swift */,
-				B2000001D /* HotkeyManagerTests.swift */,
-				B2000001E /* SelectionSessionTests.swift */,
-				B2000001F /* CaptureFlowTests.swift */,
-				B20000111 /* ImageStoreTests.swift */,
-				B20000112 /* EditorWindowTests.swift */,
-				B20000113 /* SettingsTests.swift */,
-				B20000114 /* StatusMenuTests.swift */,
-				B20000115 /* ScreenCoordinatesTests.swift */,
-				B20000116 /* PermissionsManagerTests.swift */,
-				B20000012 /* Mocks.swift */,
-			);
-			path = KuKaTests;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -260,6 +84,9 @@
 			buildRules = (
 			);
 			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				7A3E1C4B98D2F05617BE0C31 /* KuKa */,
 			);
 			name = KuKa;
 			productName = KuKa;
@@ -278,6 +105,9 @@
 			dependencies = (
 				B20000021 /* PBXTargetDependency */,
 			);
+			fileSystemSynchronizedGroups = (
+				2D9B47F0E1A6C38254FD7B09 /* KuKaTests */,
+			);
 			name = KuKaTests;
 			productName = KuKaTests;
 			productReference = B20000010 /* KuKaTests.xctest */;
@@ -294,7 +124,6 @@
 				LastUpgradeCheck = 1500;
 			};
 			buildConfigurationList = A10000070 /* Build configuration list for PBXProject "KuKa" */;
-			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -302,6 +131,8 @@
 				Base,
 			);
 			mainGroup = A10000030;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
 			productRefGroup = A10000032 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -317,7 +148,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				E227F2EA2F51CF630032905B /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -328,41 +158,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A10000001 /* main.swift in Sources */,
-				A10000002 /* AppDelegate.swift in Sources */,
-				A10000003 /* HotkeyManager.swift in Sources */,
-				A10000004 /* OverlayWindow.swift in Sources */,
-				A10000005 /* SelectionView.swift in Sources */,
-				A10000112 /* SelectionSession.swift in Sources */,
-				A10000113 /* CaptureFlow.swift in Sources */,
-				A10000114 /* ImageStore.swift in Sources */,
-				A10000120 /* Settings.swift in Sources */,
-				A10000122 /* StatusMenu.swift in Sources */,
-				A10000124 /* Screens.swift in Sources */,
-				A10000006 /* CaptureManager.swift in Sources */,
-				A10000007 /* ThumbnailPanel.swift in Sources */,
-				A10000008 /* DrawingView.swift in Sources */,
-				A10000141 /* CropBox.swift in Sources */,
-				A10000143 /* CropOverlayView.swift in Sources */,
-				A10000145 /* SizeLabel.swift in Sources */,
-				A10000009 /* EditorWindow.swift in Sources */,
-				A100000A /* ThumbnailStackManager.swift in Sources */,
-				A100000B /* CombineButton.swift in Sources */,
-				A100000C /* FlashView.swift in Sources */,
-				A100000D /* WindowListProvider.swift in Sources */,
-				A100000F /* WakeSession.swift in Sources */,
-				A10000100 /* WakeManager.swift in Sources */,
-				A10000101 /* KeepAwakeController.swift in Sources */,
-				A10000102 /* FloatingPanel.swift in Sources */,
-				A10000103 /* KeepAwakePanelView.swift in Sources */,
-				A10000111 /* TilingLayoutEngine.swift in Sources */,
-				A10000104 /* StageManagerDetector.swift in Sources */,
-				A10000105 /* AccessibilityWindowControl.swift in Sources */,
-				A10000106 /* TilingScreenRules.swift in Sources */,
-				A10000107 /* ScreenCoordinates.swift in Sources */,
-				A10000108 /* WindowTilingController.swift in Sources */,
-				A10000130 /* PermissionsManager.swift in Sources */,
-				A10000131 /* OnboardingWindowController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -370,26 +165,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				B20000001 /* CaptureManagerTests.swift in Sources */,
-				B20000005 /* WakeSessionTests.swift in Sources */,
-				B20000006 /* WakeManagerTests.swift in Sources */,
-				B20000007 /* KeepAwakeControllerTests.swift in Sources */,
-				B20000008 /* ThumbnailStackManagerTests.swift in Sources */,
-				B20000009 /* DrawingViewTests.swift in Sources */,
-				B20000121 /* CropBoxTests.swift in Sources */,
-				B2000000A /* TilingLayoutEngineTests.swift in Sources */,
-				B2000000B /* TilingAdaptersTests.swift in Sources */,
-				B2000000C /* WindowTilingControllerTests.swift in Sources */,
-				B2000000D /* HotkeyManagerTests.swift in Sources */,
-				B2000000E /* SelectionSessionTests.swift in Sources */,
-				B2000000F /* CaptureFlowTests.swift in Sources */,
-				B20000101 /* ImageStoreTests.swift in Sources */,
-				B20000102 /* EditorWindowTests.swift in Sources */,
-				B20000103 /* SettingsTests.swift in Sources */,
-				B20000104 /* StatusMenuTests.swift in Sources */,
-				B20000105 /* ScreenCoordinatesTests.swift in Sources */,
-				B20000106 /* PermissionsManagerTests.swift in Sources */,
-				B20000002 /* Mocks.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

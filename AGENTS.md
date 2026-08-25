@@ -52,6 +52,11 @@ KuKa/
 └── KuKa.entitlements    # Sandbox disabled (required for CGEvent tap + screen capture)
 ```
 
+`KuKa/` and `KuKaTests/` are file-system synchronized folders. Xcode compiles every
+file in them, so adding, renaming, or deleting a source file changes nothing in
+`KuKa.xcodeproj/project.pbxproj`. Do not add file entries to the project file by hand.
+To keep a file out of the build, put it outside these two folders.
+
 ### Key Classes
 
 | Class | Responsibility |
@@ -116,6 +121,7 @@ Ctrl+Opt+Left/Right/Return/C → HotkeyManager (suppresses event; skipped entire
 ### Technical Requirements
 
 - **Language**: Swift 5, macOS 14.0+
+- **Project format**: Xcode 16 synchronized folders (object version 77) — opening the project needs Xcode 16 or later
 - **Frameworks**: AppKit, CoreGraphics, ScreenCaptureKit, ServiceManagement, ApplicationServices (Accessibility API for window tiling)
 - **Permissions**: Accessibility (covers both the CGEvent tap and AX window move/resize — no extra grant for tiling), Screen Recording (ScreenCaptureKit)
 - **Launch at Login**: `SMAppService.mainApp.register()` / `unregister()`
