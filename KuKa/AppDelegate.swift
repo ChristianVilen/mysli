@@ -20,6 +20,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private lazy var clipboardPanel = ClipboardPanel(controller: clipboardHistory)
     private lazy var statusMenu = StatusMenu(settings: settings, keepAwake: keepAwake)
     private let permissions = PermissionsManager()
+    /// Lazy so the probes can reference the types that own what they report:
+    /// permission status is `PermissionsManager`'s, tap status is
+    /// `HotkeyManager`'s. The closures capture those, not self, so there is
+    /// no retain cycle.
+    private lazy var hotkeyHealth = HotkeyHealthMonitor(
+        isAccessibilityGranted: { [permissions] in permissions.accessibility },
+        isTapDelivering: { [hotkeyManager] in hotkeyManager.isDelivering }
+    )
     private var onboardingController: OnboardingWindowController?
     /// False in UI-test runs, where permission handling is skipped entirely
     /// (also keeps the warning badge off the status icon there).
@@ -39,6 +47,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupClipboardHistory()
         if !isTesting {
             setupPermissions()
+            setupHotkeyHealthWatch()
             // Polling the real pasteboard during unit/UI test runs would
             // ingest whatever the developer happens to have copied, so this
             // stays behind the same isTesting gate as setupPermissions().
@@ -60,7 +69,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // An accessory app rarely becomes active, so also re-check every time
         // the status menu opens — otherwise a revocation made in System
         // Settings would leave the warning badge stale until onboarding opens.
-        statusMenu.onMenuWillOpen = { [weak self] in self?.permissions.refresh() }
+        statusMenu.onMenuWillOpen = { [weak self] in
+            self?.permissions.refresh()
+            self?.hotkeyHealth.refresh()
+        }
         permissions.refresh()
         permissionsChanged()
         if !permissions.allGranted {
@@ -68,10 +80,30 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// Every hotkey-death cause is silent on its own (a starved tap logs
+    /// nothing a user sees), so watch the health monitor and surface its
+    /// state. Called behind the same isTesting gate as `setupPermissions()`:
+    /// tests never poll the real session. The menu-open refresh lives in
+    /// `setupPermissions()`'s `onMenuWillOpen` closure — it's a single
+    /// callback slot shared by both.
+    private func setupHotkeyHealthWatch() {
+        hotkeyHealth.onChange = { [weak self] in self?.hotkeyHealthChanged() }
+        hotkeyHealth.startMonitoring()
+    }
+
+    private func hotkeyHealthChanged() {
+        statusMenu.updateHotkeyHealth(hotkeyHealth.state)
+        updateStatusItemIcon()
+    }
+
     private func permissionsChanged() {
         if permissions.accessibility && !hotkeyManager.isRunning {
             setupHotkey()
         }
+        // After setupHotkey, so the tap probe sees the tap it just started.
+        // Without this the menu would keep the "Hotkeys off" warning, and the
+        // icon its red dot, until the health monitor's next 5s poll.
+        hotkeyHealth.refresh()
         updateStatusItemIcon()
         onboardingController?.refreshRows()
     }
@@ -214,7 +246,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func updateStatusItemIcon() {
         statusItem.button?.image = statusMenu.icon(
             keepAwakeActive: keepAwake.isActive,
-            permissionMissing: permissionHandlingEnabled && !permissions.allGranted
+            warning: statusWarning()
         )
+    }
+
+    /// Dead hotkeys win the corner over a missing permission — they are the
+    /// more urgent state, and the menu spells out the cause. Orange is left
+    /// for the one permission hotkey health can't see (Screen Recording); a
+    /// missing Accessibility grant already shows as red through
+    /// `hotkeyHealth`, because it means hotkeys are dead right now.
+    private func statusWarning() -> StatusWarning? {
+        guard permissionHandlingEnabled else { return nil }
+        if hotkeyHealth.state != .healthy { return .hotkeysDead }
+        if !permissions.screenRecording { return .screenRecordingMissing }
+        return nil
     }
 }

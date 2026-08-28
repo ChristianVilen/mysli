@@ -4,6 +4,14 @@ import Cocoa
 /// Settings), keeps checkmarks in step, and renders the status-item icon.
 /// Serves as the menu's delegate, forwarding open/close to KeepAwakeController.
 @MainActor
+/// What the status icon's bottom-left warning corner shows. At most one, and
+/// red beats orange: dead hotkeys are the more urgent state, and the menu
+/// spells out the cause anyway.
+enum StatusWarning {
+    case hotkeysDead
+    case screenRecordingMissing
+}
+
 final class StatusMenu: NSObject, NSMenuDelegate {
     let menu = NSMenu()
     var onTilingToggled: ((Bool) -> Void)?
@@ -20,6 +28,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     private var windowTilingItem: NSMenuItem!
     private var clipboardHistoryItem: NSMenuItem!
     private var durationItems: [NSMenuItem] = []
+    private var hotkeyWarningItems: [NSMenuItem] = []
 
     init(settings: Settings, keepAwake: KeepAwakeController) {
         self.settings = settings
@@ -30,15 +39,15 @@ final class StatusMenu: NSObject, NSMenuDelegate {
 
     /// The status-item image: the app icon, plus a small dot (with a light
     /// ring for contrast) per active state — Keep Awake gets the accent dot
-    /// in the bottom-right, a missing permission gets an orange warning dot
-    /// in the bottom-left. Separate corners so both can show at once.
-    func icon(keepAwakeActive: Bool, permissionMissing: Bool) -> NSImage {
+    /// in the bottom-right, and `warning` gets the bottom-left corner.
+    /// Separate corners so both can show at once.
+    func icon(keepAwakeActive: Bool, warning: StatusWarning?) -> NSImage {
         guard let base = NSImage(named: "MenuBarIcon") else {
             return NSImage(systemSymbolName: "camera.viewfinder", accessibilityDescription: "Ku-Ka") ?? NSImage()
         }
         let size = NSSize(width: 18, height: 18)
 
-        guard keepAwakeActive || permissionMissing else {
+        guard keepAwakeActive || warning != nil else {
             let icon = (base.copy() as? NSImage) ?? base
             icon.size = size
             icon.isTemplate = false
@@ -57,13 +66,51 @@ final class StatusMenu: NSObject, NSMenuDelegate {
             if keepAwakeActive {
                 drawDot(NSRect(x: rect.maxX - 8, y: rect.minY + 1, width: 7, height: 7), color: .controlAccentColor)
             }
-            if permissionMissing {
-                drawDot(NSRect(x: rect.minX + 1, y: rect.minY + 1, width: 7, height: 7), color: .systemOrange)
+            let corner = NSRect(x: rect.minX + 1, y: rect.minY + 1, width: 7, height: 7)
+            switch warning {
+            case .hotkeysDead: drawDot(corner, color: .systemRed)
+            case .screenRecordingMissing: drawDot(corner, color: .systemOrange)
+            case nil: break
             }
             return true
         }
         badged.isTemplate = false
         return badged
+    }
+
+    /// Show or clear the hotkey-health warning at the top of the menu: why
+    /// hotkeys are dead, and the one thing the user can do about it. Rebuilt
+    /// on every call, so a repeated state never duplicates and a changed
+    /// cause replaces the old lines.
+    func updateHotkeyHealth(_ health: HotkeyHealth) {
+        for item in hotkeyWarningItems { menu.removeItem(item) }
+        hotkeyWarningItems = []
+
+        let title: String, remedy: String
+        switch health {
+        case .healthy:
+            return
+        case .noPermission:
+            title = "⚠️ Hotkeys off — Accessibility permission missing"
+            remedy = "Grant it under Permissions… below"
+        case .tapDead:
+            title = "⚠️ Hotkeys stopped working"
+            remedy = "Quit and reopen Ku-Ka to fix"
+        case .secureInputStuck(let holderName):
+            title = "⚠️ Hotkeys blocked by \(holderName ?? "another app")"
+            remedy = "Lock and unlock the screen to fix"
+        }
+
+        let warning = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+        warning.isEnabled = false
+        let hint = NSMenuItem(title: remedy, action: nil, keyEquivalent: "")
+        hint.isEnabled = false
+        hint.indentationLevel = 1
+
+        hotkeyWarningItems = [warning, hint, .separator()]
+        for (index, item) in hotkeyWarningItems.enumerated() {
+            menu.insertItem(item, at: index)
+        }
     }
 
     // MARK: - Build

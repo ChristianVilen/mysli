@@ -30,6 +30,16 @@ class HotkeyManager {
     /// start the tap exactly once when Accessibility is granted.
     var isRunning: Bool { eventTap != nil }
 
+    /// Whether key events can actually reach the tap right now: it exists
+    /// and the system reports it enabled. `isRunning` can't answer this — a
+    /// system-disabled tap still counts as installed there. Read by
+    /// `HotkeyHealthMonitor`'s tap probe; the watchdog's self-healing stays
+    /// in here.
+    var isDelivering: Bool {
+        guard let tap = eventTap else { return false }
+        return CGEvent.tapIsEnabled(tap: tap)
+    }
+
     func stop() {
         watchdogTimer?.invalidate()
         watchdogTimer = nil
