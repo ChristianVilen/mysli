@@ -1,23 +1,29 @@
 import Cocoa
 
-/// The System Settings panes Ku-Ka deep-links into. The anchor tokens after
-/// `?` are unchanged across the System Settings redesign.
+/// The System Settings panes Ku-Ka opens for permissions and shortcut setup.
 enum SettingsPane {
     case accessibility
     case screenCapture
+    case keyboardShortcuts
 
     private var anchor: String {
         switch self {
         case .accessibility: return "Privacy_Accessibility"
         case .screenCapture: return "Privacy_ScreenCapture"
+        case .keyboardShortcuts: return "Shortcuts"
         }
     }
 
-    /// In the order to try them: the modern `.extension` pane identifier
-    /// (Sequoia/Tahoe) first, then the pre-redesign form as fallback — Apple
-    /// has broken some `.extension` panes on individual builds.
+    /// Privacy panes try the modern identifier first. Keyboard setup tries
+    /// the shortcuts link, then falls back to the general Keyboard pane.
     var urls: [URL] {
-        [
+        if self == .keyboardShortcuts {
+            return [
+                URL(string: "x-apple.systempreferences:com.apple.preference.keyboard?Shortcuts")!,
+                URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension")!,
+            ]
+        }
+        return [
             URL(string: "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?" + anchor)!,
             URL(string: "x-apple.systempreferences:com.apple.preference.security?" + anchor)!,
         ]
@@ -25,7 +31,7 @@ enum SettingsPane {
 }
 
 /// Single source of truth for the two permissions Ku-Ka needs: Accessibility
-/// (the CGEvent tap for hotkeys plus AX window moves for tiling) and Screen
+/// (window moves for tiling and synthetic clipboard paste) and Screen
 /// Recording (ScreenCaptureKit capture).
 ///
 /// macOS offers no callback when the user grants a permission in System

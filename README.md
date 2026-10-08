@@ -89,20 +89,31 @@ Alternatively, you can use the GUI method:
 
 ## Build & Run
 
-1. Open `KuKa.xcodeproj` in Xcode
+1. Open `KuKa.xcodeproj` in Xcode 26 or later
 2. Select the `KuKa` scheme and your Mac as the destination
 3. `Cmd+R` to build and run
 
 ## Permissions
 
-Ku-Ka needs two permissions. On first launch (and whenever one is missing) a setup window opens — a short welcome page, then one row per permission with a Grant button and a live ❌/✅ status. Grant each one in System Settings and the row flips to ✅ by itself, no relaunch needed. The window can be reopened anytime from the menu bar via **Permissions…**, and the menu-bar icon shows a small orange dot while a permission is missing.
+Screen Recording lets Ku-Ka take screenshots. Accessibility lets it move windows and paste from clipboard history. On first launch, a setup window explains these permissions. Grant the permissions for the features you use; each row updates after you allow it in System Settings. Open the window again from **Permissions…** in the menu. A red dot means an Accessibility or shortcut problem. An orange dot means Screen Recording is missing, when no red warning is present.
 
-### Accessibility (required)
-The app intercepts `Shift+Command+3/4` via a `CGEvent` tap, which requires Accessibility access. The same permission also lets Ku-Ka move and resize windows, which is what the window tiling hotkeys use — no separate permission is needed for that.
+### Accessibility (window tiling and automatic paste)
+Accessibility lets Ku-Ka move and resize windows and paste items from clipboard history. Registering the shortcuts does not need this permission.
 
 **System Settings → Privacy & Security → Accessibility** → Enable Ku-Ka
 
-The hotkeys start working the moment the permission is granted.
+Ku-Ka detects the permission when it becomes active or you open its menu. You do not need to restart it.
+
+### Screenshot shortcut setup
+
+Ku-Ka keeps `Shift+Command+3` and `Shift+Command+4`. If macOS already uses them, Ku-Ka shows a screenshot setup window once, after permission setup, and lists the conflicts in its menu. Choose **Open Keyboard Settings…**, then **Keyboard Shortcuts → Screenshots**, and turn off the matching macOS shortcuts:
+
+- **Save picture of screen as a file** — `Shift+Command+3`
+- **Save picture of selected area as a file** — `Shift+Command+4`
+
+Ku-Ka retries within a few seconds. The menu warnings disappear when the shortcuts are ready. It does not change system settings for you. If you choose **Later**, you can return to the instructions through the menu's conflict warning.
+
+All Ku-Ka shortcuts use registered macOS hotkeys instead of a keyboard event tap. The menu lists registration failures for each shortcut; other registered shortcuts remain available. If a shortcut cannot be released, Ku-Ka reports it and retries while running. Opening clipboard history and pasting are separate operations, so automatic paste can still fail in protected fields.
 
 ### Screen Recording (required)
 ScreenCaptureKit requires screen recording permission to capture screen content.
@@ -149,7 +160,11 @@ The folder is created automatically if it doesn't exist.
 KuKa/
 ├── main.swift           # App entry point
 ├── AppDelegate.swift    # Menu bar setup, wires hotkey → overlay → capture → thumbnail → editor
-├── HotkeyManager.swift  # CGEvent tap for Shift+Command+4 interception
+├── HotkeyManager.swift  # Desired shortcuts, feature toggles, retry and wake recovery
+├── HotkeyShortcut.swift # Shortcut definitions and registration failures
+├── HotkeyRegistration.swift # Registration state, reconciliation, conflict checks and failed-release recovery
+├── CarbonHotkeyAPI.swift # Injectable macOS calls
+├── HotkeyHealth.swift   # Permission and shortcut issues displayed by the menu
 ├── OverlayWindow.swift  # Full-screen transparent overlay window
 ├── SelectionView.swift  # Mouse drag selection with dimmed background + dimensions
 ├── CaptureManager.swift # Screen capture, save to disk, clipboard, delete
@@ -172,7 +187,7 @@ KuKa/
 
 ## Known Limitations
 
-- You must disable or accept that the system `Shift+Command+3` and `Shift+Command+4` are intercepted (the app suppresses the system shortcuts when running)
+- Turn off the matching macOS screenshot shortcuts to let Ku-Ka register `Shift+Command+3/4`. With those macOS bindings off, quitting Ku-Ka leaves those two shortcuts unassigned until you restore them in System Settings.
 - `Ctrl+Option+Left/Right/Return` are intercepted globally while window tiling is enabled, even inside apps that use those same keys for something else. Turn off **Window Tiling** in the menu to give the keys back to other apps.
 - `Shift+Command+C` is intercepted globally while clipboard history is enabled, including in apps that use it for something else. Turn off **Clipboard History** in the menu to give the key back.
 - The automatic paste can't reach password fields or apps that block synthetic key events. The item is still on the clipboard, so pasting it by hand (`Cmd+V`) works.
@@ -200,8 +215,8 @@ Tests cover:
 - Screenshot deletion (file removal + clipboard clear)
 - Tiling layout math and the maximize/restore toggle, including apps that snap window sizes
 - Screen-picking and windows-per-screen rules, plus the tiling controller's saved-frame handling
-- Hotkey routing: tiling keys are swallowed while enabled and pass through while disabled; screenshot keys work either way
+- Shortcut registration, feature toggles, action delivery, conflict detection, partial failure recovery, wake renewal, stale callback rejection, and cleanup
 
 ### Test-Mode Guard
 
-When running under XCTest, the app skips hotkey registration to avoid permission prompts. Detection uses `XCTestConfigurationFilePath` (unit tests) and the `--uitesting` launch argument (no UI-test target currently exists).
+When running under XCTest, the app skips real shortcut registration, permission setup, and clipboard polling. Tests use the real registrar with fake Carbon calls. Detection uses `XCTestConfigurationFilePath` (unit tests) and the `--uitesting` launch argument (no UI-test target currently exists).

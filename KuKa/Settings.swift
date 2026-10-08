@@ -45,6 +45,11 @@ final class Settings {
         set { defaults.set(newValue, forKey: "clipboardHistoryEnabled") }
     }
 
+    var didShowScreenshotShortcutSetup: Bool {
+        get { defaults.bool(forKey: "didShowScreenshotShortcutSetup") }
+        set { defaults.set(newValue, forKey: "didShowScreenshotShortcutSetup") }
+    }
+
     var launchAtLogin: Bool { loginItem.isEnabled }
 
     func setLaunchAtLogin(_ enabled: Bool) {

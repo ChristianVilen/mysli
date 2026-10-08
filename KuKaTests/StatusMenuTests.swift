@@ -33,46 +33,46 @@ final class StatusMenuTests: XCTestCase {
 
     // MARK: - Hotkey health warning
 
-    func testHotkeyWarningAppearsOnceWithHolderNameAndClears() {
-        sut.updateHotkeyHealth(.secureInputStuck(holderName: "Arc"))
-        sut.updateHotkeyHealth(.secureInputStuck(holderName: "Arc"))
+    func testRepeatedHealthDoesNotReplaceMenuItems() {
+        let health = HotkeyHealth(issues: [.init(shortcut: .tileLeft, failure: .releaseFailed(-50))])
+        sut.updateHotkeyHealth(health)
+        let warning = sut.menu.items.first
+        XCTAssertNotNil(item(titled: "⚠️ ⌃⌥← (tile left) could not be released"))
+        XCTAssertNotNil(item(titled: "Ku-Ka will retry automatically"))
+        sut.updateHotkeyHealth(health)
+        XCTAssertTrue(sut.menu.items.first === warning)
+    }
 
-        let warnings = menuItems.filter { $0.title == "⚠️ Hotkeys blocked by Arc" }
-        XCTAssertEqual(warnings.count, 1, "repeated updates must not duplicate the warning")
-        XCTAssertNotNil(item(titled: "Lock and unlock the screen to fix"))
+    func testPermissionRecoveryKeepsTheShortcutWarningUntilRegistrationRecovers() {
+        let issues = [HotkeyRegistrationIssue(shortcut: .captureArea, failure: .systemConflict)]
+        sut.updateHotkeyHealth(.init(accessibilityMissing: true, issues: issues))
+        sut.updateHotkeyHealth(.init(issues: issues))
+        XCTAssertNil(item(titled: "⚠️ Window tiling and paste need Accessibility permission"))
+        XCTAssertNotNil(item(titled: "⚠️ ⇧⌘4 (selected area) is used by macOS"))
+        sut.updateHotkeyHealth(.healthy)
+        XCTAssertFalse(menuItems.contains { $0.title.hasPrefix("⚠️") })
+    }
+
+    func testShortcutWarningsShowConflictsAndPermissionWithoutBlamingAnApp() {
+        let health = HotkeyHealth(accessibilityMissing: true, issues: [
+            .init(shortcut: .captureArea, failure: .systemConflict),
+            .init(shortcut: .tileLeft, failure: .registrationFailed(-9878))
+        ])
+        sut.updateHotkeyHealth(health)
+        sut.updateHotkeyHealth(health)
+        XCTAssertEqual(menuItems.filter { $0.title == "⚠️ ⇧⌘4 (selected area) is used by macOS" }.count, 1)
+        XCTAssertNotNil(item(titled: "⚠️ Window tiling and paste need Accessibility permission"))
+        XCTAssertNotNil(item(titled: "⚠️ ⌃⌥← (tile left) could not be registered"))
+        XCTAssertNotNil(item(titled: "In Screenshots, turn off the matching macOS shortcut"))
+        var opened = false
+        sut.onOpenKeyboardSettings = { opened = true }
+        click(item(titled: "Open Keyboard Settings…")!)
+        XCTAssertTrue(opened)
+        XCTAssertFalse(menuItems.contains { $0.title.contains("blocked by") || $0.title.contains("unlock") })
 
         sut.updateHotkeyHealth(.healthy)
-
-        XCTAssertNil(item(titled: "⚠️ Hotkeys blocked by Arc"))
-        XCTAssertNil(item(titled: "Lock and unlock the screen to fix"))
-    }
-
-    func testHotkeyWarningNamesAnotherAppWhenHolderIsUnknown() {
-        sut.updateHotkeyHealth(.secureInputStuck(holderName: nil))
-
-        XCTAssertNotNil(item(titled: "⚠️ Hotkeys blocked by another app"))
-    }
-
-    func testHotkeyWarningForMissingPermission() {
-        sut.updateHotkeyHealth(.noPermission)
-
-        XCTAssertNotNil(item(titled: "⚠️ Hotkeys off — Accessibility permission missing"))
-        XCTAssertNotNil(item(titled: "Grant it under Permissions… below"))
-    }
-
-    func testHotkeyWarningForDeadTap() {
-        sut.updateHotkeyHealth(.tapDead)
-
-        XCTAssertNotNil(item(titled: "⚠️ Hotkeys stopped working"))
-        XCTAssertNotNil(item(titled: "Quit and reopen Ku-Ka to fix"))
-    }
-
-    func testHotkeyWarningSwitchesWhenTheCauseChanges() {
-        sut.updateHotkeyHealth(.noPermission)
-        sut.updateHotkeyHealth(.tapDead)
-
-        XCTAssertNil(item(titled: "⚠️ Hotkeys off — Accessibility permission missing"))
-        XCTAssertNotNil(item(titled: "⚠️ Hotkeys stopped working"))
+        XCTAssertFalse(menuItems.contains { $0.title.hasPrefix("⚠️") })
+        XCTAssertNil(item(titled: "Open Keyboard Settings…"))
     }
 
     // MARK: - Structure

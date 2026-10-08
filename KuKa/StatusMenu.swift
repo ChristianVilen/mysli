@@ -1,17 +1,12 @@
 import Cocoa
 
-/// Owns the status-bar menu: builds it, handles its actions (writing through
-/// Settings), keeps checkmarks in step, and renders the status-item icon.
-/// Serves as the menu's delegate, forwarding open/close to KeepAwakeController.
-@MainActor
-/// What the status icon's bottom-left warning corner shows. At most one, and
-/// red beats orange: dead hotkeys are the more urgent state, and the menu
-/// spells out the cause anyway.
+/// The menu gives the details behind the status icon's warning dot.
 enum StatusWarning {
-    case hotkeysDead
+    case shortcutsUnavailable
     case screenRecordingMissing
 }
 
+@MainActor
 final class StatusMenu: NSObject, NSMenuDelegate {
     let menu = NSMenu()
     var onTilingToggled: ((Bool) -> Void)?
@@ -19,6 +14,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     /// Fired when the user picks "Permissions…" — AppDelegate opens the
     /// onboarding window.
     var onShowPermissions: (() -> Void)?
+    var onOpenKeyboardSettings: (() -> Void)?
     /// Fired every time the menu opens, before it is shown.
     var onMenuWillOpen: (() -> Void)?
 
@@ -29,6 +25,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     private var clipboardHistoryItem: NSMenuItem!
     private var durationItems: [NSMenuItem] = []
     private var hotkeyWarningItems: [NSMenuItem] = []
+    private var renderedHealth: HotkeyHealth?
 
     init(settings: Settings, keepAwake: KeepAwakeController) {
         self.settings = settings
@@ -68,7 +65,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
             }
             let corner = NSRect(x: rect.minX + 1, y: rect.minY + 1, width: 7, height: 7)
             switch warning {
-            case .hotkeysDead: drawDot(corner, color: .systemRed)
+            case .shortcutsUnavailable: drawDot(corner, color: .systemRed)
             case .screenRecordingMissing: drawDot(corner, color: .systemOrange)
             case nil: break
             }
@@ -78,42 +75,61 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         return badged
     }
 
-    /// Show or clear the hotkey-health warning at the top of the menu: why
-    /// hotkeys are dead, and the one thing the user can do about it. Rebuilt
-    /// on every call, so a repeated state never duplicates and a changed
-    /// cause replaces the old lines.
+    /// Rebuild warnings so recovery removes only the resolved problems.
     func updateHotkeyHealth(_ health: HotkeyHealth) {
+        guard health != renderedHealth else { return }
+        renderedHealth = health
         for item in hotkeyWarningItems { menu.removeItem(item) }
         hotkeyWarningItems = []
 
-        let title: String, remedy: String
-        switch health {
-        case .healthy:
-            return
-        case .noPermission:
-            title = "⚠️ Hotkeys off — Accessibility permission missing"
-            remedy = "Grant it under Permissions… below"
-        case .tapDead:
-            title = "⚠️ Hotkeys stopped working"
-            remedy = "Quit and reopen Ku-Ka to fix"
-        case .secureInputStuck(let holderName):
-            title = "⚠️ Hotkeys blocked by \(holderName ?? "another app")"
-            remedy = "Lock and unlock the screen to fix"
+        func addLine(_ title: String, indented: Bool = false) {
+            let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+            item.isEnabled = false
+            item.indentationLevel = indented ? 1 : 0
+            hotkeyWarningItems.append(item)
         }
-
-        let warning = NSMenuItem(title: title, action: nil, keyEquivalent: "")
-        warning.isEnabled = false
-        let hint = NSMenuItem(title: remedy, action: nil, keyEquivalent: "")
-        hint.isEnabled = false
-        hint.indentationLevel = 1
-
-        hotkeyWarningItems = [warning, hint, .separator()]
+        if health.accessibilityMissing {
+            addLine("⚠️ Window tiling and paste need Accessibility permission")
+            addLine("Grant it under Permissions… below", indented: true)
+        }
+        for issue in health.issues {
+            switch issue.failure {
+            case .systemConflict:
+                addLine("⚠️ \(issue.shortcut.label) is used by macOS")
+            case .systemLookupFailed:
+                addLine("⚠️ \(issue.shortcut.label) could not be checked")
+            case .registrationFailed:
+                addLine("⚠️ \(issue.shortcut.label) could not be registered")
+            case .releaseFailed:
+                addLine("⚠️ \(issue.shortcut.label) could not be released")
+            }
+        }
+        let conflicts = health.issues.filter { $0.failure == .systemConflict }
+        if !conflicts.isEmpty {
+            addLine("Keyboard Settings → Keyboard Shortcuts", indented: true)
+            if conflicts.contains(where: { $0.shortcut.isScreenshot }) {
+                addLine("In Screenshots, turn off the matching macOS shortcut", indented: true)
+            }
+            if conflicts.contains(where: { !$0.shortcut.isScreenshot }) {
+                addLine("Turn off or change the matching macOS shortcut", indented: true)
+            }
+            let settings = NSMenuItem(title: "Open Keyboard Settings…", action: #selector(openKeyboardSettings), keyEquivalent: "")
+            settings.target = self
+            hotkeyWarningItems.append(settings)
+        }
+        if health.issues.contains(where: { $0.failure != .systemConflict }) {
+            addLine("Ku-Ka will retry automatically", indented: true)
+        }
+        guard !hotkeyWarningItems.isEmpty else { return }
+        hotkeyWarningItems.append(.separator())
         for (index, item) in hotkeyWarningItems.enumerated() {
             menu.insertItem(item, at: index)
         }
     }
 
     // MARK: - Build
+
+    @objc private func openKeyboardSettings() { onOpenKeyboardSettings?() }
 
     private func build() {
         let settingsLabel = NSMenuItem(title: "Settings", action: nil, keyEquivalent: "")

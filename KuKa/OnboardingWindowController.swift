@@ -72,9 +72,8 @@ final class PermissionRowView: NSView {
     }
 }
 
-/// The permission onboarding window: a short welcome page on first open at
-/// launch, then one checklist row per needed permission. Reachable anytime
-/// via the status menu's "Permissions…" item (which skips the welcome).
+/// Setup for permissions and screenshot shortcuts. The permission checklist
+/// stays available through the menu; shortcut setup is shown automatically once.
 ///
 /// While the window is open the app temporarily becomes a regular app (Dock
 /// icon, can take focus) so the window reliably comes to the front, and
@@ -87,23 +86,27 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
     enum Page {
         case welcome
         case checklist
+        case screenshotShortcuts([HotkeyShortcut])
     }
 
     private static let contentWidth: CGFloat = 480
     private static let contentPadding: CGFloat = 20
 
     private let permissions: PermissionsManager
+    private let settings: Settings
     private let accessibilityRow: PermissionRowView
     private let screenRecordingRow: PermissionRowView
     private lazy var welcomePage = makeWelcomePage()
     private lazy var checklistPage = makeChecklistPage()
+    var onClose: (() -> Void)?
 
-    init(permissions: PermissionsManager) {
+    init(permissions: PermissionsManager, settings: Settings = Settings()) {
         self.permissions = permissions
+        self.settings = settings
 
         accessibilityRow = PermissionRowView(
-            title: "Accessibility (required)",
-            explanation: "Lets Ku-Ka catch the ⇧⌘3 / ⇧⌘4 screenshot shortcuts and move windows for the tiling hotkeys."
+            title: "Accessibility (window tiling and paste)",
+            explanation: "Lets Ku-Ka move windows and paste items from clipboard history."
         )
         screenRecordingRow = PermissionRowView(
             title: "Screen Recording (required)",
@@ -166,7 +169,7 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
         title.font = .boldSystemFont(ofSize: 20)
 
         let body = NSTextField(wrappingLabelWithString:
-            "Ku-Ka lives in your menu bar: ⇧⌘3 / ⇧⌘4 take screenshots you can annotate, and hotkeys tile your windows.\n\nBefore the hotkeys can work, macOS needs your OK on two permissions. The next step walks you through them."
+            "Ku-Ka lives in your menu bar. Use ⇧⌘3 / ⇧⌘4 to take screenshots you can annotate, or use its shortcuts to move windows and open clipboard history.\n\nScreen Recording lets Ku-Ka take screenshots. Accessibility lets it move windows and paste from clipboard history. The next step helps you grant these permissions."
         )
         body.font = .systemFont(ofSize: 13)
         body.alignment = .center
@@ -187,7 +190,7 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
 
     private func makeChecklistPage() -> NSView {
         let header = NSTextField(wrappingLabelWithString:
-            "Ku-Ka needs two permissions to work. Grant each one below — the status updates here by itself once you allow it in System Settings."
+            "Screen Recording is needed for screenshots. Accessibility is needed for window tiling and automatic paste. Grant the permissions for the features you use. The status updates after you allow each one in System Settings."
         )
         header.font = .systemFont(ofSize: 13)
 
@@ -208,11 +211,61 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
         return page
     }
 
+    private func makeScreenshotSetupPage(shortcuts: [HotkeyShortcut]) -> NSView {
+        let header = NSTextField(labelWithString: "Set up screenshot shortcuts")
+        header.font = .boldSystemFont(ofSize: 20)
+        let body = NSTextField(wrappingLabelWithString:
+            "To let Ku-Ka use these keys, turn off their macOS shortcuts in System Settings → Keyboard → Keyboard Shortcuts → Screenshots."
+        )
+        body.font = .systemFont(ofSize: 13)
+        let shortcutRows = shortcuts.map { shortcut in
+            let name = shortcut == .captureFullScreen
+                ? "Save picture of screen as a file"
+                : "Save picture of selected area as a file"
+            let row = NSTextField(wrappingLabelWithString: "\(shortcut.label)\n\(name)")
+            row.font = .systemFont(ofSize: 13)
+            return row
+        }
+        let note = NSTextField(wrappingLabelWithString:
+            "Ku-Ka retries automatically within a few seconds. The warnings in its menu disappear when the shortcuts are ready.\n\nIf you quit Ku-Ka, turn these shortcuts back on in System Settings to use the macOS screenshot tool."
+        )
+        note.font = .systemFont(ofSize: 12)
+        note.textColor = .secondaryLabelColor
+
+        let openSettings = NSButton(title: "Open Keyboard Settings…", target: self, action: #selector(openKeyboardSettingsClicked))
+        openSettings.bezelStyle = .rounded
+        openSettings.keyEquivalent = "\r"
+        let later = NSButton(title: "Later", target: self, action: #selector(doneClicked))
+        later.bezelStyle = .rounded
+        let buttons = NSStackView(views: [later, openSettings])
+        buttons.spacing = 8
+
+        let stack = NSStackView(views: [header, body] + shortcutRows + [note, buttons])
+        stack.alignment = .leading
+        stack.spacing = 16
+        let page = makePage(with: stack)
+        for label in [body, note] + shortcutRows {
+            label.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -2 * Self.contentPadding).isActive = true
+        }
+        buttons.trailingAnchor.constraint(equalTo: stack.trailingAnchor, constant: -Self.contentPadding).isActive = true
+        return page
+    }
+
     private func install(_ page: Page) {
         guard let window else { return }
-        let view = page == .welcome ? welcomePage : checklistPage
+        let view: NSView
+        switch page {
+        case .welcome:
+            view = welcomePage
+            window.title = "Welcome to Ku-Ka"
+        case .checklist:
+            view = checklistPage
+            window.title = "Ku-Ka Permissions"
+        case .screenshotShortcuts(let shortcuts):
+            view = makeScreenshotSetupPage(shortcuts: shortcuts)
+            window.title = "Ku-Ka Screenshot Setup"
+        }
         guard window.contentView !== view else { return }
-        window.title = page == .welcome ? "Welcome to Ku-Ka" : "Ku-Ka Permissions"
         window.contentView = view
         // Size the window from the laid-out page so wrapped labels always fit.
         view.layoutSubtreeIfNeeded()
@@ -220,6 +273,16 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
     }
 
     // MARK: - Showing
+
+    @discardableResult
+    func showScreenshotSetupIfNeeded(issues: [HotkeyRegistrationIssue]) -> Bool {
+        let conflicts = issues.filter { $0.shortcut.isScreenshot && $0.failure == .systemConflict }.map(\.shortcut)
+        guard window?.isVisible != true,
+              !conflicts.isEmpty, !settings.didShowScreenshotShortcutSetup else { return false }
+        settings.didShowScreenshotShortcutSetup = true
+        show(.screenshotShortcuts(conflicts))
+        return true
+    }
 
     func show(_ page: Page = .checklist) {
         install(page)
@@ -249,8 +312,13 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
         close()
     }
 
+    @objc private func openKeyboardSettingsClicked() {
+        permissions.openSettings(.keyboardShortcuts)
+    }
+
     func windowWillClose(_ notification: Notification) {
         permissions.stopPolling()
         NSApp.setActivationPolicy(.accessory)
+        onClose?()
     }
 }

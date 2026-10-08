@@ -20,20 +20,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private lazy var clipboardPanel = ClipboardPanel(controller: clipboardHistory)
     private lazy var statusMenu = StatusMenu(settings: settings, keepAwake: keepAwake)
     private let permissions = PermissionsManager()
-    /// Lazy so the probes can reference the types that own what they report:
-    /// permission status is `PermissionsManager`'s, tap status is
-    /// `HotkeyManager`'s. The closures capture those, not self, so there is
-    /// no retain cycle.
-    private lazy var hotkeyHealth = HotkeyHealthMonitor(
-        isAccessibilityGranted: { [permissions] in permissions.accessibility },
-        isTapDelivering: { [hotkeyManager] in hotkeyManager.isDelivering }
-    )
     private var onboardingController: OnboardingWindowController?
     /// False in UI-test runs, where permission handling is skipped entirely
     /// (also keeps the warning badge off the status icon there).
     private var permissionHandlingEnabled = false
 
     func applicationWillTerminate(_ notification: Notification) {
+        hotkeyManager.stop()
         keepAwake.deactivate()
         clipboardHistory.disable()
     }
@@ -46,8 +39,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupKeepAwake()
         setupClipboardHistory()
         if !isTesting {
+            setupHotkey()
             setupPermissions()
-            setupHotkeyHealthWatch()
             // Polling the real pasteboard during unit/UI test runs would
             // ingest whatever the developer happens to have copied, so this
             // stays behind the same isTesting gate as setupPermissions().
@@ -59,9 +52,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Permissions
 
-    /// Wires `PermissionsManager` in as the single source of truth: the event
-    /// tap starts the moment Accessibility is granted (no relaunch), and the
-    /// onboarding window opens on launch while anything is missing.
+    /// Refresh permissions and show onboarding while a grant is missing.
     private func setupPermissions() {
         permissionHandlingEnabled = true
         permissions.onChange = { [weak self] in self?.permissionsChanged() }
@@ -71,7 +62,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Settings would leave the warning badge stale until onboarding opens.
         statusMenu.onMenuWillOpen = { [weak self] in
             self?.permissions.refresh()
-            self?.hotkeyHealth.refresh()
+            self?.hotkeyManager.refresh()
+            self?.updateStatus()
         }
         permissions.refresh()
         permissionsChanged()
@@ -80,50 +72,50 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// Every hotkey-death cause is silent on its own (a starved tap logs
-    /// nothing a user sees), so watch the health monitor and surface its
-    /// state. Called behind the same isTesting gate as `setupPermissions()`:
-    /// tests never poll the real session. The menu-open refresh lives in
-    /// `setupPermissions()`'s `onMenuWillOpen` closure — it's a single
-    /// callback slot shared by both.
-    private func setupHotkeyHealthWatch() {
-        hotkeyHealth.onChange = { [weak self] in self?.hotkeyHealthChanged() }
-        hotkeyHealth.startMonitoring()
-    }
-
-    private func hotkeyHealthChanged() {
-        statusMenu.updateHotkeyHealth(hotkeyHealth.state)
-        updateStatusItemIcon()
-    }
-
     private func permissionsChanged() {
-        if permissions.accessibility && !hotkeyManager.isRunning {
-            setupHotkey()
-        }
-        // After setupHotkey, so the tap probe sees the tap it just started.
-        // Without this the menu would keep the "Hotkeys off" warning, and the
-        // icon its red dot, until the health monitor's next 5s poll.
-        hotkeyHealth.refresh()
-        updateStatusItemIcon()
+        updateStatus()
         onboardingController?.refreshRows()
     }
 
     private func showOnboarding(_ page: OnboardingWindowController.Page = .checklist) {
+        onboarding().show(page)
+    }
+
+    private func onboarding() -> OnboardingWindowController {
         if onboardingController == nil {
-            onboardingController = OnboardingWindowController(permissions: permissions)
+            let controller = OnboardingWindowController(permissions: permissions, settings: settings)
+            controller.onClose = { [weak self] in
+                self?.scheduleScreenshotSetup()
+            }
+            onboardingController = controller
         }
-        onboardingController?.show(page)
+        return onboardingController!
+    }
+
+    private func showScreenshotSetupIfNeeded() {
+        guard permissionHandlingEnabled, !settings.didShowScreenshotShortcutSetup,
+              hotkeyManager.issues.contains(where: { $0.shortcut.isScreenshot && $0.failure == .systemConflict }) else { return }
+        onboarding().showScreenshotSetupIfNeeded(issues: hotkeyManager.issues)
+    }
+
+    private func scheduleScreenshotSetup() {
+        guard permissionHandlingEnabled, !settings.didShowScreenshotShortcutSetup else { return }
+        // Default mode waits for menu tracking and window-close handling to finish.
+        RunLoop.main.perform(inModes: [.default]) { [weak self] in
+            MainActor.assumeIsolated { self?.showScreenshotSetupIfNeeded() }
+        }
     }
 
     // MARK: - Menu Bar
 
     private func setupMenuBar() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        updateStatusItemIcon()
+        updateStatus()
         statusMenu.onTilingToggled = { [weak self] enabled in
             self?.hotkeyManager.tilingEnabled = enabled
         }
         statusMenu.onShowPermissions = { [weak self] in self?.showOnboarding() }
+        statusMenu.onOpenKeyboardSettings = { [weak self] in self?.permissions.openSettings(.keyboardShortcuts) }
         statusItem.menu = statusMenu.menu
     }
 
@@ -160,19 +152,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Hotkey
 
     private func setupHotkey() {
-        // HotkeyManager always delivers actions via DispatchQueue.main.async,
-        // so we're already on the main thread here — assumeIsolated documents
-        // that instead of hopping through a Task, which would run the action
-        // one runloop turn late and could reorder rapid key presses.
+        hotkeyManager.onChange = { [weak self] in self?.updateStatus() }
         hotkeyManager.onAction = { [weak self] action in
             guard let self else { return }
-            MainActor.assumeIsolated {
-                switch action {
-                case .captureArea: self.startCapture(.interactive)
-                case .captureFullScreen: self.startCapture(.fullScreen)
-                case .tile(let tilingAction): self.windowTiling.tile(tilingAction)
-                case .showClipboardHistory: self.toggleClipboardPanel()
-                }
+            switch action {
+            case .captureArea: self.startCapture(.interactive)
+            case .captureFullScreen: self.startCapture(.fullScreen)
+            case .tile(let tilingAction): self.windowTiling.tile(tilingAction)
+            case .showClipboardHistory: self.toggleClipboardPanel()
             }
         }
         hotkeyManager.tilingEnabled = settings.windowTilingEnabled
@@ -218,7 +205,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func setupKeepAwake() {
-        keepAwake.onStateChange = { [weak self] in self?.updateStatusItemIcon() }
+        keepAwake.onStateChange = { [weak self] in self?.updateStatus() }
     }
 
     private func openEditor(result: CaptureResult) {
@@ -243,22 +230,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         editor.makeKeyAndOrderFront(nil)
     }
 
-    private func updateStatusItemIcon() {
+    private func updateStatus() {
+        let health = permissionHandlingEnabled
+            ? HotkeyHealth(accessibilityMissing: !permissions.accessibility, issues: hotkeyManager.issues)
+            : .healthy
+        statusMenu.updateHotkeyHealth(health)
+        let warning: StatusWarning?
+        if health != .healthy {
+            warning = .shortcutsUnavailable
+        } else if permissionHandlingEnabled && !permissions.screenRecording {
+            warning = .screenRecordingMissing
+        } else {
+            warning = nil
+        }
         statusItem.button?.image = statusMenu.icon(
             keepAwakeActive: keepAwake.isActive,
-            warning: statusWarning()
+            warning: warning
         )
-    }
-
-    /// Dead hotkeys win the corner over a missing permission — they are the
-    /// more urgent state, and the menu spells out the cause. Orange is left
-    /// for the one permission hotkey health can't see (Screen Recording); a
-    /// missing Accessibility grant already shows as red through
-    /// `hotkeyHealth`, because it means hotkeys are dead right now.
-    private func statusWarning() -> StatusWarning? {
-        guard permissionHandlingEnabled else { return nil }
-        if hotkeyHealth.state != .healthy { return .hotkeysDead }
-        if !permissions.screenRecording { return .screenRecordingMissing }
-        return nil
+        scheduleScreenshotSetup()
     }
 }
