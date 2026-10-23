@@ -94,15 +94,21 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
 
     private let permissions: PermissionsManager
     private let settings: Settings
+    private let setActivationPolicy: (NSApplication.ActivationPolicy) -> Void
     private let accessibilityRow: PermissionRowView
     private let screenRecordingRow: PermissionRowView
     private lazy var welcomePage = makeWelcomePage()
     private lazy var checklistPage = makeChecklistPage()
     var onClose: (() -> Void)?
 
-    init(permissions: PermissionsManager, settings: Settings = Settings()) {
+    init(
+        permissions: PermissionsManager,
+        settings: Settings = Settings(),
+        setActivationPolicy: @escaping (NSApplication.ActivationPolicy) -> Void = { NSApp.setActivationPolicy($0) }
+    ) {
         self.permissions = permissions
         self.settings = settings
+        self.setActivationPolicy = setActivationPolicy
 
         accessibilityRow = PermissionRowView(
             title: "Accessibility (window tiling and paste)",
@@ -286,7 +292,7 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
 
     func show(_ page: Page = .checklist) {
         install(page)
-        NSApp.setActivationPolicy(.regular)
+        setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
         if window?.isVisible != true {
             window?.center()
@@ -318,7 +324,7 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
 
     func windowWillClose(_ notification: Notification) {
         permissions.stopPolling()
-        NSApp.setActivationPolicy(.accessory)
+        setActivationPolicy(.accessory)
         onClose?()
     }
 }

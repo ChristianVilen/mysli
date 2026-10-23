@@ -14,7 +14,9 @@ final class OnboardingWindowControllerTests: XCTestCase {
             openURL: { opened.append($0); return true }
         )
         permissions.refresh()
-        let controller = OnboardingWindowController(permissions: permissions, settings: Settings(defaults: defaults))
+        let controller = OnboardingWindowController(
+            permissions: permissions, settings: Settings(defaults: defaults), setActivationPolicy: { _ in }
+        )
         defer { controller.close() }
 
         XCTAssertFalse(controller.showScreenshotSetupIfNeeded(issues: []))
@@ -47,7 +49,9 @@ final class OnboardingWindowControllerTests: XCTestCase {
             hasScreenCaptureAccess: { true }
         )
         permissions.refresh()
-        let controller = OnboardingWindowController(permissions: permissions, settings: Settings(defaults: defaults))
+        let controller = OnboardingWindowController(
+            permissions: permissions, settings: Settings(defaults: defaults), setActivationPolicy: { _ in }
+        )
         defer { controller.close() }
         controller.show(.checklist)
         controller.close()
@@ -68,7 +72,9 @@ final class OnboardingWindowControllerTests: XCTestCase {
             hasScreenCaptureAccess: { screenRecording }
         )
         permissions.refresh()
-        let controller = OnboardingWindowController(permissions: permissions, settings: Settings(defaults: defaults))
+        let controller = OnboardingWindowController(
+            permissions: permissions, settings: Settings(defaults: defaults), setActivationPolicy: { _ in }
+        )
         defer { controller.close() }
         let issues = [HotkeyRegistrationIssue(shortcut: .captureArea, failure: .systemConflict)]
 
@@ -92,7 +98,9 @@ final class OnboardingWindowControllerTests: XCTestCase {
             hasScreenCaptureAccess: { true }
         )
         permissions.refresh()
-        let controller = OnboardingWindowController(permissions: permissions, settings: Settings(defaults: defaults))
+        let controller = OnboardingWindowController(
+            permissions: permissions, settings: Settings(defaults: defaults), setActivationPolicy: { _ in }
+        )
         defer { controller.close() }
         let issues = [HotkeyRegistrationIssue(shortcut: .captureArea, failure: .systemConflict)]
 
@@ -100,9 +108,35 @@ final class OnboardingWindowControllerTests: XCTestCase {
         XCTAssertEqual(controller.window?.title, "Ku-Ka Screenshot Setup")
         controller.close()
 
-        let nextLaunch = OnboardingWindowController(permissions: permissions, settings: Settings(defaults: defaults))
+        let nextLaunch = OnboardingWindowController(
+            permissions: permissions, settings: Settings(defaults: defaults), setActivationPolicy: { _ in }
+        )
         defer { nextLaunch.close() }
         XCTAssertFalse(nextLaunch.showScreenshotSetupIfNeeded(issues: issues))
         XCTAssertFalse(nextLaunch.window?.isVisible ?? true)
+    }
+
+    func testShowMakesTheAppRegularAndCloseMakesItAccessoryAgain() {
+        let defaults = UserDefaults(suiteName: "OnboardingWindowControllerTests")!
+        defaults.removePersistentDomain(forName: "OnboardingWindowControllerTests")
+        defer { defaults.removePersistentDomain(forName: "OnboardingWindowControllerTests") }
+        let permissions = PermissionsManager(
+            isAccessibilityTrusted: { true },
+            hasScreenCaptureAccess: { true }
+        )
+        permissions.refresh()
+        var policies: [NSApplication.ActivationPolicy] = []
+        let controller = OnboardingWindowController(
+            permissions: permissions,
+            settings: Settings(defaults: defaults),
+            setActivationPolicy: { policies.append($0) }
+        )
+        defer { controller.close() }
+
+        controller.show(.checklist)
+        XCTAssertEqual(policies, [.regular])
+
+        controller.close()
+        XCTAssertEqual(policies, [.regular, .accessory])
     }
 }
