@@ -197,6 +197,12 @@ chooser for rich text) → panel closes → ClipboardHistoryController writes th
 
 ---
 
+## Worktrees
+
+Create git worktrees with `workmux add <branch>`, and remove them with `workmux remove` or `workmux merge`. Do not create worktrees in `.claude/worktrees/`, and do not use an agent tool's own worktree option. The project's workmux settings are in `.workmux.yaml`.
+
+---
+
 ## Testing
 
 ### Architecture
