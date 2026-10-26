@@ -57,9 +57,11 @@ The whole feature can be turned on and off with the **Clipboard History** checkb
 
 When a call starts, open the Ku-Ka menu and choose **Start Recording Meeting**. Ku-Ka records your microphone and the sound your Mac plays, so any call app works. While Ku-Ka records, its menu bar icon shows a red record mark (a red dot with a white centre) in its top-right corner, and a stop button appears next to it. When the call ends, click the stop button or choose **Stop Recording Meeting**. If Start cannot record, for example because a permission is missing, an alert says why.
 
-Ku-Ka then transcribes the call on your Mac with Apple's speech recognition and asks an AI command-line tool for a summary. It tries Antigravity (`agy`) first and Claude Code (`claude`) if that fails. Install at least one of them in `/opt/homebrew/bin`, `/usr/local/bin`, or `~/.local/bin`, and log in to it once in Terminal. A notification tells you when the notes are ready; click it to open the summary. Ku-Ka asks for notification permission the first time you start a recording. Each meeting gets its own folder, for example `~/Meetings/2026-10-23_14-02/`, with `transcript.md` and `summary.md`.
+Ku-Ka then transcribes the call on your Mac with Whisper (the `large-v3-v20240930_turbo` model, through WhisperKit) and asks an AI command-line tool for a summary. It tries Antigravity (`agy`) first and Claude Code (`claude`) if that fails. Install at least one of them in `/opt/homebrew/bin`, `/usr/local/bin`, or `~/.local/bin`, and log in to it once in Terminal. A notification tells you when the notes are ready; click it to open the summary. Ku-Ka asks for notification permission the first time you start a recording. Each meeting gets its own folder, for example `~/Meetings/2026-10-23_14-02/`, with `transcript.md` and `summary.md`.
 
 In the transcript, "Me" is you (the microphone) and "Them" is everyone else (the sound your Mac plays). Headphones give the cleanest transcript. On speakers, your microphone also hears the other people. Ku-Ka removes those repeated lines from "Me" when it finds them.
+
+The first meeting downloads the Whisper model, about 1.5 GB, to `~/Library/Application Support/Ku-Ka/whisper-models`. Ku-Ka excludes this model cache from Time Machine backups. The menu shows **Downloading speech model** meanwhile. After that, transcription needs no network while the model and tokenizer files remain intact. If Ku-Ka cannot download or load the model, or Whisper does not know the language, Ku-Ka transcribes with Apple's speech recognition instead. The top of the transcript names the transcriber and, after a fallback, says why Whisper was not used. These diagnostics stay in the transcript file and are left out of the summary input.
 
 Only the transcript text goes to the AI tool. Audio never leaves your Mac. `agy` keeps a copy of each transcript in its own conversation history; `claude` runs without saving a session. Ku-Ka moves the audio files to the Trash when the transcript is written, so you can still restore them from there.
 
@@ -79,7 +81,7 @@ Ku-Ka transcribes US English by default. To transcribe another language, set its
 defaults write com.kuka.screenshot meetingLocale de-DE
 ```
 
-The tag must match one that Apple's speech recognition supports, for example `en-GB`, `de-DE`, `fr-FR`, `es-ES`, `it-IT`, `pt-BR`, `ja-JP`, `ko-KR`, or `zh-CN`. Finnish is not supported. If the tag is not supported, the transcription fails and `error.md` lists the supported tags. The first meeting in a new language downloads its speech model; the menu shows **Downloading speech model** meanwhile. The summary is written in the language of the transcript.
+Whisper uses only the language part of the tag, so `fi-FI` gives Finnish. The Apple fallback needs a tag that Apple's speech recognition supports exactly, for example `en-GB`, `de-DE`, `fr-FR`, `es-ES`, `it-IT`, `pt-BR`, `ja-JP`, `ko-KR`, or `zh-CN`. Apple does not support Finnish. If neither can transcribe the language, the transcription fails, and `error.md` gives the reason for each. The summary is written in the language of the transcript.
 
 Recording needs the Screen Recording permission (for the sound your Mac plays) and the Microphone permission. Ku-Ka asks for Microphone the first time you start a recording.
 
@@ -223,7 +225,8 @@ KuKa/
 ├── MeetingFolder.swift       # One meeting on disk and the rule that reads its stage from the files
 ├── Transcript.swift          # Merges the two tracks, drops echoes, writes transcript.md
 ├── MeetingAudioCapture.swift # Records the microphone and system audio into two CAF files
-├── MeetingTranscriber.swift  # On-device transcription with Apple's SpeechTranscriber
+├── MeetingTranscriber.swift  # The transcriber seam and the fallback, Apple's SpeechTranscriber
+├── WhisperKitTranscriber.swift # On-device transcription with WhisperKit: model download, languages, silence filter
 ├── MeetingSummarizer.swift   # Runs agy or claude for the summary, writes summary.md
 ├── MeetingProcessor.swift    # Transcribes, then summarizes, from wherever a meeting stopped
 ├── MeetingNotesController.swift # Meeting Notes menu section, recording state, and processing queue
@@ -267,8 +270,14 @@ Tests cover:
 - Tiling layout math and the maximize/restore toggle, including apps that snap window sizes
 - Screen-picking and windows-per-screen rules, plus the tiling controller's saved-frame handling
 - Shortcut registration, feature toggles, action delivery, conflict detection, partial failure recovery, wake renewal, stale callback rejection, and cleanup
-- Meeting notes: the stage rule and folder rules on a real temporary folder, the transcript merge and echo rule, the summary fallback from `agy` to `claude`, child processes with real executables, recovery and retry from each step, and the recording controller with a fake capture
+- Meeting notes: the stage rule and folder rules on a real temporary folder, the transcript merge and echo rule, the transcriber fallback from Whisper to Apple, the Whisper model install, language codes, and silence filter against a fake WhisperKit, the summary fallback from `agy` to `claude`, child processes with real executables, recovery and retry from each step, and the recording controller with a fake capture
+
+Unit tests never download or load the Whisper model. `RealMeetingAudioTests` runs the real model on your own meeting audio, and it is skipped unless you set its environment variables. `AGENTS.md` describes how to run it.
 
 ### Test-Mode Guard
 
 When running under XCTest, the app skips real shortcut registration, permission setup, clipboard polling, and meeting recovery. Meeting tests use a temporary folder, never `~/Meetings`. Tests use the real registrar with fake Carbon calls. Detection uses `XCTestConfigurationFilePath` (unit tests) and the `--uitesting` launch argument (no UI-test target currently exists).
+
+## Acknowledgements
+
+Meeting Notes transcribes with [WhisperKit](https://github.com/argmaxinc/argmax-oss-swift) (`argmaxinc/argmax-oss-swift`), which is under the MIT License.

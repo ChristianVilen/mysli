@@ -20,7 +20,7 @@ final class StatusMenuTests: XCTestCase {
                                             microphoneAccess: { .granted }),
             root: { [unowned self] in meetingsRoot },
             capture: FakeMeetingAudioCapture(),
-            processor: MeetingProcessor(transcriber: FakeTranscriber()),
+            processor: MeetingProcessor(transcribers: [FakeTranscriber()]),
             notifier: FakeNotifier())
         sut = StatusMenu(settings: settings, sections: [KeepAwakeController(defaults: defaults), meetingNotes])
     }

@@ -291,23 +291,46 @@ class FakeMeetingAudioCapture: MeetingAudioCapturing {
 }
 
 class FakeTranscriber: Transcribing {
+    let name: String
     var byFileName: [String: Result<TrackTranscript, Error>] = [:]
     var modelIsMissing = false
+    var failure: (stage: TranscriberFailure.Stage, error: Error)?
     private(set) var downloads: [String] = []
-    private(set) var transcribedLocales: [String] = []
+    private(set) var loads: [String] = []
+    private(set) var transcribed: [String] = []
+
+    init(name: String = "Fake") {
+        self.name = name
+    }
 
     func needsDownload(for locale: Locale) async throws -> Bool {
-        modelIsMissing
+        if let failure, failure.stage == .unavailable { throw failure.error }
+        return modelIsMissing
     }
 
     func download(for locale: Locale) async throws {
         downloads.append(locale.identifier(.bcp47))
+        if let failure, failure.stage == .download { throw failure.error }
         modelIsMissing = false
     }
 
-    func transcribe(_ audio: URL, locale: Locale) async throws -> TrackTranscript {
-        transcribedLocales.append(locale.identifier(.bcp47))
+    func load(for locale: Locale) async throws -> any TranscriptionSession {
+        loads.append(locale.identifier(.bcp47))
+        if let failure, failure.stage == .load { throw failure.error }
+        return Session(transcriber: self)
+    }
+
+    func transcribe(_ audio: URL) async throws -> TrackTranscript {
+        transcribed.append(audio.lastPathComponent)
         return try byFileName[audio.lastPathComponent, default: .success(TrackTranscript(segments: [], duration: 0))].get()
+    }
+
+    private struct Session: TranscriptionSession {
+        let transcriber: FakeTranscriber
+
+        func transcribe(_ audio: URL) async throws -> TrackTranscript {
+            try await transcriber.transcribe(audio)
+        }
     }
 }
 

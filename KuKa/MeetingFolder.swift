@@ -166,17 +166,15 @@ struct MeetingFolder: Hashable {
     /// Throws `MeetingLockError.held` when a recorder or processor already
     /// holds the folder, in this process or another Ku-Ka, and `.failed`
     /// when the folder cannot be locked at all: it is gone, read-only, or
-    /// on a file system without `flock`. The system releases the lock when
-    /// the process ends, so a crash leaves no stale lock behind.
-    func lock() throws -> MeetingLock {
-        let descriptor = open(url.appendingPathComponent(".lock").path, O_RDWR | O_CREAT | O_CLOEXEC, 0o644)
-        guard descriptor >= 0 else { throw MeetingLockError.failed(self, reason: String(cString: strerror(errno))) }
-        guard flock(descriptor, LOCK_EX | LOCK_NB) == 0 else {
-            let code = errno
-            close(descriptor)
-            throw code == EWOULDBLOCK ? MeetingLockError.held(self) : .failed(self, reason: String(cString: strerror(code)))
+    /// on a file system without `flock`.
+    func lock() throws -> FileLock {
+        do {
+            return try FileLock.acquire(at: url.appendingPathComponent(".lock"))
+        } catch FileLockError.held {
+            throw MeetingLockError.held(self)
+        } catch FileLockError.failed(let reason) {
+            throw MeetingLockError.failed(self, reason: reason)
         }
-        return MeetingLock(descriptor: descriptor)
     }
 
     private var audioFolder: URL {
@@ -198,12 +196,29 @@ enum MeetingLockError: LocalizedError, Equatable {
     }
 }
 
-/// Closing the descriptor releases the `flock`.
-final class MeetingLock {
+enum FileLockError: Error, Equatable {
+    case held
+    case failed(reason: String)
+}
+
+/// The system also releases the `flock` when the process ends, so a crash
+/// leaves no stale lock behind.
+final class FileLock {
     private var descriptor: Int32
 
-    init(descriptor: Int32) {
+    private init(descriptor: Int32) {
         self.descriptor = descriptor
+    }
+
+    static func acquire(at url: URL) throws -> FileLock {
+        let descriptor = open(url.path, O_RDWR | O_CREAT | O_CLOEXEC, 0o644)
+        guard descriptor >= 0 else { throw FileLockError.failed(reason: String(cString: strerror(errno))) }
+        guard flock(descriptor, LOCK_EX | LOCK_NB) == 0 else {
+            let code = errno
+            close(descriptor)
+            throw code == EWOULDBLOCK ? FileLockError.held : .failed(reason: String(cString: strerror(code)))
+        }
+        return FileLock(descriptor: descriptor)
     }
 
     func release() {

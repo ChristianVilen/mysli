@@ -13,30 +13,27 @@ enum MeetingOutcome: Equatable {
 
 @MainActor
 struct MeetingProcessor {
-    private let transcriber: Transcribing
+    private let transcribers: [Transcribing]
     private let summarizer: Summarizer
     private let locale: () -> Locale
     private let trash: (URL) throws -> Void
     private let now: () -> Date
 
-    init(transcriber: Transcribing = SpeechTranscriberAdapter(),
+    init(transcribers: [Transcribing] = [WhisperKitTranscriber(), SpeechTranscriberAdapter()],
          summarizer: Summarizer = Summarizer(),
          locale: @escaping () -> Locale = { Locale(identifier: "en-US") },
          trash: @escaping (URL) throws -> Void = { try FileManager.default.trashItem(at: $0, resultingItemURL: nil) },
          now: @escaping () -> Date = { Date() }) {
-        self.transcriber = transcriber
+        self.transcribers = transcribers
         self.summarizer = summarizer
         self.locale = locale
         self.trash = trash
         self.now = now
     }
 
-    /// `onDownload` runs when the speech model must be downloaded before
-    /// the transcription can start, and `onStep(.transcribe)` runs again
-    /// once it is installed.
     func process(_ meeting: MeetingFolder, onStep: (MeetingStep) -> Void,
                  onDownload: () -> Void = {}) async -> MeetingOutcome {
-        let lock: MeetingLock
+        let lock: FileLock
         do {
             lock = try meeting.lock()
         } catch MeetingLockError.held {
@@ -70,7 +67,7 @@ struct MeetingProcessor {
                     }
                 } catch {
                     if Task.isCancelled { return .cancelled }
-                    return fail(meeting, at: step, message: (error as? MeetingStepError)?.message ?? error.localizedDescription)
+                    return fail(meeting, at: step, message: error.localizedDescription)
                 }
                 if meeting.stage() == stage {
                     return fail(meeting, at: step, message: "The step finished, but the meeting folder did not change.")
@@ -88,15 +85,12 @@ struct MeetingProcessor {
     /// in the folder.
     private func transcribe(_ meeting: MeetingFolder, onStep: (MeetingStep) -> Void,
                             onDownload: () -> Void) async throws -> Bool {
-        let locale = self.locale()
-        if try await transcriber.needsDownload(for: locale) {
-            onDownload()
-            try await transcriber.download(for: locale)
-            onStep(.transcribe)
-        }
+        let (session, transcriber, failures) = try await startTranscriber(onStep: onStep, onDownload: onDownload)
+        try Task.checkCancellation()
         var tracks: [MeetingTrack: TrackTranscript] = [:]
         for track in MeetingTrack.allCases where FileManager.default.fileExists(atPath: meeting.audioURL(track).path) {
-            tracks[track] = try await transcriber.transcribe(meeting.audioURL(track), locale: locale)
+            tracks[track] = try await session.transcribe(meeting.audioURL(track))
+            try Task.checkCancellation()
         }
         let lines = Transcript.merge(tracks)
         let duration = tracks.values.map(\.duration).max() ?? 0
@@ -106,8 +100,41 @@ struct MeetingProcessor {
             // trash the audio.
             try meeting.write(SummaryDocument.noSpeech(title: meeting.title), to: .summary)
         }
-        try meeting.write(Transcript.markdown(lines, title: meeting.title, duration: duration), to: .transcript)
+        try meeting.write(Transcript.markdown(lines, title: meeting.title, duration: duration,
+                                              by: transcriber, after: failures), to: .transcript)
         return !lines.isEmpty
+    }
+
+    private func startTranscriber(onStep: (MeetingStep) -> Void, onDownload: () -> Void) async throws
+        -> (session: any TranscriptionSession, transcriber: String, failures: [TranscriberFailure]) {
+        let locale = self.locale()
+        var failures: [TranscriberFailure] = []
+        for transcriber in transcribers {
+            try Task.checkCancellation()
+            var stage = TranscriberFailure.Stage.unavailable
+            do {
+                let needsDownload = try await transcriber.needsDownload(for: locale)
+                try Task.checkCancellation()
+                if needsDownload {
+                    stage = .download
+                    onDownload()
+                    defer { onStep(.transcribe) }
+                    try await transcriber.download(for: locale)
+                }
+                try Task.checkCancellation()
+                stage = .load
+                let session = try await transcriber.load(for: locale)
+                try Task.checkCancellation()
+                return (session, transcriber.name, failures)
+            } catch {
+                // URLSession reports a cancelled download as URLError(.cancelled),
+                // not CancellationError, so the task is asked instead.
+                if Task.isCancelled { throw error }
+                failures.append(TranscriberFailure(transcriber: transcriber.name, stage: stage,
+                                                   message: error.localizedDescription))
+            }
+        }
+        throw MeetingStepError(failures.map(\.description).joined(separator: "\n"))
     }
 
     private func summarize(_ meeting: MeetingFolder) async throws {
@@ -119,7 +146,7 @@ struct MeetingProcessor {
         } catch {
             NSLog("Ku-Ka: could not move meeting audio to the Trash: \(error)")
         }
-        let transcript = try meeting.read(.transcript)
+        let transcript = Transcript.contentForSummary(try meeting.read(.transcript))
         switch await summarizer.summarize(transcript: transcript) {
         case .written(let markdown, let cli, let earlier):
             try meeting.write(SummaryDocument.markdown(title: meeting.title, body: markdown, by: cli, after: earlier),
@@ -146,7 +173,7 @@ struct MeetingProcessor {
     }
 }
 
-struct MeetingStepError: Error {
-    let message: String
-    init(_ message: String) { self.message = message }
+struct MeetingStepError: LocalizedError {
+    let errorDescription: String?
+    init(_ message: String) { errorDescription = message }
 }

@@ -53,7 +53,7 @@ final class MeetingNotesControllerTests: XCTestCase {
             root: { [unowned self] in root },
             capture: capture,
             processor: MeetingProcessor(
-                transcriber: transcriber,
+                transcribers: [transcriber],
                 summarizer: Summarizer(runner: runner, home: URL(fileURLWithPath: "/Users/test"), isExecutable: { _ in true }),
                 trash: { try FileManager.default.removeItem(at: $0) },
                 now: { localDate(2026, 10, 23, 15, 0) }),
@@ -358,7 +358,7 @@ final class MeetingNotesControllerTests: XCTestCase {
 }
 
 private final class SuspendedTranscriber: FakeTranscriber {
-    override func transcribe(_ audio: URL, locale: Locale) async throws -> TrackTranscript {
+    override func transcribe(_ audio: URL) async throws -> TrackTranscript {
         try await Task.sleep(for: .seconds(60))
         return TrackTranscript(segments: [], duration: 0)
     }

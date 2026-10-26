@@ -5,7 +5,7 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
     private enum Recorder {
         case idle
         case starting
-        case recording(MeetingFolder, since: Date, ActiveRecording, MeetingLock)
+        case recording(MeetingFolder, since: Date, ActiveRecording, FileLock)
     }
 
     private let permissions: PermissionsManager

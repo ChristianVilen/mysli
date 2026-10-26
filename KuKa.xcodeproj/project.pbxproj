@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		C30000011 /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = C30000010 /* WhisperKit */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		B20000020 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -39,6 +43,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C30000011 /* WhisperKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -89,6 +94,9 @@
 				7A3E1C4B98D2F05617BE0C31 /* KuKa */,
 			);
 			name = KuKa;
+			packageProductDependencies = (
+				C30000010 /* WhisperKit */,
+			);
 			productName = KuKa;
 			productReference = A10000010 /* KuKa.app */;
 			productType = "com.apple.product-type.application";
@@ -132,6 +140,9 @@
 			);
 			mainGroup = A10000030;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				C30000001 /* XCRemoteSwiftPackageReference "argmax-oss-swift" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A10000032 /* Products */;
 			projectDirPath = "";
@@ -309,6 +320,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		C30000001 /* XCRemoteSwiftPackageReference "argmax-oss-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/argmaxinc/argmax-oss-swift";
+			requirement = {
+				kind = exactVersion;
+				version = 1.1.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		C30000010 /* WhisperKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C30000001 /* XCRemoteSwiftPackageReference "argmax-oss-swift" */;
+			productName = WhisperKit;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = A10000050 /* Project object */;
 }

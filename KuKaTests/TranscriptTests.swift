@@ -91,18 +91,43 @@ final class TranscriptTests: XCTestCase {
         let markdown = Transcript.markdown([
             TranscriptLine(speaker: .them, start: 1.7, text: "Let's ship on Friday"),
             TranscriptLine(speaker: .me, start: 3604, text: "Sounds good"),
-        ], title: "Meeting on 2026-10-23 at 14:02", duration: 3729)
+        ], title: "Meeting on 2026-10-23 at 14:02", duration: 3729, by: "Whisper large-v3-v20240930_turbo", after: [])
 
         XCTAssertEqual(markdown, """
         # Meeting on 2026-10-23 at 14:02
 
         Duration: 01:02:09
 
+        Transcript by Whisper large-v3-v20240930_turbo.
+
         "Me" is the person who recorded the meeting. "Them" is everyone else on the call.
 
         **[00:00:01] Them:** Let's ship on Friday
 
         **[01:00:04] Me:** Sounds good
+
+        """)
+    }
+
+    func testMarkdownListsWhatFailedBeforeTheTranscriberThatWroteIt() {
+        let markdown = Transcript.markdown(
+            [TranscriptLine(speaker: .them, start: 1, text: "Let's ship on Friday")],
+            title: "Meeting on 2026-10-23 at 14:02", duration: 60, by: "Apple speech recognition",
+            after: [TranscriberFailure(transcriber: "Whisper large-v3-v20240930_turbo", stage: .download,
+                                       message: "The Internet connection appears to be offline.")])
+
+        XCTAssertEqual(markdown, """
+        # Meeting on 2026-10-23 at 14:02
+
+        Duration: 00:01:00
+
+        Transcript by Apple speech recognition. Tried first:
+
+        - Whisper large-v3-v20240930_turbo could not download its model: The Internet connection appears to be offline.
+
+        "Me" is the person who recorded the meeting. "Them" is everyone else on the call.
+
+        **[00:00:01] Them:** Let's ship on Friday
 
         """)
     }
