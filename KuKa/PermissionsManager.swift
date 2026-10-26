@@ -1,15 +1,18 @@
+import AVFoundation
 import Cocoa
 
 /// The System Settings panes Ku-Ka opens for permissions and shortcut setup.
 enum SettingsPane {
     case accessibility
     case screenCapture
+    case microphone
     case keyboardShortcuts
 
     private var anchor: String {
         switch self {
         case .accessibility: return "Privacy_Accessibility"
         case .screenCapture: return "Privacy_ScreenCapture"
+        case .microphone: return "Privacy_Microphone"
         case .keyboardShortcuts: return "Shortcuts"
         }
     }
@@ -30,9 +33,24 @@ enum SettingsPane {
     }
 }
 
-/// Single source of truth for the two permissions Ku-Ka needs: Accessibility
-/// (window moves for tiling and synthetic clipboard paste) and Screen
-/// Recording (ScreenCaptureKit capture).
+enum MicrophoneAccess: Equatable {
+    case granted
+    case denied
+    case notDetermined
+
+    init(_ status: AVAuthorizationStatus) {
+        switch status {
+        case .authorized: self = .granted
+        case .notDetermined: self = .notDetermined
+        case .denied, .restricted: self = .denied
+        @unknown default: self = .denied
+        }
+    }
+}
+
+/// Single source of truth for the permissions Ku-Ka needs: Accessibility
+/// (window moves for tiling and synthetic clipboard paste), Screen
+/// Recording (ScreenCaptureKit capture) and Microphone (Meeting Notes only).
 ///
 /// macOS offers no callback when the user grants a permission in System
 /// Settings, so status is re-read either on demand (`refresh()`) or on a
@@ -45,12 +63,15 @@ final class PermissionsManager {
 
     private(set) var accessibility = false
     private(set) var screenRecording = false
+    private(set) var microphone = MicrophoneAccess.notDetermined
 
-    /// Fired after `refresh()` whenever either status changed.
+    /// Fired after `refresh()` whenever any status changed.
     var onChange: (@MainActor () -> Void)?
 
     private let isAccessibilityTrusted: () -> Bool
     private let hasScreenCaptureAccess: () -> Bool
+    private let microphoneAccess: () -> MicrophoneAccess
+    private let requestMicrophoneAccess: @MainActor () async -> Bool
     private let openURL: (URL) -> Bool
     private let showAccessibilityPrompt: () -> Void
     private let defaults: UserDefaults
@@ -63,6 +84,8 @@ final class PermissionsManager {
     init(
         isAccessibilityTrusted: @escaping () -> Bool = { AXIsProcessTrusted() },
         hasScreenCaptureAccess: @escaping () -> Bool = { CGPreflightScreenCaptureAccess() },
+        microphoneAccess: @escaping () -> MicrophoneAccess = { MicrophoneAccess(AVCaptureDevice.authorizationStatus(for: .audio)) },
+        requestMicrophoneAccess: @escaping @MainActor () async -> Bool = { await AVCaptureDevice.requestAccess(for: .audio) },
         openURL: @escaping (URL) -> Bool = { NSWorkspace.shared.open($0) },
         showAccessibilityPrompt: @escaping () -> Void = {
             _ = AXIsProcessTrustedWithOptions(
@@ -73,18 +96,22 @@ final class PermissionsManager {
     ) {
         self.isAccessibilityTrusted = isAccessibilityTrusted
         self.hasScreenCaptureAccess = hasScreenCaptureAccess
+        self.microphoneAccess = microphoneAccess
+        self.requestMicrophoneAccess = requestMicrophoneAccess
         self.openURL = openURL
         self.showAccessibilityPrompt = showAccessibilityPrompt
         self.defaults = defaults
     }
 
-    /// Re-read both statuses without prompting the user.
+    /// Re-read every status without prompting the user.
     func refresh() {
         let ax = isAccessibilityTrusted()
         let screen = hasScreenCaptureAccess()
-        guard ax != accessibility || screen != screenRecording else { return }
+        let mic = microphoneAccess()
+        guard ax != accessibility || screen != screenRecording || mic != microphone else { return }
         accessibility = ax
         screenRecording = screen
+        microphone = mic
         onChange?()
     }
 
@@ -109,6 +136,22 @@ final class PermissionsManager {
     func requestScreenRecording() {
         CGRequestScreenCaptureAccess()
         openSettings(.screenCapture)
+    }
+
+    /// Shows the system prompt when the user was never asked; macOS shows it
+    /// only once, so after a refusal this opens the Microphone pane instead.
+    func requestMicrophone() async -> Bool {
+        switch microphone {
+        case .granted:
+            return true
+        case .denied:
+            openSettings(.microphone)
+            return false
+        case .notDetermined:
+            _ = await requestMicrophoneAccess()
+            refresh()
+            return microphone == .granted
+        }
     }
 
     func openSettings(_ pane: SettingsPane) {

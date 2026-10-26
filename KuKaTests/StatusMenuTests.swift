@@ -6,6 +6,7 @@ final class StatusMenuTests: XCTestCase {
     private var defaults: UserDefaults!
     private var loginItem: FakeLoginItem!
     private var settings: Settings!
+    private var meetingsRoot: URL!
     private var sut: StatusMenu!
 
     override func setUp() async throws {
@@ -13,7 +14,15 @@ final class StatusMenuTests: XCTestCase {
         defaults.removePersistentDomain(forName: "StatusMenuTests")
         loginItem = FakeLoginItem()
         settings = Settings(defaults: defaults, loginItem: loginItem)
-        sut = StatusMenu(settings: settings, keepAwake: KeepAwakeController(defaults: defaults))
+        meetingsRoot = try makeTemporaryDirectory()
+        let meetingNotes = MeetingNotesController(
+            permissions: PermissionsManager(isAccessibilityTrusted: { true }, hasScreenCaptureAccess: { true },
+                                            microphoneAccess: { .granted }),
+            root: { [unowned self] in meetingsRoot },
+            capture: FakeMeetingAudioCapture(),
+            processor: MeetingProcessor(transcriber: FakeTranscriber()),
+            notifier: FakeNotifier())
+        sut = StatusMenu(settings: settings, sections: [KeepAwakeController(defaults: defaults), meetingNotes])
     }
 
     override func tearDown() {
@@ -87,6 +96,25 @@ final class StatusMenuTests: XCTestCase {
         XCTAssertNotNil(item(titled: "⌘⇧C to open clipboard history"), "missing clipboard history feature line")
     }
 
+    func testMeetingNotesSectionFollowsKeepAwake() throws {
+        let titles = menuItems.filter { !$0.isHidden }.map(\.title)
+        let lidHint = try XCTUnwrap(titles.firstIndex(of: "Closing the lid still sleeps your Mac"))
+
+        XCTAssertEqual(Array(titles[(lidHint + 1)...(lidHint + 6)]),
+                       ["", "Meeting Notes", "Start Recording Meeting", "Open Meetings Folder", "", "Features"])
+    }
+
+    func testOpeningTheMenuShowsFailedMeetingsFromDisk() throws {
+        let meeting = try MeetingFolder.create(in: meetingsRoot, startingAt: localDate(2026, 10, 23, 14, 2))
+        try meeting.write("# Transcript", to: .transcript)
+        try meeting.write("agy exited with status 1", to: .failure)
+
+        sut.menuWillOpen(sut.menu)
+        sut.menuDidClose(sut.menu)
+
+        XCTAssertEqual(item(titled: "Retry Failed Meeting")?.isHidden, false)
+    }
+
     // MARK: - Window tiling
 
     func testTilingToggleWritesSettingsFiresCallbackAndFlipsCheckmark() {
@@ -147,8 +175,18 @@ final class StatusMenuTests: XCTestCase {
     // MARK: - Icon
 
     func testIconDiffersWhenKeepAwakeIsActive() {
-        let plain = sut.icon(keepAwakeActive: false, warning: nil)
-        let badged = sut.icon(keepAwakeActive: true, warning: nil)
+        let plain = sut.icon(keepAwakeActive: false, recording: false, warning: nil)
+        let badged = sut.icon(keepAwakeActive: true, recording: false, warning: nil)
         XCTAssertNotEqual(plain.tiffRepresentation, badged.tiffRepresentation)
+    }
+
+    func testRecordingAddsItsOwnDotNextToTheOthers() {
+        let plain = sut.icon(keepAwakeActive: false, recording: false, warning: nil)
+        let recording = sut.icon(keepAwakeActive: false, recording: true, warning: nil)
+        let others = sut.icon(keepAwakeActive: true, recording: false, warning: .shortcutsUnavailable)
+        let all = sut.icon(keepAwakeActive: true, recording: true, warning: .shortcutsUnavailable)
+
+        XCTAssertNotEqual(plain.tiffRepresentation, recording.tiffRepresentation)
+        XCTAssertNotEqual(others.tiffRepresentation, all.tiffRepresentation)
     }
 }

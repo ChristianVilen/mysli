@@ -1,12 +1,9 @@
 import Cocoa
-import UserNotifications
 
 /// Owns the "Keep Awake" menu section and drives a `WakeManager`: builds the
 /// inline panel (status line, duration chips, display checkbox) plus the
-/// Turn Off item, reflects session state, runs the per-second countdown while
-/// the menu is open, persists the display-awake preference, and posts the
-/// expiry notification. Keeping all of the feature's AppKit glue here lets
-/// `AppDelegate` stay a thin coordinator.
+/// Turn Off item, reflects session state and the countdown, persists the
+/// display-awake preference, and posts the expiry notification.
 final class KeepAwakeController: NSObject {
     /// Selectable keep-awake durations, in chip order. The chip index is the
     /// only identifier that travels through the panel's callback.
@@ -23,11 +20,10 @@ final class KeepAwakeController: NSObject {
     private let wakeManager: WakeManager
     private let now: () -> Date
     private let defaults: UserDefaults
+    private let notifier: Notifying
 
     let panelView: KeepAwakePanelView
     private let turnOffItem: NSMenuItem
-    private var countdownTimer: Timer?
-    private var hasRequestedNotificationAuth = false
 
     /// Fired whenever the active/inactive state changes, so the owner can
     /// refresh anything outside this section (e.g. the status-bar icon).
@@ -37,10 +33,12 @@ final class KeepAwakeController: NSObject {
 
     init(wakeManager: WakeManager = WakeManager(),
          now: @escaping () -> Date = { Date() },
-         defaults: UserDefaults = .standard) {
+         defaults: UserDefaults = .standard,
+         notifier: Notifying = SystemNotifier.shared) {
         self.wakeManager = wakeManager
         self.now = now
         self.defaults = defaults
+        self.notifier = notifier
         panelView = KeepAwakePanelView(presets: Self.presets)
         turnOffItem = NSMenuItem(title: "Turn Off", action: #selector(turnOff(_:)), keyEquivalent: "")
         super.init()
@@ -86,35 +84,21 @@ final class KeepAwakeController: NSObject {
         updateMenu()
     }
 
-    // MARK: - Menu delegate forwarding (called by AppDelegate)
-
     func menuWillOpen() {
         updateMenu()
-        // Re-entrancy guard: never leak a previous timer if open/close didn't pair.
-        countdownTimer?.invalidate()
-        countdownTimer = nil
-        guard wakeManager.session?.expiresAt != nil else { return }
-        // .common mode so it keeps firing while the menu tracks events. Teardown
-        // is owned solely by menuDidClose.
-        let timer = Timer(timeInterval: 1.0, repeats: true) { [weak self] _ in
-            self?.updateMenu()
-        }
-        RunLoop.main.add(timer, forMode: .common)
-        countdownTimer = timer
     }
 
-    func menuDidClose() {
-        countdownTimer?.invalidate()
-        countdownTimer = nil
+    func menuTick() {
+        updateMenu()
     }
 
     // MARK: - Actions
 
     private func select(_ duration: WakeDuration) {
         // Only timed sessions post an expiry notification, so request
-        // permission (once) only for them.
+        // permission only for them.
         if case .timed = duration {
-            requestNotificationAuthIfNeeded()
+            notifier.requestPermission()
         }
         activate(duration)
     }
@@ -153,21 +137,11 @@ final class KeepAwakeController: NSObject {
         panelView.displayAwakeCheckbox.state = wakeManager.keepDisplayAwake ? .on : .off
     }
 
-    private func requestNotificationAuthIfNeeded() {
-        guard !hasRequestedNotificationAuth else { return }
-        hasRequestedNotificationAuth = true
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
-    }
-
     private func notifyEnded() {
         // If notification authorization was denied or never requested (indefinite
         // sessions don't request it), the center silently drops this request.
         // That's fine — the notification is purely informational.
-        let content = UNMutableNotificationContent()
-        content.title = "Ku-Ka"
-        content.body = "Keep-awake ended — your Mac can sleep again."
-        let request = UNNotificationRequest(identifier: "keepAwakeEnded", content: content, trigger: nil)
-        UNUserNotificationCenter.current().add(request)
+        notifier.post(title: "Ku-Ka", body: "Keep-awake ended — your Mac can sleep again.", opening: nil)
     }
 
     static func formatRemaining(_ interval: TimeInterval) -> String {
@@ -179,3 +153,8 @@ final class KeepAwakeController: NSObject {
         return minutes == 0 ? "\(hours)h left" : "\(hours)h \(minutes)m left"
     }
 }
+
+// In an extension: on the class declaration, the conformance would make the
+// whole class @MainActor, and the nonisolated KeepAwakeControllerTests could
+// no longer create or drive it.
+extension KeepAwakeController: MenuSection {}

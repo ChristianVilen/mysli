@@ -43,6 +43,25 @@ final class SettingsTests: XCTestCase {
         XCTAssertFalse(Settings(defaults: defaults, loginItem: loginItem).clipboardHistoryEnabled)
     }
 
+    func testMeetingsFolderDefaultsToMeetingsInTheHomeFolder() {
+        XCTAssertEqual(sut.meetingsFolder.path, NSHomeDirectory() + "/Meetings")
+    }
+
+    func testMeetingsFolderReadsThePathSetWithDefaultsWrite() {
+        defaults.set("/Users/test/work/notes", forKey: "meetingsFolder")
+        XCTAssertEqual(sut.meetingsFolder.path, "/Users/test/work/notes")
+
+        defaults.set("~/Notes", forKey: "meetingsFolder")
+        XCTAssertEqual(sut.meetingsFolder.path, NSHomeDirectory() + "/Notes")
+    }
+
+    func testMeetingLocaleDefaultsToUSEnglishAndReadsTheTagSetWithDefaultsWrite() {
+        XCTAssertEqual(sut.meetingLocale.identifier(.bcp47), "en-US")
+
+        defaults.set("de-DE", forKey: "meetingLocale")
+        XCTAssertEqual(sut.meetingLocale.identifier(.bcp47), "de-DE")
+    }
+
     func testLaunchAtLoginReflectsAndDrivesTheLoginItem() {
         XCTAssertFalse(sut.launchAtLogin)
 

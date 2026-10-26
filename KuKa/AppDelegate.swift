@@ -1,8 +1,11 @@
 import Cocoa
+import UserNotifications
 
 @MainActor
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
+    /// Shown only while a meeting is being recorded.
+    private var stopRecordingItem: NSStatusItem?
     private let hotkeyManager = HotkeyManager()
     private let settings = Settings()
     private let imageStore = ImageStore()
@@ -18,17 +21,34 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private let windowTiling = WindowTilingController()
     private let clipboardHistory = ClipboardHistoryController()
     private lazy var clipboardPanel = ClipboardPanel(controller: clipboardHistory)
-    private lazy var statusMenu = StatusMenu(settings: settings, keepAwake: keepAwake)
+    private lazy var meetingNotes = MeetingNotesController(
+        permissions: permissions,
+        root: { [settings] in settings.meetingsFolder },
+        processor: MeetingProcessor(locale: { [settings] in settings.meetingLocale })
+    )
+    private lazy var statusMenu = StatusMenu(settings: settings, sections: [keepAwake, meetingNotes])
     private let permissions = PermissionsManager()
     private var onboardingController: OnboardingWindowController?
     /// False in UI-test runs, where permission handling is skipped entirely
     /// (also keeps the warning badge off the status icon there).
     private var permissionHandlingEnabled = false
 
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard meetingNotes.isRecording else { return .terminateNow }
+        let alert = NSAlert()
+        alert.messageText = "Stop Recording and Quit?"
+        alert.informativeText = "Ku-Ka is recording a meeting. If you quit, the recording stops, and Ku-Ka makes the notes the next time it opens."
+        alert.addButton(withTitle: "Quit")
+        alert.addButton(withTitle: "Cancel")
+        NSApp.activate()
+        return alert.runModal() == .alertFirstButtonReturn ? .terminateNow : .terminateCancel
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         hotkeyManager.stop()
         keepAwake.deactivate()
         clipboardHistory.disable()
+        meetingNotes.shutDown()
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -38,7 +58,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupThumbnailStack()
         setupKeepAwake()
         setupClipboardHistory()
+        setupMeetingNotes()
         if !isTesting {
+            UNUserNotificationCenter.current().delegate = SystemNotifier.shared
             setupHotkey()
             setupPermissions()
             // Polling the real pasteboard during unit/UI test runs would
@@ -47,6 +69,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             if settings.clipboardHistoryEnabled {
                 clipboardHistory.enable()
             }
+            meetingNotes.resumeUnfinished()
         }
     }
 
@@ -208,6 +231,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         keepAwake.onStateChange = { [weak self] in self?.updateStatus() }
     }
 
+    private func setupMeetingNotes() {
+        meetingNotes.onStateChange = { [weak self] in self?.updateStatus() }
+        meetingNotes.onShowPermissions = { [weak self] in self?.showOnboarding() }
+    }
+
     private func openEditor(result: CaptureResult) {
         NSApp.activate(ignoringOtherApps: true)
 
@@ -243,10 +271,33 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             warning = nil
         }
+        let recording = meetingNotes.isRecording
         statusItem.button?.image = statusMenu.icon(
             keepAwakeActive: keepAwake.isActive,
+            recording: recording,
             warning: warning
         )
+        statusItem.button?.setAccessibilityLabel(recording ? "Ku-Ka, recording meeting" : "Ku-Ka")
+        statusItem.button?.toolTip = recording ? "Ku-Ka: recording meeting" : nil
+        showStopRecordingItem(recording)
         scheduleScreenshotSetup()
+    }
+
+    private func showStopRecordingItem(_ show: Bool) {
+        if show, stopRecordingItem == nil {
+            let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+            item.button?.image = NSImage(systemSymbolName: "stop.circle.fill", accessibilityDescription: "Stop recording meeting")
+            item.button?.toolTip = "Stop recording meeting"
+            item.button?.target = self
+            item.button?.action = #selector(stopRecordingClicked)
+            stopRecordingItem = item
+        } else if !show, let item = stopRecordingItem {
+            NSStatusBar.system.removeStatusItem(item)
+            stopRecordingItem = nil
+        }
+    }
+
+    @objc private func stopRecordingClicked() {
+        Task { await meetingNotes.toggleRecording() }
     }
 }

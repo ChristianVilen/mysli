@@ -89,9 +89,8 @@ final class KeepAwakeControllerTests: XCTestCase {
         XCTAssertEqual(panel.titleLabel.stringValue, "☕ Awake · 1h left")
 
         clock = clock.addingTimeInterval(15 * 60)
-        controller.menuWillOpen() // refreshes the title on open
+        controller.menuWillOpen()
         XCTAssertEqual(panel.titleLabel.stringValue, "☕ Awake · 45 min left")
-        controller.menuDidClose()
     }
 
     // MARK: - Turn off

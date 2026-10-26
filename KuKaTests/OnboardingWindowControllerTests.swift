@@ -139,4 +139,33 @@ final class OnboardingWindowControllerTests: XCTestCase {
         controller.close()
         XCTAssertEqual(policies, [.regular, .accessory])
     }
+
+    func testTheMicrophoneRowOpensItsSettingsPaneWhenDenied() async throws {
+        var opened: [String] = []
+        let permissions = PermissionsManager(
+            isAccessibilityTrusted: { true },
+            hasScreenCaptureAccess: { true },
+            microphoneAccess: { .denied },
+            openURL: { opened.append($0.absoluteString); return true }
+        )
+        permissions.refresh()
+        let controller = OnboardingWindowController(permissions: permissions, setActivationPolicy: { _ in })
+        defer { controller.close() }
+        controller.show(.checklist)
+
+        func descendants(of view: NSView) -> [NSView] {
+            [view] + view.subviews.flatMap { descendants(of: $0) }
+        }
+        let row = try XCTUnwrap(descendants(of: controller.window!.contentView!).first { view in
+            view is PermissionRowView
+                && descendants(of: view).contains { ($0 as? NSTextField)?.stringValue == "Microphone (Meeting Notes, optional)" }
+        })
+        let grant = try XCTUnwrap(descendants(of: row).compactMap { $0 as? NSButton }.first)
+        XCTAssertEqual(grant.title, "Grant")
+
+        _ = (grant.target as? NSObject)?.perform(grant.action, with: grant)
+        await waitUntil { !opened.isEmpty }
+
+        XCTAssertEqual(opened, ["x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_Microphone"])
+    }
 }

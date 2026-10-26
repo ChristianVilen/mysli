@@ -45,6 +45,25 @@ final class Settings {
         set { defaults.set(newValue, forKey: "clipboardHistoryEnabled") }
     }
 
+    /// Defaults to ~/Meetings, not ~/Documents or ~/Desktop: with iCloud
+    /// "Desktop & Documents" on, those sync to iCloud, and meeting audio must
+    /// stay on this Mac.
+    var meetingsFolder: URL {
+        guard let path = defaults.string(forKey: "meetingsFolder"), !path.isEmpty else {
+            return FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Meetings", isDirectory: true)
+        }
+        return URL(fileURLWithPath: (path as NSString).expandingTildeInPath, isDirectory: true)
+    }
+
+    /// A BCP 47 tag such as "de-DE", set with `defaults write`. It must match
+    /// one of `SpeechTranscriber.supportedLocales` exactly.
+    var meetingLocale: Locale {
+        guard let tag = defaults.string(forKey: "meetingLocale"), !tag.isEmpty else {
+            return Locale(identifier: "en-US")
+        }
+        return Locale(identifier: tag)
+    }
+
     var didShowScreenshotShortcutSetup: Bool {
         get { defaults.bool(forKey: "didShowScreenshotShortcutSetup") }
         set { defaults.set(newValue, forKey: "didShowScreenshotShortcutSetup") }

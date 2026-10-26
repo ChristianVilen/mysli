@@ -237,3 +237,111 @@ class FakeKeystrokeSender: KeystrokeSending {
         sendCount += 1
     }
 }
+
+class FakeNotifier: Notifying {
+    private(set) var permissionRequests = 0
+    private(set) var posted: [(title: String, body: String, url: URL?)] = []
+
+    func requestPermission() {
+        permissionRequests += 1
+    }
+
+    func post(title: String, body: String, opening url: URL?) {
+        posted.append((title, body, url))
+    }
+}
+
+class FakeActiveRecording: ActiveRecording {
+    var endReason: String?
+    private(set) var stopCount = 0
+
+    func stop() {
+        stopCount += 1
+    }
+}
+
+class FakeMeetingAudioCapture: MeetingAudioCapturing {
+    var startError: Error?
+    /// Ends the capture with this reason before `start` returns.
+    var endsWhileStarting: String?
+    private(set) var recordings: [FakeActiveRecording] = []
+    private var interruptHandler: (@MainActor (String) -> Void)?
+
+    @MainActor
+    func start(into meeting: MeetingFolder,
+               onInterrupted: @escaping @MainActor (String) -> Void) async throws -> ActiveRecording {
+        if let startError { throw startError }
+        for track in MeetingTrack.allCases {
+            FileManager.default.createFile(atPath: meeting.audioURL(track).path, contents: Data())
+        }
+        interruptHandler = onInterrupted
+        let recording = FakeActiveRecording()
+        recordings.append(recording)
+        if let reason = endsWhileStarting {
+            recording.endReason = reason
+            onInterrupted(reason)
+        }
+        return recording
+    }
+
+    @MainActor
+    func interrupt(reason: String) {
+        interruptHandler?(reason)
+    }
+}
+
+class FakeTranscriber: Transcribing {
+    var byFileName: [String: Result<TrackTranscript, Error>] = [:]
+    var modelIsMissing = false
+    private(set) var downloads: [String] = []
+    private(set) var transcribedLocales: [String] = []
+
+    func needsDownload(for locale: Locale) async throws -> Bool {
+        modelIsMissing
+    }
+
+    func download(for locale: Locale) async throws {
+        downloads.append(locale.identifier(.bcp47))
+        modelIsMissing = false
+    }
+
+    func transcribe(_ audio: URL, locale: Locale) async throws -> TrackTranscript {
+        transcribedLocales.append(locale.identifier(.bcp47))
+        return try byFileName[audio.lastPathComponent, default: .success(TrackTranscript(segments: [], duration: 0))].get()
+    }
+}
+
+class FakeCommandRunner: CommandRunning {
+    var results: [String: Result<CommandResult, Error>] = [:]
+    private(set) var calls: [(executable: URL, arguments: [String], input: String?, searchPath: [String])] = []
+
+    func run(executable: URL, arguments: [String], input: String?, searchPath: [String],
+             timeout: Duration) async throws -> CommandResult {
+        calls.append((executable, arguments, input, searchPath))
+        return try results[executable.lastPathComponent,
+                           default: .success(CommandResult(termination: .exited(127), stdout: "", stderr: "not faked"))].get()
+    }
+}
+
+extension XCTestCase {
+    func makeTemporaryDirectory() throws -> URL {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("KuKaTests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: url) }
+        return url
+    }
+}
+
+@MainActor
+func waitUntil(_ condition: () -> Bool) async {
+    let deadline = Date().addingTimeInterval(5)
+    while !condition(), Date() < deadline {
+        try? await Task.sleep(for: .milliseconds(10))
+    }
+}
+
+func localDate(_ year: Int, _ month: Int, _ day: Int, _ hour: Int, _ minute: Int, _ second: Int = 0) -> Date {
+    Calendar.current.date(from: DateComponents(year: year, month: month, day: day,
+                                               hour: hour, minute: minute, second: second))!
+}

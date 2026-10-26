@@ -134,6 +134,62 @@ final class PermissionsManagerTests: XCTestCase {
         XCTAssertTrue(sut.accessibility)
     }
 
+    func testRefreshReadsTheMicrophoneAndReportsAChange() {
+        var microphone = MicrophoneAccess.notDetermined
+        let sut = PermissionsManager(isAccessibilityTrusted: { true }, hasScreenCaptureAccess: { true },
+                                     microphoneAccess: { microphone })
+        sut.refresh()
+        var changeCount = 0
+        sut.onChange = { changeCount += 1 }
+
+        microphone = .granted
+        sut.refresh()
+
+        XCTAssertEqual(sut.microphone, .granted)
+        XCTAssertEqual(changeCount, 1)
+    }
+
+    func testADeniedMicrophoneDoesNotOpenOnboarding() {
+        let sut = PermissionsManager(isAccessibilityTrusted: { true }, hasScreenCaptureAccess: { true },
+                                     microphoneAccess: { .denied })
+
+        sut.refresh()
+
+        XCTAssertEqual(sut.microphone, .denied)
+        XCTAssertTrue(sut.allGranted)
+    }
+
+    func testRequestMicrophoneShowsTheSystemPromptWhenNeverAsked() async {
+        var microphone = MicrophoneAccess.notDetermined
+        var prompts = 0
+        let sut = PermissionsManager(isAccessibilityTrusted: { true }, hasScreenCaptureAccess: { true },
+                                     microphoneAccess: { microphone },
+                                     requestMicrophoneAccess: { prompts += 1; microphone = .granted; return true })
+        sut.refresh()
+
+        let granted = await sut.requestMicrophone()
+
+        XCTAssertTrue(granted)
+        XCTAssertEqual(prompts, 1)
+        XCTAssertEqual(sut.microphone, .granted)
+    }
+
+    func testRequestMicrophoneOpensItsSettingsPaneWhenDenied() async {
+        var opened: [String] = []
+        var prompts = 0
+        let sut = PermissionsManager(isAccessibilityTrusted: { true }, hasScreenCaptureAccess: { true },
+                                     microphoneAccess: { .denied },
+                                     requestMicrophoneAccess: { prompts += 1; return false },
+                                     openURL: { opened.append($0.absoluteString); return true })
+        sut.refresh()
+
+        let granted = await sut.requestMicrophone()
+
+        XCTAssertFalse(granted)
+        XCTAssertEqual(prompts, 0)
+        XCTAssertEqual(opened, ["x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_Microphone"])
+    }
+
     // MARK: - Accessibility prompt
 
     func testAccessibilityPromptShowsOnlyOnTheFirstRequest() {
