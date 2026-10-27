@@ -13,6 +13,11 @@ protocol MenuSection: AnyObject {
     func menuWillOpen()
     /// Called once a second while the menu is open, so keep it cheap.
     func menuTick()
+    func menuDidClose()
+}
+
+extension MenuSection {
+    func menuDidClose() {}
 }
 
 @MainActor
@@ -294,5 +299,6 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     func menuDidClose(_ menu: NSMenu) {
         refreshTimer?.invalidate()
         refreshTimer = nil
+        for section in sections { section.menuDidClose() }
     }
 }

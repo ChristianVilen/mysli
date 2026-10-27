@@ -72,7 +72,7 @@ final class MeetingNotesControllerTests: XCTestCase {
     }
 
     private var visibleTitles: [String] {
-        menu.items.filter { !$0.isHidden }.map(\.title)
+        menu.items.filter { !$0.isHidden && $0.view == nil }.map(\.title)
     }
 
     private func item(titled title: String) -> NSMenuItem? {
@@ -109,6 +109,98 @@ final class MeetingNotesControllerTests: XCTestCase {
         sut.menuTick()
 
         XCTAssertEqual(visibleTitles, ["Meeting Notes", "● Recording · 4:05", "Stop Recording Meeting", "Open Meetings Folder", ""])
+    }
+
+    func testTheOpenMenuShowsIndependentMicrophoneAndMacAudioReadings() async throws {
+        await sut.toggleRecording()
+        try XCTUnwrap(capture.recordings.last).levels = RecordingAudioLevels(microphone: 0.25, system: 0.75)
+
+        sut.menuWillOpen()
+
+        let meterItem = try XCTUnwrap(menu.items.first { $0.view != nil })
+        XCTAssertFalse(meterItem.isHidden)
+        let indicators = levelIndicators(in: try XCTUnwrap(meterItem.view))
+        XCTAssertEqual(indicators.map { $0.accessibilityLabel() }, ["Microphone audio level", "Mac audio level"])
+        XCTAssertEqual(indicators.map(\.doubleValue), [0.25, 0.75])
+    }
+
+    func testStoppingAndRestartingCannotShowThePreviousRecordingLevels() async throws {
+        await sut.toggleRecording()
+        try XCTUnwrap(capture.recordings.last).levels = RecordingAudioLevels(microphone: 1, system: 0.5)
+        sut.menuWillOpen()
+        let meterItem = try XCTUnwrap(menu.items.first { $0.view != nil })
+        XCTAssertEqual(levelIndicators(in: try XCTUnwrap(meterItem.view)).map(\.doubleValue), [1, 0.5])
+
+        await sut.toggleRecording()
+        await sut.waitUntilIdle()
+        XCTAssertTrue(meterItem.isHidden)
+
+        await sut.toggleRecording()
+        XCTAssertFalse(meterItem.isHidden)
+        XCTAssertEqual(levelIndicators(in: try XCTUnwrap(meterItem.view)).map(\.doubleValue), [0, 0])
+    }
+
+    func testAnInterruptionHidesTheRecordingMeters() async throws {
+        await sut.toggleRecording()
+        sut.menuWillOpen()
+        let meterItem = try XCTUnwrap(menu.items.first { $0.view != nil })
+        XCTAssertFalse(meterItem.isHidden)
+
+        capture.interrupt(reason: "The display disconnected.")
+
+        XCTAssertTrue(meterItem.isHidden)
+        await sut.waitUntilIdle()
+    }
+
+    func testAnInterruptionDuringStartNeverShowsMeters() async throws {
+        capture.endsWhileStarting = "The microphone stopped."
+        sut.menuWillOpen()
+
+        await sut.toggleRecording()
+
+        let meterItem = try XCTUnwrap(menu.items.first { $0.view != nil })
+        XCTAssertTrue(meterItem.isHidden)
+        await sut.waitUntilIdle()
+    }
+
+    func testStatusMenuCloseStopsMeterUpdatesAndReopenReadsCurrentLevels() async throws {
+        await sut.toggleRecording()
+        let handle = try XCTUnwrap(capture.recordings.last)
+        handle.levels = RecordingAudioLevels(microphone: 0.2, system: 0.8)
+        menu.removeAllItems()
+        let statusMenu = StatusMenu(settings: Settings(defaults: UserDefaults(suiteName: "MeterMenuTests")!,
+                                                       loginItem: FakeLoginItem()), sections: [sut])
+        statusMenu.menuWillOpen(statusMenu.menu)
+        defer { statusMenu.menuDidClose(statusMenu.menu) }
+        let meterItem = try XCTUnwrap(statusMenu.menu.items.first { $0.view != nil })
+        let indicators = levelIndicators(in: try XCTUnwrap(meterItem.view))
+        XCTAssertEqual(indicators.map(\.doubleValue), [0.2, 0.8])
+
+        handle.levels = RecordingAudioLevels(microphone: 0.7, system: 0.3)
+        runMenuLoop(for: 0.2)
+        XCTAssertEqual(indicators.map(\.doubleValue), [0.7, 0.3])
+
+        statusMenu.menuDidClose(statusMenu.menu)
+        handle.levels = RecordingAudioLevels(microphone: 0.1, system: 0.9)
+        runMenuLoop(for: 0.2)
+        XCTAssertEqual(indicators.map(\.doubleValue), [0.7, 0.3])
+
+        statusMenu.menuWillOpen(statusMenu.menu)
+        XCTAssertEqual(indicators.map(\.doubleValue), [0.1, 0.9])
+        sut.shutDown()
+        XCTAssertTrue(meterItem.isHidden)
+    }
+
+    private func levelIndicators(in view: NSView) -> [NSLevelIndicator] {
+        if let indicator = view as? NSLevelIndicator { return [indicator] }
+        return view.subviews.flatMap { levelIndicators(in: $0) }
+    }
+
+    private func runMenuLoop(for duration: TimeInterval) {
+        let until = Date().addingTimeInterval(duration)
+        while Date() < until {
+            RunLoop.current.run(mode: .eventTracking, before: until)
+        }
     }
 
     func testStopProcessesTheMeetingAndSaysTheNotesAreReady() async throws {

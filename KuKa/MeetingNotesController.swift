@@ -22,8 +22,12 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
     private var queue: [MeetingFolder] = []
     private var current: (meeting: MeetingFolder, activity: String)?
     private var processingTask: Task<Void, Never>?
+    private var menuIsOpen = false
+    private var meterTimer: Timer?
 
     private let statusLineItem: NSMenuItem
+    private let meterItem: NSMenuItem
+    private let meterView = RecordingAudioMeterView()
     private let recordItem: NSMenuItem
     private let progressItem: NSMenuItem
     private let waitingItem: NSMenuItem
@@ -55,21 +59,25 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
         self.openURL = openURL
         self.now = now
         statusLineItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+        meterItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
         recordItem = NSMenuItem(title: "", action: #selector(recordClicked), keyEquivalent: "")
         progressItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
         waitingItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
         retryItem = NSMenuItem(title: "", action: #selector(retryClicked), keyEquivalent: "")
         openFolderItem = NSMenuItem(title: "Open Meetings Folder", action: #selector(openFolderClicked), keyEquivalent: "")
         super.init()
+        meterItem.view = meterView
         for item in [recordItem, retryItem, openFolderItem] { item.target = self }
-        for item in [statusLineItem, progressItem, waitingItem, retryItem] { item.isHidden = true }
+        for item in [statusLineItem, meterItem, progressItem, waitingItem, retryItem] { item.isHidden = true }
     }
+
+    isolated deinit { meterTimer?.invalidate() }
 
     func buildMenuSection(into menu: NSMenu) {
         let header = NSMenuItem(title: "Meeting Notes", action: nil, keyEquivalent: "")
         header.isEnabled = false
         menu.addItem(header)
-        for item in [statusLineItem, recordItem, progressItem, waitingItem, retryItem, openFolderItem] {
+        for item in [statusLineItem, meterItem, recordItem, progressItem, waitingItem, retryItem, openFolderItem] {
             menu.addItem(item)
         }
         menu.addItem(.separator())
@@ -77,12 +85,19 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
     }
 
     func menuWillOpen() {
+        menuIsOpen = true
         updateMenu()
         reloadFailedMeetingsFromDisk()
     }
 
     func menuTick() {
         updateMenu()
+    }
+
+    func menuDidClose() {
+        menuIsOpen = false
+        meterTimer?.invalidate()
+        meterTimer = nil
     }
 
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
@@ -99,6 +114,7 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
     func shutDown() {
         if case .recording(_, _, let handle, _) = recorder { handle.stop() }
         recorder = .idle
+        updateMenu()
         processingTask?.cancel()
     }
 
@@ -272,12 +288,35 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
             statusLineItem.isHidden = false
         }
         recordItem.title = isRecording ? "Stop Recording Meeting" : "Start Recording Meeting"
+        meterItem.isHidden = !isRecording
+        reconcileMeterTimer()
         progressItem.isHidden = current == nil
         waitingItem.isHidden = current == nil || queue.isEmpty
         if let current {
             progressItem.title = "\(current.activity): \(current.meeting.title)"
             waitingItem.title = queue.count == 1 ? "1 more meeting waiting" : "\(queue.count) more meetings waiting"
         }
+    }
+
+    private func reconcileMeterTimer() {
+        guard menuIsOpen, isRecording else {
+            meterTimer?.invalidate()
+            meterTimer = nil
+            if !isRecording { meterView.show(.silent) }
+            return
+        }
+        refreshMeters()
+        guard meterTimer == nil else { return }
+        let timer = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refreshMeters() }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        meterTimer = timer
+    }
+
+    private func refreshMeters() {
+        guard menuIsOpen, case .recording(_, _, let handle, _) = recorder else { return }
+        meterView.show(handle.audioLevels())
     }
 
     private func reloadFailedMeetingsFromDisk() {

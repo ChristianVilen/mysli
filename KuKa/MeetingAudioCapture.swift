@@ -1,6 +1,7 @@
 import AVFAudio
 import CoreMedia
 import ScreenCaptureKit
+import os
 
 protocol MeetingAudioCapturing {
     @MainActor
@@ -13,6 +14,7 @@ protocol ActiveRecording: AnyObject {
     /// end before `start` returns, while the caller cannot yet match the
     /// callback to this recording, so the caller checks this afterwards.
     var endReason: String? { get }
+    @MainActor func audioLevels() -> RecordingAudioLevels
     func stop()
 }
 
@@ -83,9 +85,6 @@ extension MeetingTrack {
     }
 }
 
-/// The writers, `timelineStart` and `isClosed` are used only on `queue`.
-/// `stream` and `endReason` are used only on the main actor, where `start`,
-/// `stop` and the interruption hop run. So nothing needs a lock.
 final class ScreenCaptureRecording:NSObject, ActiveRecording, SCStreamOutput, SCStreamDelegate {
     let queue = DispatchQueue(label: "ku-ka.meeting-audio")
     var stream: SCStream?
@@ -97,6 +96,13 @@ final class ScreenCaptureRecording:NSObject, ActiveRecording, SCStreamOutput, SC
     /// tracks share one timeline.
     private var timelineStart: CMTime?
     private var isClosed = false
+    private let meter = OSAllocatedUnfairLock(initialState: RecordingAudioMeter())
+
+    @MainActor
+    func audioLevels() -> RecordingAudioLevels {
+        let snapshot = meter.withLock { $0 }
+        return snapshot.levels(at: ProcessInfo.processInfo.systemUptime)
+    }
 
     init(meeting: MeetingFolder, onInterrupted: @escaping @MainActor (String) -> Void) throws {
         self.onInterrupted = onInterrupted
@@ -112,7 +118,10 @@ final class ScreenCaptureRecording:NSObject, ActiveRecording, SCStreamOutput, SC
         let start = timelineStart ?? sampleBuffer.presentationTimeStamp
         timelineStart = start
         do {
-            try writers[track]?.append(sampleBuffer, timelineStart: start)
+            if let rms = try writers[track]?.append(sampleBuffer, timelineStart: start) {
+                let receivedAt = ProcessInfo.processInfo.systemUptime
+                meter.withLock { $0.record(rms: rms, for: track, at: receivedAt) }
+            }
         } catch {
             interrupt(reason: "Ku-Ka could not write the audio file (\(error.localizedDescription)).")
         }
@@ -143,6 +152,7 @@ final class ScreenCaptureRecording:NSObject, ActiveRecording, SCStreamOutput, SC
         guard !isClosed else { return }
         isClosed = true
         for writer in writers.values { writer.close() }
+        meter.withLock { $0 = RecordingAudioMeter() }
     }
 
     private func stopStream() {
@@ -169,9 +179,10 @@ final class AudioTrackWriter {
                                commonFormat: .pcmFormatInt16, interleaved: true)
     }
 
-    func append(_ sampleBuffer: CMSampleBuffer, timelineStart: CMTime) throws {
+    @discardableResult
+    func append(_ sampleBuffer: CMSampleBuffer, timelineStart: CMTime) throws -> Double? {
         let frames = AVAudioFrameCount(sampleBuffer.numSamples)
-        guard frames > 0 else { return }
+        guard frames > 0 else { return nil }
         guard var description = sampleBuffer.formatDescription?.audioStreamBasicDescription,
               let inputFormat = AVAudioFormat(streamDescription: &description),
               let input = AVAudioPCMBuffer(pcmFormat: inputFormat, frameCapacity: frames) else {
@@ -209,7 +220,14 @@ final class AudioTrackWriter {
             return input
         }
         if result == .error { throw conversionError ?? NSError(domain: NSOSStatusErrorDomain, code: -1) }
-        if output.frameLength > 0 { try file.write(from: output) }
+        guard output.frameLength > 0 else { return nil }
+        try file.write(from: output)
+        let samples = UnsafeBufferPointer(start: output.int16ChannelData![0], count: Int(output.frameLength))
+        let squares = samples.reduce(0.0) { sum, sample in
+            let normalized = Double(sample) / 32_768
+            return sum + normalized * normalized
+        }
+        return sqrt(squares / Double(samples.count))
     }
 
     func close() {

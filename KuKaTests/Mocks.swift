@@ -253,7 +253,11 @@ class FakeNotifier: Notifying {
 
 class FakeActiveRecording: ActiveRecording {
     var endReason: String?
+    var levels = RecordingAudioLevels.silent
     private(set) var stopCount = 0
+
+    @MainActor
+    func audioLevels() -> RecordingAudioLevels { levels }
 
     func stop() {
         stopCount += 1
