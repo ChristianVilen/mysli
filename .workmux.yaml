@@ -1,7 +1,7 @@
 main_branch: main
 
 panes:
-  - command: <agent>
+  - command: codex
     focus: true
   - split: horizontal
 
