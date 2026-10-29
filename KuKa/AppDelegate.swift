@@ -4,7 +4,7 @@ import UserNotifications
 @MainActor
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
-    private let hotkeyManager = HotkeyManager()
+    private let hotkeyManager: HotkeyManager
     private let settings = Settings()
     private let imageStore = ImageStore()
     private lazy var captureFlow = CaptureFlow(
@@ -45,12 +45,29 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         requestUpdate: { [weak self] in self?.meetingNotes.updateNotes($0) }
     )
     private lazy var wordReviewWindow = WordReviewWindowController(controller: wordReview)
-    private lazy var statusMenu = StatusMenu(settings: settings, sections: [keepAwake, meetingNotes])
+    private lazy var statusMenu = StatusMenu(settings: settings, sections: [keepAwake, meetingNotes],
+                                            onTrackingChange: { [hotkeyManager] in hotkeyManager.meetingMenuIsOpen = $0 })
     private let permissions = PermissionsManager()
     private var onboardingController: OnboardingWindowController?
     /// False in UI-test runs, where permission handling is skipped entirely
     /// (also keeps the warning badge off the status icon there).
     private var permissionHandlingEnabled = false
+
+    init(hotkeyManager: HotkeyManager = HotkeyManager(), meetingRecorder: MeetingRecorder? = nil) {
+        self.hotkeyManager = hotkeyManager
+        super.init()
+        if let meetingRecorder { self.meetingRecorder = meetingRecorder }
+        hotkeyManager.onAction = { [weak self] action in
+            guard let self else { return }
+            switch action {
+            case .captureArea: self.startCapture(.interactive)
+            case .captureFullScreen: self.startCapture(.fullScreen)
+            case .tile(let tilingAction): self.windowTiling.tile(tilingAction)
+            case .showClipboardHistory: self.toggleClipboardPanel()
+            case .toggleMeetingRecording: Task { await self.meetingRecorder.toggleRecording() }
+            }
+        }
+    }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         guard meetingRecorder.phase.isCapturing else { return .terminateNow }
@@ -182,15 +199,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func setupHotkey() {
         hotkeyManager.onChange = { [weak self] in self?.updateStatus() }
-        hotkeyManager.onAction = { [weak self] action in
-            guard let self else { return }
-            switch action {
-            case .captureArea: self.startCapture(.interactive)
-            case .captureFullScreen: self.startCapture(.fullScreen)
-            case .tile(let tilingAction): self.windowTiling.tile(tilingAction)
-            case .showClipboardHistory: self.toggleClipboardPanel()
-            }
-        }
         hotkeyManager.tilingEnabled = settings.windowTilingEnabled
         hotkeyManager.clipboardHistoryEnabled = settings.clipboardHistoryEnabled
         hotkeyManager.start()

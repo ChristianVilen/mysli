@@ -37,6 +37,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
 
     private let settings: Settings
     private let sections: [MenuSection]
+    private let onTrackingChange: (Bool) -> Void
     private var refreshTimer: Timer?
     private var launchAtLoginItem: NSMenuItem!
     private var windowTilingItem: NSMenuItem!
@@ -45,9 +46,10 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     private var hotkeyWarningItems: [NSMenuItem] = []
     private var renderedHealth: HotkeyHealth?
 
-    init(settings: Settings, sections: [MenuSection]) {
+    init(settings: Settings, sections: [MenuSection], onTrackingChange: @escaping (Bool) -> Void = { _ in }) {
         self.settings = settings
         self.sections = sections
+        self.onTrackingChange = onTrackingChange
         super.init()
         build()
     }
@@ -280,6 +282,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     }
 
     func menuWillOpen(_ menu: NSMenu) {
+        onTrackingChange(true)
         onMenuWillOpen?()
         for section in sections { section.menuWillOpen() }
         refreshTimer?.invalidate()
@@ -298,5 +301,6 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         refreshTimer?.invalidate()
         refreshTimer = nil
         for section in sections { section.menuDidClose() }
+        onTrackingChange(false)
     }
 }

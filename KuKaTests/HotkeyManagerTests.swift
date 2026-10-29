@@ -4,6 +4,103 @@ import Carbon.HIToolbox
 
 @MainActor
 final class HotkeyManagerTests: XCTestCase {
+    func testMeetingMenuReleasesOnlyItsShortcutAndRestoresItWithANewEventID() throws {
+        let system = FakeHotkeySystem()
+        let workspace = NotificationCenter()
+        let manager = HotkeyManager(registrar: CarbonHotkeyRegistrar(api: system.api), workspaceNotifications: workspace)
+        defer { manager.stop() }
+        var actions: [HotkeyAction] = []
+        manager.onAction = { actions.append($0) }
+        manager.start()
+        let registered = system.reservedShortcuts
+        let oldPress = try XCTUnwrap(system.callbacks[.meetingRecording])
+
+        manager.meetingMenuIsOpen = true
+        manager.refresh()
+        XCTAssertEqual(system.reservedShortcuts, registered.subtracting([.meetingRecording]))
+        oldPress()
+        workspace.post(name: NSWorkspace.didWakeNotification, object: nil)
+        XCTAssertEqual(system.reservedShortcuts, registered.subtracting([.meetingRecording]))
+        manager.meetingMenuIsOpen = false
+        XCTAssertEqual(system.reservedShortcuts, registered)
+        oldPress()
+        XCTAssertEqual(actions, [])
+        system.press(.meetingRecording)
+        XCTAssertEqual(actions, [.toggleMeetingRecording])
+    }
+
+    func testMeetingMenuKeepsConflictsRegistrationErrorsAndReleaseErrorsVisible() {
+        let system = FakeHotkeySystem()
+        let manager = HotkeyManager(registrar: CarbonHotkeyRegistrar(api: system.api))
+        defer { manager.stop() }
+        system.conflicts = [.meetingRecording]
+        manager.start()
+        manager.meetingMenuIsOpen = true
+        XCTAssertEqual(manager.issues, [.init(shortcut: .meetingRecording, failure: .systemConflict)])
+        system.conflicts = []
+        manager.refresh()
+        XCTAssertEqual(manager.issues, [])
+        XCTAssertFalse(system.reservedShortcuts.contains(.meetingRecording))
+
+        system.failures[.meetingRecording] = -9878
+        manager.meetingMenuIsOpen = false
+        manager.meetingMenuIsOpen = true
+        manager.refresh()
+        XCTAssertEqual(manager.issues, [.init(shortcut: .meetingRecording, failure: .registrationFailed(-9878))])
+        system.failures = [:]
+        manager.meetingMenuIsOpen = false
+        XCTAssertEqual(manager.issues, [])
+
+        system.releaseFailures = [.meetingRecording]
+        manager.meetingMenuIsOpen = true
+        var actions: [HotkeyAction] = []
+        manager.onAction = { actions.append($0) }
+        system.press(.meetingRecording)
+        XCTAssertEqual(actions, [])
+        XCTAssertEqual(manager.issues, [.init(shortcut: .meetingRecording, failure: .releaseFailed(-50))])
+        system.releaseFailures = []
+        manager.refresh()
+        XCTAssertEqual(manager.issues, [])
+        XCTAssertFalse(system.reservedShortcuts.contains(.meetingRecording))
+    }
+
+    func testMeetingShortcutUsesControlOptionMAndSurvivesFeatureToggles() throws {
+        let meetingRecording = try XCTUnwrap(HotkeyShortcut.allCases.first { $0.keyCode == 46 })
+        XCTAssertEqual(meetingRecording.modifiers, 6144)
+        XCTAssertEqual(meetingRecording.action, .toggleMeetingRecording)
+        for shortcut in [HotkeyShortcut.captureFullScreen, .captureArea, .clipboardHistory] {
+            XCTAssertEqual(shortcut.modifiers, 768)
+        }
+        for shortcut in [HotkeyShortcut.tileLeft, .tileRight, .maximize, .center] {
+            XCTAssertEqual(shortcut.modifiers, 6144)
+        }
+        let system = FakeHotkeySystem()
+        let manager = HotkeyManager(registrar: CarbonHotkeyRegistrar(api: system.api))
+        defer { manager.stop() }
+        manager.tilingEnabled = false
+        manager.clipboardHistoryEnabled = false
+        system.conflicts.insert(meetingRecording)
+        manager.start()
+        XCTAssertEqual(manager.issues, [.init(shortcut: meetingRecording, failure: .systemConflict)])
+        XCTAssertNil(system.attempts[meetingRecording])
+        system.conflicts = []
+        system.failures[meetingRecording] = -9878
+        manager.refresh()
+        XCTAssertEqual(manager.issues, [.init(shortcut: meetingRecording, failure: .registrationFailed(-9878))])
+        system.failures = [:]
+        manager.refresh()
+        var actions: [HotkeyAction] = []
+        manager.onAction = { actions.append($0) }
+        system.press(meetingRecording)
+        XCTAssertEqual(actions, [.toggleMeetingRecording])
+        system.releaseFailures.insert(meetingRecording)
+        manager.stop()
+        XCTAssertEqual(manager.issues, [.init(shortcut: meetingRecording, failure: .releaseFailed(-50))])
+        system.releaseFailures = []
+        manager.stop()
+        XCTAssertTrue(system.reservedShortcuts.isEmpty)
+    }
+
     func testSystemLookupFailureBlocksRegistrationUntilTheCheckRecovers() {
         let system = FakeHotkeySystem()
         system.lookupFailure = OSStatus(memFullErr)
@@ -16,7 +113,8 @@ final class HotkeyManagerTests: XCTestCase {
         manager.start()
         XCTAssertEqual(manager.issues, [
             .init(shortcut: .captureFullScreen, failure: .systemLookupFailed(-108)),
-            .init(shortcut: .captureArea, failure: .systemLookupFailed(-108))
+            .init(shortcut: .captureArea, failure: .systemLookupFailed(-108)),
+            .init(shortcut: .meetingRecording, failure: .systemLookupFailed(-108))
         ])
         XCTAssertTrue(system.reservedShortcuts.isEmpty)
         system.press(.captureArea)
@@ -41,7 +139,8 @@ final class HotkeyManagerTests: XCTestCase {
         manager.start()
         XCTAssertEqual(manager.issues, [
             .init(shortcut: .captureFullScreen, failure: .registrationFailed(-108)),
-            .init(shortcut: .captureArea, failure: .registrationFailed(-108))
+            .init(shortcut: .captureArea, failure: .registrationFailed(-108)),
+            .init(shortcut: .meetingRecording, failure: .registrationFailed(-108))
         ])
         XCTAssertTrue(system.reservedShortcuts.isEmpty)
 
@@ -218,11 +317,11 @@ final class HotkeyManagerTests: XCTestCase {
         manager.tilingEnabled = false
         manager.clipboardHistoryEnabled = true
         manager.start()
-        XCTAssertEqual(Set(system.callbacks.keys), [.captureFullScreen, .captureArea, .clipboardHistory])
+        XCTAssertEqual(Set(system.callbacks.keys), [.captureFullScreen, .captureArea, .clipboardHistory, .meetingRecording])
 
         manager.clipboardHistoryEnabled = false
         manager.tilingEnabled = true
-        XCTAssertEqual(Set(system.callbacks.keys), [.captureFullScreen, .captureArea, .tileLeft, .tileRight, .maximize, .center])
+        XCTAssertEqual(Set(system.callbacks.keys), [.captureFullScreen, .captureArea, .tileLeft, .tileRight, .maximize, .center, .meetingRecording])
     }
 
     func testStartRegistersCaptureAndTilingAndDeliversActions() {
@@ -234,7 +333,7 @@ final class HotkeyManagerTests: XCTestCase {
 
         manager.start()
         XCTAssertEqual(Set(system.callbacks.keys), [
-            .captureFullScreen, .captureArea, .tileLeft, .tileRight, .maximize, .center
+            .captureFullScreen, .captureArea, .tileLeft, .tileRight, .maximize, .center, .meetingRecording
         ])
         system.press(.tileLeft)
         system.press(.captureArea)
@@ -243,7 +342,7 @@ final class HotkeyManagerTests: XCTestCase {
 }
 
 @MainActor
-private final class FakeHotkeySystem {
+final class FakeHotkeySystem {
     private struct Registered {
         let id: EventHotKeyID
         let reference: EventHotKeyRef

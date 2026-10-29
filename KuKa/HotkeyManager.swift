@@ -5,6 +5,7 @@ enum HotkeyAction: Equatable {
     case captureFullScreen
     case tile(TilingAction)
     case showClipboardHistory
+    case toggleMeetingRecording
 }
 
 @MainActor
@@ -19,6 +20,7 @@ final class HotkeyManager {
     var onChange: (() -> Void)?
     var tilingEnabled = true { didSet { refresh() } }
     var clipboardHistoryEnabled = false { didSet { refresh() } }
+    var meetingMenuIsOpen = false { didSet { refresh() } }
     var onAction: ((HotkeyAction) -> Void)? {
         get { registrar.onAction }
         set { registrar.onAction = newValue }
@@ -59,7 +61,16 @@ final class HotkeyManager {
         let desired = Set(HotkeyShortcut.allCases.filter {
             $0.isTiling ? tilingEnabled : $0 != .clipboardHistory || clipboardHistoryEnabled
         })
-        setIssues(registrar.reconcile(desired: desired))
+        let suspended: Set<HotkeyShortcut> = meetingMenuIsOpen ? [.meetingRecording] : []
+        var newIssues = registrar.reconcile(desired: desired, suspended: suspended)
+        // A suspended shortcut cannot retry registration, so keep its last registration error visible.
+        for issue in issues where suspended.contains(issue.shortcut) {
+            if case .registrationFailed = issue.failure,
+               !newIssues.contains(where: { $0.shortcut == issue.shortcut }) {
+                newIssues.append(issue)
+            }
+        }
+        setIssues(newIssues)
     }
 
     func stop() {

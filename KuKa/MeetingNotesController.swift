@@ -82,7 +82,8 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
         self.setRoot = setRoot
         statusLineItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
         meterItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
-        recordItem = NSMenuItem(title: "", action: #selector(recordClicked), keyEquivalent: "")
+        recordItem = NSMenuItem(title: "", action: #selector(recordClicked), keyEquivalent: "m")
+        recordItem.keyEquivalentModifierMask = [.control, .option]
         pauseItem = NSMenuItem(title: "", action: #selector(pauseClicked), keyEquivalent: "")
         showControlsItem = NSMenuItem(title: "Show Meeting Controls", action: #selector(showControlsClicked), keyEquivalent: "")
         restorePositionItem = NSMenuItem(title: "Restore Default Position", action: #selector(restorePositionClicked),

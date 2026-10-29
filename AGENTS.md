@@ -28,7 +28,7 @@ KuKa/
 ├── main.swift           # App entry point (NSApplication.shared.run())
 ├── AppDelegate.swift    # NSStatusItem menu bar, wires hotkey → overlay → capture → thumbnail → editor pipeline
 ├── HotkeyManager.swift  # Desired shortcuts, feature toggles, retry timer, wake handling and reported issues
-├── HotkeyShortcut.swift # Seven shortcut definitions, actions, labels and registration failures
+├── HotkeyShortcut.swift # Eight shortcut definitions, actions, labels and registration failures
 ├── HotkeyRegistration.swift # CarbonHotkeyRegistrar: sole owner of active/pending-release registrations, reconciliation and event IDs
 ├── CarbonHotkeyAPI.swift # Five injectable Carbon calls; production defaults invoke macOS directly
 ├── OverlayWindow.swift  # Borderless transparent NSWindow at screenSaver level
@@ -264,8 +264,10 @@ Update Notes (finished page) → requestUpdate → MeetingNotesController.update
 ## Implementation Notes
 
 ### Keyboard shortcuts
-- All seven shortcuts use public Carbon `RegisterEventHotKey` registrations on the main actor. There is no keyboard event tap or Secure Input polling.
+- All eight shortcuts use public Carbon `RegisterEventHotKey` registrations on the main actor. There is no keyboard event tap or Secure Input polling.
 - Screenshot combinations use `kVK_ANSI_3/4` with `cmdKey | shiftKey`. Clipboard history uses `kVK_ANSI_C` with the same modifiers. Tiling uses `kVK_LeftArrow/RightArrow/Return/ANSI_C` with `controlKey | optionKey`.
+- Meeting recording uses `kVK_ANSI_M` with `controlKey | optionKey` and calls `MeetingRecorder.toggleRecording()`. Idle starts with permission checks, recording or paused stops, and starting ignores another press. The recording menu item has the native Control-Option-M key equivalent. `StatusMenu` reports tracking changes to `HotkeyManager`, which suspends only the meeting's Carbon registration while the menu is open and restores it on close. Conflict checks and release retries continue while suspended; the last registration error stays visible until registration can retry.
+- `AppDelegate` binds shortcut actions at initialization and accepts an injected manager and recorder for tests. Registration still starts only at non-test launch. Meeting shortcut tests use that production callback with fake audio and Carbon registration calls. `MeetingHotkeyDispatchTests` also queues a synthetic Carbon event through the real handler, opens a native menu, and invokes its key-equivalent matching. It does not verify physical keyboard input.
 - Carbon matches each registered combination; additional Command/Control/Option/Shift modifiers are not part of that registration. Ku-Ka no longer captures screenshot variants with extra modifiers.
 - One `onAction` callback carries `HotkeyAction`. Turning a feature off unregisters its combinations so other apps can use them.
 - Before registering, check enabled macOS shortcuts with `CopySymbolicHotKeys`. Do not assume a successful registration proves there is no conflict. If the lookup fails, report and retry rather than register blindly.

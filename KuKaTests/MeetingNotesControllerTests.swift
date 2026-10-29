@@ -78,6 +78,83 @@ final class MeetingNotesControllerTests: MeetingNotesTestCase {
         XCTAssertEqual(MeetingFolder.all(in: actual).count, 1)
     }
 
+    func testRecordingKeyEquivalentFollowsIdleStartingRecordingAndPaused() async throws {
+        let record = try XCTUnwrap(item(titled: "Start Recording Meeting"))
+        XCTAssertEqual(record.title, "Start Recording Meeting")
+        XCTAssertEqual(record.keyEquivalent, "m")
+        microphone = .notDetermined
+        var prompt: CheckedContinuation<Bool, Never>?
+        answerMicrophonePrompt = { await withCheckedContinuation { prompt = $0 } }
+        let start = Task { await recorder.toggleRecording() }
+        await waitUntil { prompt != nil }
+        XCTAssertEqual(recorder.phase, .starting)
+        XCTAssertEqual(record.title, "Start Recording Meeting")
+        XCTAssertEqual(record.keyEquivalent, "m")
+        microphone = .granted
+        prompt?.resume(returning: true)
+        await start.value
+        XCTAssertEqual(record.title, "Stop Recording Meeting")
+        XCTAssertEqual(record.keyEquivalent, "m")
+        recorder.pause()
+        XCTAssertEqual(record.title, "Stop Recording Meeting")
+        XCTAssertEqual(record.keyEquivalent, "m")
+    }
+
+    func testRegisteredMeetingShortcutStartsAndStopsIncludingWhilePaused() async throws {
+        let shortcut = try XCTUnwrap(HotkeyShortcut.allCases.first { $0.keyCode == 46 })
+        let system = FakeHotkeySystem()
+        let manager = HotkeyManager(registrar: CarbonHotkeyRegistrar(api: system.api))
+        let app = AppDelegate(hotkeyManager: manager, meetingRecorder: recorder)
+        defer { manager.stop(); withExtendedLifetime(app) {} }
+        manager.start()
+        system.press(shortcut)
+        await waitUntil { recorder.phase == .recording }
+        XCTAssertEqual(recorder.phase, .recording)
+        XCTAssertEqual(capture.recordings.count, 1)
+        system.press(shortcut)
+        await waitUntil { recorder.phase == .idle }
+        await sut.waitUntilIdle()
+        XCTAssertEqual(recorder.phase, .idle)
+        XCTAssertEqual(capture.recordings.first?.stopCount, 1)
+        system.press(shortcut)
+        await waitUntil { recorder.phase == .recording }
+        recorder.pause()
+        system.press(shortcut)
+        await waitUntil { recorder.phase == .idle }
+        await sut.waitUntilIdle()
+        XCTAssertEqual(recorder.phase, .idle)
+        XCTAssertEqual(capture.recordings.last?.stopCount, 1)
+    }
+
+    func testRegisteredMeetingShortcutKeepsPermissionChecksAndIgnoresStartingRepeats() async throws {
+        let shortcut = try XCTUnwrap(HotkeyShortcut.allCases.first { $0.keyCode == 46 })
+        let system = FakeHotkeySystem()
+        let manager = HotkeyManager(registrar: CarbonHotkeyRegistrar(api: system.api))
+        let app = AppDelegate(hotkeyManager: manager, meetingRecorder: recorder)
+        defer { manager.stop(); withExtendedLifetime(app) {} }
+        manager.start()
+        screenRecording = false
+        system.press(shortcut)
+        await waitUntil { permissionWindows == 1 }
+        XCTAssertEqual(recorder.phase, .idle)
+        XCTAssertEqual(permissionWindows, 1)
+        XCTAssertTrue(capture.recordings.isEmpty)
+        screenRecording = true
+        microphone = .notDetermined
+        var prompt: CheckedContinuation<Bool, Never>?
+        answerMicrophonePrompt = { await withCheckedContinuation { prompt = $0 } }
+        system.press(shortcut)
+        await waitUntil { prompt != nil }
+        system.press(shortcut)
+        await Task.yield()
+        XCTAssertEqual(recorder.phase, .starting)
+        microphone = .granted
+        prompt?.resume(returning: true)
+        await waitUntil { recorder.phase == .recording }
+        XCTAssertEqual(recorder.phase, .recording)
+        XCTAssertEqual(capture.recordings.count, 1)
+    }
+
     private func meetingNames() -> [String] {
         ((try? FileManager.default.contentsOfDirectory(atPath: root.path)) ?? []).sorted()
     }

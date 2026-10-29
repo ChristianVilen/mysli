@@ -22,9 +22,9 @@ final class CarbonHotkeyRegistrar {
 
     isolated deinit { stop() }
 
-    func reconcile(desired: Set<HotkeyShortcut>) -> [HotkeyRegistrationIssue] {
+    func reconcile(desired: Set<HotkeyShortcut>, suspended: Set<HotkeyShortcut> = []) -> [HotkeyRegistrationIssue] {
         var failures = systemIssues(for: desired)
-        let available = desired.subtracting(failures.keys)
+        let available = desired.subtracting(failures.keys).subtracting(suspended)
         for shortcut in HotkeyShortcut.allCases {
             if let registration = registrations[shortcut],
                registration.state == .pendingRelease || !available.contains(shortcut) {

@@ -8,6 +8,8 @@ final class StatusMenuTests: XCTestCase {
     private var settings: Settings!
     private var meetingsRoot: URL!
     private var sut: StatusMenu!
+    private var recorder: MeetingRecorder!
+    private var meetingNotes: MeetingNotesController!
 
     override func setUp() async throws {
         defaults = UserDefaults(suiteName: "StatusMenuTests")!
@@ -15,13 +17,14 @@ final class StatusMenuTests: XCTestCase {
         loginItem = FakeLoginItem()
         settings = Settings(defaults: defaults, loginItem: loginItem)
         meetingsRoot = try makeTemporaryDirectory()
-        let recorder = MeetingRecorder(
+        recorder = MeetingRecorder(
             permissions: PermissionsManager(isAccessibilityTrusted: { true }, hasScreenCaptureAccess: { true },
                                             microphoneAccess: { .granted }),
             root: { [unowned self] in meetingsRoot },
             capture: FakeMeetingAudioCapture(),
+            liveTranscriber: FakeLiveTranscriber(),
             notifier: FakeNotifier())
-        let meetingNotes = MeetingNotesController(
+        meetingNotes = MeetingNotesController(
             recorder: recorder,
             root: { [unowned self] in meetingsRoot },
             processor: makeMeetingProcessor(),
@@ -32,9 +35,11 @@ final class StatusMenuTests: XCTestCase {
         sut = StatusMenu(settings: settings, sections: [KeepAwakeController(defaults: defaults), meetingNotes])
     }
 
-    override func tearDown() {
+    override func tearDown() async throws {
+        meetingNotes.shutDown()
+        await meetingNotes.waitUntilIdle()
         defaults.removePersistentDomain(forName: "StatusMenuTests")
-        super.tearDown()
+        try await super.tearDown()
     }
 
     private func item(titled title: String) -> NSMenuItem? {
@@ -45,6 +50,28 @@ final class StatusMenuTests: XCTestCase {
 
     private func click(_ item: NSMenuItem) {
         _ = (item.target as? NSObject)?.perform(item.action, with: item)
+    }
+
+    func testCarbonStartsAndTheMenuKeyEquivalentStopsRecordingOnce() async throws {
+        let record = try XCTUnwrap(item(titled: "Start Recording Meeting"))
+        XCTAssertEqual(record.title, "Start Recording Meeting")
+        XCTAssertEqual(record.keyEquivalent, "m")
+        let event = try XCTUnwrap(NSEvent.keyEvent(
+            with: .keyDown, location: .zero, modifierFlags: [.control, .option],
+            timestamp: 0, windowNumber: 0, context: nil, characters: "m",
+            charactersIgnoringModifiers: "m", isARepeat: false, keyCode: 46))
+        XCTAssertEqual(record.keyEquivalentModifierMask, [.control, .option])
+        let system = FakeHotkeySystem()
+        let manager = HotkeyManager(registrar: CarbonHotkeyRegistrar(api: system.api))
+        let app = AppDelegate(hotkeyManager: manager, meetingRecorder: recorder)
+        defer { manager.stop(); withExtendedLifetime(app) {} }
+        manager.start()
+        system.press(.meetingRecording)
+        await waitUntil { self.recorder.phase == .recording }
+        XCTAssertEqual(recorder.phase, .recording)
+        XCTAssertTrue(sut.menu.performKeyEquivalent(with: event))
+        await waitUntil { self.recorder.phase == .idle }
+        XCTAssertEqual(recorder.phase, .idle)
     }
 
     func testRepeatedHealthDoesNotReplaceMenuItems() {

@@ -55,11 +55,11 @@ The whole feature can be turned on and off with the **Clipboard History** checkb
 
 ## Meeting Notes
 
-When a call starts, open the Ku-Ka menu and choose **Start Recording Meeting**. Ku-Ka records your microphone and the sound your Mac plays, so any call app works. If Start cannot record, for example because a permission is missing, an alert says why.
+When a call starts, press `Control+Option+M` or open the Ku-Ka menu and choose **Start Recording Meeting**. Ku-Ka records your microphone and the sound your Mac plays, so any call app works. If Start cannot record, for example because a permission is missing, an alert says why.
 
 While Ku-Ka records, a small panel floats near the top-right corner of the screen. It shows the recorded time and has a pause button, a stop button, and a button that opens the live transcript. A click on the panel does not take the keyboard away from your call app. To move the panel, drag it. Ku-Ka remembers where you put it, and **Restore Default Position** in the menu puts it back. **Hide panel** in the header of the live transcript hides it while the recording goes on, and **Show Meeting Controls** in the menu brings it back. The menu bar icon also shows a red dot in its top-right corner, with a white centre while Ku-Ka records and two white bars while the recording is paused.
 
-When the call ends, click the stop button in the panel or choose **Stop Recording Meeting**. The panel says "Recording saved" for a few seconds. If the recording stops by itself, for example because a display went away, the panel says why and stays until you close it.
+When the call ends, press `Control+Option+M`, click the stop button in the panel, or choose **Stop Recording Meeting**. The shortcut also stops a paused recording. The panel says "Recording saved" for a few seconds. If the recording stops by itself, for example because a display went away, the panel says why and stays until you close it.
 
 To leave part of a call out of the notes, click the pause button or choose **Pause Recording**. Ku-Ka saves no audio until you click **Resume** or choose **Resume Recording**. The timer stands still while the recording is paused. The macOS microphone indicator stays on during a pause, because Ku-Ka keeps the capture running so that Resume always works. In the transcript, each pause becomes 3 seconds of silence. So a time in `transcript.md` is 3 seconds later than the timer showed for each earlier pause.
 

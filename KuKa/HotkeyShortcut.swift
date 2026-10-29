@@ -3,6 +3,7 @@ import Carbon.HIToolbox
 enum HotkeyShortcut: CaseIterable {
     case captureFullScreen, captureArea, clipboardHistory
     case tileLeft, tileRight, maximize, center
+    case meetingRecording
 
     var keyCode: UInt32 {
         switch self {
@@ -12,6 +13,7 @@ enum HotkeyShortcut: CaseIterable {
         case .tileLeft: return UInt32(kVK_LeftArrow)
         case .tileRight: return UInt32(kVK_RightArrow)
         case .maximize: return UInt32(kVK_Return)
+        case .meetingRecording: return UInt32(kVK_ANSI_M)
         }
     }
 
@@ -25,7 +27,10 @@ enum HotkeyShortcut: CaseIterable {
     var isScreenshot: Bool { self == .captureFullScreen || self == .captureArea }
 
     var modifiers: UInt32 {
-        UInt32(isTiling ? controlKey | optionKey : cmdKey | shiftKey)
+        switch self {
+        case .captureFullScreen, .captureArea, .clipboardHistory: return UInt32(cmdKey | shiftKey)
+        case .tileLeft, .tileRight, .maximize, .center, .meetingRecording: return UInt32(controlKey | optionKey)
+        }
     }
 
     var label: String {
@@ -37,6 +42,7 @@ enum HotkeyShortcut: CaseIterable {
         case .tileRight: return "⌃⌥→ (tile right)"
         case .maximize: return "⌃⌥Return (maximize)"
         case .center: return "⌃⌥C (center)"
+        case .meetingRecording: return "⌃⌥M (meeting recording)"
         }
     }
 
@@ -49,6 +55,7 @@ enum HotkeyShortcut: CaseIterable {
         case .tileRight: return .tile(.rightHalf)
         case .maximize: return .tile(.maximize)
         case .center: return .tile(.center)
+        case .meetingRecording: return .toggleMeetingRecording
         }
     }
 }
