@@ -130,6 +130,9 @@ class MeetingNotesTestCase: XCTestCase {
     var knownWords = KnownWordsList.empty
     var alerts: [String] = []
     var opened: [URL] = []
+    var pickedFolder: URL?
+    var pickerRoots: [URL] = []
+    var savedRoots: [URL] = []
     var permissionWindows = 0
     var stateChanges = 0
     var controlsRequests: [MeetingControlsRequest] = []
@@ -187,6 +190,8 @@ class MeetingNotesTestCase: XCTestCase {
                 runner: gate ?? runner,
                 knownWords: { [unowned self] in knownWords }),
             wordsToCheck: { [unowned self] in WordReview.openQuestionCount(of: $0, in: root, knownWords: knownWords) },
+            chooseFolder: { [unowned self] in pickerRoots.append($0); return pickedFolder },
+            setRoot: { [unowned self] in savedRoots.append($0); root = $0 },
             notifier: notifier,
             openURL: { [unowned self] in opened.append($0) })
         controller.onStateChange = { [unowned self] in stateChanges += 1 }

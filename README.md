@@ -81,13 +81,15 @@ Only the transcript text goes to the AI tool. With it goes each known word (see 
 
 If nobody spoke, the meeting ends without a summary and keeps its audio, so you can listen to it. If a step fails, the meeting folder gets an `error.md` with the reason, and the menu shows **Retry Failed Meeting**. Retry continues from the step that failed. If Ku-Ka quits or crashes during a meeting, it finishes the notes from the saved audio the next time it starts. If it crashed while it told the voices apart, that meeting gets no room labels, and the top of the transcript says why. To give up on a meeting, delete its folder. **Open Meetings Folder** in the menu opens the folder that holds them.
 
-To keep the notes in another folder, set the path in Terminal:
+To keep new meetings in another folder, choose **Choose Meetings Folder…** in the menu. Select a folder or create one, then click **Choose**. The new folder applies immediately, including **Open Meetings Folder**. Cancel leaves the setting unchanged. Ku-Ka does not move existing meetings. A recording or a meeting already waiting for notes finishes in its original folder.
+
+You can also set the path in Terminal:
 
 ```bash
 defaults write com.kuka.screenshot meetingsFolder /path/to/folder
 ```
 
-Ku-Ka uses the new folder the next time it needs it, without a restart. Do not use `~/Documents` or `~/Desktop` when iCloud syncs them, because the audio would then leave your Mac.
+Do not use `~/Documents` or `~/Desktop` when iCloud syncs them, because the audio would then leave your Mac.
 
 Ku-Ka transcribes US English by default. To transcribe another language, set its tag in Terminal:
 
@@ -97,7 +99,7 @@ defaults write com.kuka.screenshot meetingLocale de-DE
 
 Whisper uses only the language part of the tag, so `fi-FI` gives Finnish. The Apple fallback needs a tag that Apple's speech recognition supports exactly, for example `en-GB`, `de-DE`, `fr-FR`, `es-ES`, `it-IT`, `pt-BR`, `ja-JP`, `ko-KR`, or `zh-CN`. Apple does not support Finnish. If neither can transcribe the language, the transcription fails, and `error.md` gives the reason for each. The summary is written in the language of the transcript.
 
-Speech recognition often spells names and terms wrong. Ku-Ka keeps a list of known words that fixes them. By default, the list is `known-words.md` in the meetings folder. To use a list that you already keep, set its path in Terminal:
+Speech recognition often spells names and terms wrong. Ku-Ka keeps a list of known words that fixes them. By default, the list is `known-words.md` in the meetings folder. This default follows a changed meetings folder, but an explicit list path stays the same. Ku-Ka does not move the list. To use a list that you already keep, set its path in Terminal:
 
 ```bash
 defaults write com.kuka.screenshot knownWordsFile ~/path/to/list.md
@@ -221,6 +223,7 @@ The folder is created automatically if it doesn't exist.
 - **Check Words** appears when meetings have words to check, with their number. It opens the review window on the oldest of those meetings.
 - **Retry Failed Meeting** appears when a meeting's transcription or summary failed.
 - **Open Meetings Folder** opens the folder that holds the meeting notes.
+- **Choose Meetings Folder…** selects where new meetings are saved, without moving existing meetings.
 - **Quit Ku-Ka** — Exit the app
 
 ## File Structure

@@ -47,6 +47,18 @@ final class SettingsTests: XCTestCase {
         XCTAssertEqual(sut.meetingsFolder.path, NSHomeDirectory() + "/Meetings")
     }
 
+    func testChosenMeetingsFolderPersistsAndTheDefaultKnownWordsPathFollows() {
+        let chosen = URL(fileURLWithPath: "/Users/test/Meeting notes", isDirectory: true)
+        sut.meetingsFolder = chosen
+        XCTAssertEqual(defaults.string(forKey: "meetingsFolder"), chosen.path)
+        let reopened = Settings(defaults: defaults, loginItem: loginItem)
+        XCTAssertEqual(reopened.meetingsFolder, chosen)
+        XCTAssertEqual(reopened.knownWordsFile, chosen.appendingPathComponent("known-words.md"))
+        defaults.set("~/terms.md", forKey: "knownWordsFile")
+        sut.meetingsFolder = URL(fileURLWithPath: "/Users/test/Other notes")
+        XCTAssertEqual(reopened.knownWordsFile.path, NSHomeDirectory() + "/terms.md")
+    }
+
     func testMeetingsFolderReadsThePathSetWithDefaultsWrite() {
         defaults.set("/Users/test/work/notes", forKey: "meetingsFolder")
         XCTAssertEqual(sut.meetingsFolder.path, "/Users/test/work/notes")

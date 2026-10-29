@@ -47,10 +47,13 @@ final class Settings {
     /// "Desktop & Documents" on, those sync to iCloud, and meeting audio must
     /// stay on this Mac.
     var meetingsFolder: URL {
-        guard let path = defaults.string(forKey: "meetingsFolder"), !path.isEmpty else {
-            return FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Meetings", isDirectory: true)
+        get {
+            guard let path = defaults.string(forKey: "meetingsFolder"), !path.isEmpty else {
+                return FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Meetings", isDirectory: true)
+            }
+            return URL(fileURLWithPath: (path as NSString).expandingTildeInPath, isDirectory: true)
         }
-        return URL(fileURLWithPath: (path as NSString).expandingTildeInPath, isDirectory: true)
+        set { defaults.set(newValue.path, forKey: "meetingsFolder") }
     }
 
     /// The known-words list, set with `defaults write com.kuka.screenshot knownWordsFile <path>`

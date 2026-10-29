@@ -1,5 +1,19 @@
 import Cocoa
 
+@MainActor
+enum MeetingsFolderPicker {
+    static func choose(current: URL) -> URL? {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.canCreateDirectories = true
+        panel.directoryURL = current
+        panel.prompt = "Choose"
+        return panel.runModal() == .OK ? panel.url : nil
+    }
+}
+
 /// Owns the Meeting Notes menu and serial processing queue.
 @MainActor
 final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection {
@@ -21,6 +35,8 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
     private let wordsToCheck: (MeetingFolder?) -> Int
     private let notifier: Notifying
     private let openURL: (URL) -> Void
+    private let chooseFolder: @MainActor (URL) -> URL?
+    private let setRoot: (URL) -> Void
 
     private var queue: [Job] = []
     private var current: (job: Job, activity: String)?
@@ -40,6 +56,7 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
     private let checkWordsItem: NSMenuItem
     private let retryItem: NSMenuItem
     private let openFolderItem: NSMenuItem
+    private let chooseFolderItem: NSMenuItem
 
     /// Fires on every change of the recorder's `phase`, Starting and quit included.
     var onStateChange: (() -> Void)?
@@ -51,6 +68,8 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
          root: @escaping () -> URL,
          processor: MeetingProcessor,
          wordsToCheck: @escaping (MeetingFolder?) -> Int,
+         chooseFolder: @escaping @MainActor (URL) -> URL? = MeetingsFolderPicker.choose,
+         setRoot: @escaping (URL) -> Void,
          notifier: Notifying = SystemNotifier.shared,
          openURL: @escaping (URL) -> Void = { NSWorkspace.shared.open($0) }) {
         self.recorder = recorder
@@ -59,6 +78,8 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
         self.wordsToCheck = wordsToCheck
         self.notifier = notifier
         self.openURL = openURL
+        self.chooseFolder = chooseFolder
+        self.setRoot = setRoot
         statusLineItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
         meterItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
         recordItem = NSMenuItem(title: "", action: #selector(recordClicked), keyEquivalent: "")
@@ -71,9 +92,11 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
         checkWordsItem = NSMenuItem(title: "", action: #selector(checkWordsClicked), keyEquivalent: "")
         retryItem = NSMenuItem(title: "", action: #selector(retryClicked), keyEquivalent: "")
         openFolderItem = NSMenuItem(title: "Open Meetings Folder", action: #selector(openFolderClicked), keyEquivalent: "")
+        chooseFolderItem = NSMenuItem(title: "Choose Meetings Folder…", action: #selector(chooseFolderClicked), keyEquivalent: "")
         super.init()
         meterItem.view = meterView
-        for item in [recordItem, pauseItem, showControlsItem, restorePositionItem, checkWordsItem, retryItem, openFolderItem] {
+        for item in [recordItem, pauseItem, showControlsItem, restorePositionItem, checkWordsItem, retryItem, openFolderItem,
+                     chooseFolderItem] {
             item.target = self
         }
         for item in [statusLineItem, meterItem, pauseItem, showControlsItem, restorePositionItem, progressItem, waitingItem,
@@ -96,7 +119,7 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
         header.isEnabled = false
         menu.addItem(header)
         for item in [statusLineItem, meterItem, recordItem, pauseItem, showControlsItem, restorePositionItem, progressItem,
-                     waitingItem, checkWordsItem, retryItem, openFolderItem] {
+                     waitingItem, checkWordsItem, retryItem, openFolderItem, chooseFolderItem] {
             menu.addItem(item)
         }
         menu.addItem(.separator())
@@ -184,6 +207,12 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
         let root = root()
         try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         openURL(root)
+    }
+
+    @objc private func chooseFolderClicked() {
+        guard let chosen = chooseFolder(root()) else { return }
+        setRoot(chosen)
+        reloadFromDisk()
     }
 
     private func enqueue(_ job: Job) {

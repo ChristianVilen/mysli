@@ -33,7 +33,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                                     locale: { [settings] in settings.meetingLocale }),
         wordsToCheck: { [knownWords, settings] in
             WordReview.openQuestionCount(of: $0, in: settings.meetingsFolder, knownWords: knownWords.read())
-        }
+        },
+        setRoot: { [settings] in settings.meetingsFolder = $0 }
     )
     private lazy var meetingControlsPanel = MeetingControlsPanel(recorder: meetingRecorder, settings: settings)
     private lazy var wordReview = WordReviewController(

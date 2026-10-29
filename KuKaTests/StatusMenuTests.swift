@@ -26,6 +26,8 @@ final class StatusMenuTests: XCTestCase {
             root: { [unowned self] in meetingsRoot },
             processor: makeMeetingProcessor(),
             wordsToCheck: { [unowned self] in WordReview.openQuestionCount(of: $0, in: meetingsRoot, knownWords: .empty) },
+            chooseFolder: { _ in nil },
+            setRoot: { [unowned self] in meetingsRoot = $0 },
             notifier: FakeNotifier())
         sut = StatusMenu(settings: settings, sections: [KeepAwakeController(defaults: defaults), meetingNotes])
     }
@@ -101,8 +103,8 @@ final class StatusMenuTests: XCTestCase {
         let titles = menuItems.filter { !$0.isHidden }.map(\.title)
         let lidHint = try XCTUnwrap(titles.firstIndex(of: "Closing the lid still sleeps your Mac"))
 
-        XCTAssertEqual(Array(titles[(lidHint + 1)...(lidHint + 6)]),
-                       ["", "Meeting Notes", "Start Recording Meeting", "Open Meetings Folder", "", "Features"])
+        XCTAssertEqual(Array(titles[(lidHint + 1)...(lidHint + 7)]),
+                       ["", "Meeting Notes", "Start Recording Meeting", "Open Meetings Folder", "Choose Meetings Folder…", "", "Features"])
     }
 
     func testOpeningTheMenuShowsFailedMeetingsFromDisk() throws {
