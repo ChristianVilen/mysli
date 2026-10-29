@@ -15,12 +15,17 @@ final class StatusMenuTests: XCTestCase {
         loginItem = FakeLoginItem()
         settings = Settings(defaults: defaults, loginItem: loginItem)
         meetingsRoot = try makeTemporaryDirectory()
-        let meetingNotes = MeetingNotesController(
+        let recorder = MeetingRecorder(
             permissions: PermissionsManager(isAccessibilityTrusted: { true }, hasScreenCaptureAccess: { true },
                                             microphoneAccess: { .granted }),
             root: { [unowned self] in meetingsRoot },
             capture: FakeMeetingAudioCapture(),
-            processor: MeetingProcessor(transcribers: [FakeTranscriber()]),
+            notifier: FakeNotifier())
+        let meetingNotes = MeetingNotesController(
+            recorder: recorder,
+            root: { [unowned self] in meetingsRoot },
+            processor: makeMeetingProcessor(),
+            wordsToCheck: { [unowned self] in WordReview.openQuestionCount(of: $0, in: meetingsRoot, knownWords: .empty) },
             notifier: FakeNotifier())
         sut = StatusMenu(settings: settings, sections: [KeepAwakeController(defaults: defaults), meetingNotes])
     }
@@ -39,8 +44,6 @@ final class StatusMenuTests: XCTestCase {
     private func click(_ item: NSMenuItem) {
         _ = (item.target as? NSObject)?.perform(item.action, with: item)
     }
-
-    // MARK: - Hotkey health warning
 
     func testRepeatedHealthDoesNotReplaceMenuItems() {
         let health = HotkeyHealth(issues: [.init(shortcut: .tileLeft, failure: .releaseFailed(-50))])
@@ -84,8 +87,6 @@ final class StatusMenuTests: XCTestCase {
         XCTAssertNil(item(titled: "Open Keyboard Settings…"))
     }
 
-    // MARK: - Structure
-
     func testMenuContainsCoreItems() {
         for title in ["Launch at Login", "Window Tiling", "Clipboard History", "3 Seconds", "5 Seconds", "15 Seconds", "Forever", "Quit Ku-Ka"] {
             XCTAssertNotNil(item(titled: title), "missing menu item: \(title)")
@@ -115,7 +116,23 @@ final class StatusMenuTests: XCTestCase {
         XCTAssertEqual(item(titled: "Retry Failed Meeting")?.isHidden, false)
     }
 
-    // MARK: - Window tiling
+    func testOpeningTheMenuShowsWordsToCheckFromDiskBeforeRetry() throws {
+        let failed = try MeetingFolder.create(in: meetingsRoot, startingAt: localDate(2026, 10, 22, 10, 0))
+        try failed.write("# Transcript", to: .transcript)
+        try failed.write("agy exited with status 1", to: .failure)
+        let reviewed = try MeetingFolder.create(in: meetingsRoot, startingAt: localDate(2026, 10, 23, 14, 2))
+        try reviewed.write("**[00:00:01] Them:** Ask Convio.\n", to: .transcript)
+        try reviewed.write("# Summary\n", to: .summary)
+        try reviewed.write(#"{"questions": [{"heard": "Convio", "kind": "company", "quote": "Ask Convio."}]}"#, to: .questions)
+
+        sut.menuWillOpen(sut.menu)
+        sut.menuDidClose(sut.menu)
+
+        let titles = menuItems.filter { !$0.isHidden }.map(\.title)
+        let header = try XCTUnwrap(titles.firstIndex(of: "Meeting Notes"))
+        XCTAssertEqual(Array(titles[header...(header + 4)]),
+                       ["Meeting Notes", "Start Recording Meeting", "Check Words (1)…", "Retry Failed Meeting", "Open Meetings Folder"])
+    }
 
     func testTilingToggleWritesSettingsFiresCallbackAndFlipsCheckmark() {
         let tiling = item(titled: "Window Tiling")!
@@ -130,8 +147,6 @@ final class StatusMenuTests: XCTestCase {
         XCTAssertEqual(tiling.state, .off)
     }
 
-    // MARK: - Clipboard history
-
     func testClipboardHistoryToggleWritesSettingsFiresCallbackAndFlipsCheckmark() {
         let clipboardHistory = item(titled: "Clipboard History")!
         XCTAssertEqual(clipboardHistory.state, .on, "clipboard history defaults to enabled")
@@ -144,8 +159,6 @@ final class StatusMenuTests: XCTestCase {
         XCTAssertEqual(callbackValue, false)
         XCTAssertEqual(clipboardHistory.state, .off)
     }
-
-    // MARK: - Thumbnail duration
 
     func testDurationPickIsExclusiveAndPersisted() {
         let fifteen = item(titled: "15 Seconds")!
@@ -160,8 +173,6 @@ final class StatusMenuTests: XCTestCase {
         }
     }
 
-    // MARK: - Launch at login
-
     func testLaunchAtLoginToggleDrivesTheLoginSeam() {
         let login = item(titled: "Launch at Login")!
         XCTAssertEqual(login.state, .off)
@@ -172,21 +183,28 @@ final class StatusMenuTests: XCTestCase {
         XCTAssertEqual(login.state, .on)
     }
 
-    // MARK: - Icon
-
     func testIconDiffersWhenKeepAwakeIsActive() {
-        let plain = sut.icon(keepAwakeActive: false, recording: false, warning: nil)
-        let badged = sut.icon(keepAwakeActive: true, recording: false, warning: nil)
+        let plain = sut.icon(keepAwakeActive: false, recording: nil, warning: nil)
+        let badged = sut.icon(keepAwakeActive: true, recording: nil, warning: nil)
         XCTAssertNotEqual(plain.tiffRepresentation, badged.tiffRepresentation)
     }
 
     func testRecordingAddsItsOwnDotNextToTheOthers() {
-        let plain = sut.icon(keepAwakeActive: false, recording: false, warning: nil)
-        let recording = sut.icon(keepAwakeActive: false, recording: true, warning: nil)
-        let others = sut.icon(keepAwakeActive: true, recording: false, warning: .shortcutsUnavailable)
-        let all = sut.icon(keepAwakeActive: true, recording: true, warning: .shortcutsUnavailable)
+        let plain = sut.icon(keepAwakeActive: false, recording: nil, warning: nil)
+        let recording = sut.icon(keepAwakeActive: false, recording: .recording, warning: nil)
+        let others = sut.icon(keepAwakeActive: true, recording: nil, warning: .shortcutsUnavailable)
+        let all = sut.icon(keepAwakeActive: true, recording: .recording, warning: .shortcutsUnavailable)
 
         XCTAssertNotEqual(plain.tiffRepresentation, recording.tiffRepresentation)
         XCTAssertNotEqual(others.tiffRepresentation, all.tiffRepresentation)
+    }
+
+    func testThePausedMarkDiffersFromTheRecordingMarkAndFromNoMark() {
+        let plain = sut.icon(keepAwakeActive: false, recording: nil, warning: nil)
+        let recording = sut.icon(keepAwakeActive: false, recording: .recording, warning: nil)
+        let paused = sut.icon(keepAwakeActive: false, recording: .paused, warning: nil)
+
+        XCTAssertNotEqual(paused.tiffRepresentation, recording.tiffRepresentation)
+        XCTAssertNotEqual(paused.tiffRepresentation, plain.tiffRepresentation)
     }
 }

@@ -1,21 +1,9 @@
 import Cocoa
 
-/// The clipboard-history overlay: a filter field above a list of recorded
-/// items, floating on `NSGlassEffectView` glass roughly where Spotlight
-/// appears.
+/// Renders controller state and forwards input to `ClipboardHistoryController`.
 ///
-/// Pure view. Every piece of state it draws — the visible items, the
-/// selected row, list-versus-chooser mode — belongs to
-/// `ClipboardHistoryController`; the panel reads that state to render and
-/// pushes key events back into the controller's entry points. It reads no
-/// history, no `NSPasteboard`, and no `Settings`. Sizes and insets live in
-/// `Metrics`, next to the row views that draw against the same numbers.
-///
-/// Focus discipline matters here: the panel is borderless and
-/// `.nonactivatingPanel`, so it takes key status without activating Ku-Ka.
-/// The app the user was working in stays frontmost, which is what the
-/// synthetic Cmd+V after a paste needs. Never call `NSApp.activate` from
-/// this file.
+/// Takes key status without activating Ku-Ka. The previous app must stay frontmost for
+/// the synthetic Cmd+V after a paste. Never call `NSApp.activate` here.
 final class ClipboardPanel: FloatingPanel {
 
     private static let emptyStateText = "Nothing copied yet"
@@ -30,12 +18,8 @@ final class ClipboardPanel: FloatingPanel {
         ("textformat", "Paste with formatting"),
     ]
 
-    // MARK: - Collaborators
-
     private let controller: ClipboardHistoryController
     private let screens: Screens
-
-    // MARK: - Views
 
     private let searchGlyph = NSImageView()
     private let searchField = NSTextField()
@@ -52,16 +36,12 @@ final class ClipboardPanel: FloatingPanel {
     /// `resignKey` dismisses.
     private var isDismissing = false
 
-    // MARK: - Init
-
     init(controller: ClipboardHistoryController, screens: Screens = SystemScreens()) {
         self.controller = controller
         self.screens = screens
         super.init(contentRect: NSRect(origin: .zero, size: Metrics.size))
 
-        // An NSPanel hides itself when its app deactivates. Ku-Ka is a menu
-        // bar app that deliberately never activates, so that default would
-        // hide the panel the moment it appears.
+        // Ku-Ka never activates; the NSPanel default would hide it as soon as it appears.
         hidesOnDeactivate = false
         // A clipboard panel is reached by a global hotkey, so it has to
         // follow the user across spaces and over full-screen apps.
@@ -70,20 +50,12 @@ final class ClipboardPanel: FloatingPanel {
         buildChrome()
     }
 
-    /// Claims *both* of the controller's callback slots: a list change
-    /// redraws the panel, and a close request dismisses it. The owner calls
-    /// this once, straight after building the panel.
-    ///
-    /// Deliberately not part of `init`: the claim belongs at the owner's
-    /// call site, where anything else that wants to hear about list changes
-    /// can see that these two slots are already taken and route through the
-    /// panel instead of quietly overwriting them.
+    /// Claims both controller callbacks. The owner calls this once after construction,
+    /// so other listeners can see the slots are taken and avoid overwriting them.
     func bindController() {
         controller.onListChanged = { [weak self] in self?.reload() }
         controller.onPanelShouldClose = { [weak self] in self?.dismiss() }
     }
-
-    // MARK: - Key status
 
     /// The panel has to be key to receive typing, but `.nonactivatingPanel`
     /// keeps Ku-Ka itself in the background while it is.
@@ -103,8 +75,6 @@ final class ClipboardPanel: FloatingPanel {
         controller.escPressed()
     }
 
-    // MARK: - Presentation
-
     /// Opens the panel on the screen under the pointer, with an empty
     /// filter and the newest item selected.
     func show() {
@@ -117,11 +87,7 @@ final class ClipboardPanel: FloatingPanel {
             setFrameOrigin(origin)
         }
 
-        // `show()` only ever runs on a hidden panel — the caller's toggle
-        // dismisses on a second hotkey press instead of calling `show()`
-        // again — so this always sets the pre-fade alpha; kept as a guard
-        // rather than an assumption, since restarting the fade on an
-        // already-visible panel would blink a panel being read.
+        // Restarting the fade on a visible panel would make it blink while being read.
         if !isVisible {
             setAlphaImmediately(shouldFade ? 0 : 1)
         }
@@ -131,11 +97,7 @@ final class ClipboardPanel: FloatingPanel {
         makeFirstResponder(searchField)
 
         guard shouldFade, alphaValue < 1 else { return }
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = Metrics.fadeDuration
-            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            animator().alphaValue = 1
-        }
+        fadeIn(duration: Metrics.fadeDuration, timingFunction: CAMediaTimingFunction(name: .easeOut))
     }
 
     /// Hides the panel at once. No fade out: a paste dismisses the panel
@@ -158,16 +120,6 @@ final class ClipboardPanel: FloatingPanel {
         !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
     }
 
-    /// Writes alpha through a zero-duration animation, which also replaces
-    /// any fade still in flight. A plain `alphaValue =` would be overwritten
-    /// by the running animation on its next tick.
-    private func setAlphaImmediately(_ value: CGFloat) {
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0
-            animator().alphaValue = value
-        }
-    }
-
     /// Horizontally centered on the screen under the pointer, with the top
     /// edge a quarter of the way down that screen's visible height.
     private func targetOrigin(mouseLocation: CGPoint) -> NSPoint? {
@@ -177,29 +129,18 @@ final class ClipboardPanel: FloatingPanel {
         let visible = screen.visibleFrame
         let x = visible.midX - Metrics.size.width / 2
         let topEdge = visible.maxY - visible.height * Metrics.topFraction
-        // Keep the whole panel on screen: not past the visible bottom, and
-        // not past the visible top. The top clamp is applied last so it
-        // wins on a display shorter than the panel, where the two disagree
-        // — a panel running off the bottom is far better than one whose
-        // search field is off the top.
+        // On a display shorter than the panel, the top clamp wins to keep search in view.
         var y = max(topEdge - Metrics.size.height, visible.minY)
         y = min(y, visible.maxY - Metrics.size.height)
         return NSPoint(x: x.rounded(), y: y.rounded())
     }
 
-    // MARK: - Rendering
-
-    /// Redraws everything the controller currently says to show. Cheap
-    /// enough to be the single entry point for every change — the list
-    /// caps out at `ClipboardHistory.maxItems` rows.
     func reload() {
         if case .chooser(let item) = controller.mode {
-            headerLabel.isHidden = false
-            headerLabel.stringValue = Self.headerText(for: item)
+            headerLabel.show(Self.headerText(for: item))
             scrollTopConstraint.constant = Metrics.chooserTopGap
         } else {
-            headerLabel.isHidden = true
-            headerLabel.stringValue = ""
+            headerLabel.show(nil)
             scrollTopConstraint.constant = Metrics.listTopGap
         }
 
@@ -207,10 +148,7 @@ final class ClipboardPanel: FloatingPanel {
         syncSelection()
     }
 
-    /// Names the item the chooser is deciding on, cut to a readable
-    /// prefix. The label truncates on its own once the width pin bites,
-    /// but capping the string as well keeps the header short on every
-    /// display width instead of only on narrow ones.
+    /// Caps the chooser header even on displays wide enough to show the whole preview.
     private static func headerText(for item: ClipboardItem) -> String {
         let preview = item.previewLabel
         guard preview.count > Metrics.headerPreviewMaxLength else {
@@ -239,8 +177,6 @@ final class ClipboardPanel: FloatingPanel {
         return !controller.visibleItems.isEmpty
     }
 
-    // MARK: - Mouse
-
     /// The clicked row when it is a real, selectable one — nil for a click
     /// on the empty-state message or on blank space below the last row.
     private var clickedSelectableRow: Int? {
@@ -260,10 +196,7 @@ final class ClipboardPanel: FloatingPanel {
         controller.enterPressed()
     }
 
-    // MARK: - Chrome
-
     private func buildChrome() {
-        // Frameless: the constraints below own its geometry.
         let container = NSView(frame: .zero)
         container.wantsLayer = true
         container.layer?.cornerRadius = Metrics.cornerRadius
@@ -278,9 +211,6 @@ final class ClipboardPanel: FloatingPanel {
 
         let separator = NSBox()
         separator.boxType = .separator
-        // A separator has no content to be wide about, but it is pinned to
-        // both container edges like the header is, so it gets the same
-        // treatment rather than being left as the one unchecked view.
         separator.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         separator.translatesAutoresizingMaskIntoConstraints = false
 
@@ -317,27 +247,15 @@ final class ClipboardPanel: FloatingPanel {
         ])
 
         let glass = NSGlassEffectView(frame: NSRect(origin: .zero, size: Metrics.size))
-        // `.regular` rather than `.clear`: this panel is mostly text, and
-        // regular glass is the one tuned to keep text legible over any
-        // wallpaper. `tintColor` is left unset so the glass stays neutral;
-        // it is the knob to reach for if the panel turns out short of
-        // contrast on a busy light desktop at first run.
+        // Regular glass keeps text legible over the wallpaper.
         glass.style = .regular
         glass.cornerRadius = Metrics.cornerRadius
         glass.contentView = container
         contentView = glass
 
-        // Size the content explicitly rather than letting it be inferred.
-        // The window is borderless, so AppKit takes its minimum content
-        // size from the content view's fitting size; with no width pin, the
-        // widest label's intrinsic width becomes that minimum. That is what
-        // once stretched the panel past the screen edge when a chooser
-        // header carried a 500-character preview.
-        //
-        // Position comes from leading/top, size from width/height. Pinning
-        // trailing and bottom as well would tie the container's width back
-        // to the glass's own and re-open the same argument from the other
-        // side, so those two are deliberately left out.
+        // A borderless window takes its minimum size from the content's fitting size.
+        // Explicit width/height prevent long labels from stretching it beyond the screen.
+        // Leave trailing/bottom unpinned so the glass cannot determine that size again.
         NSLayoutConstraint.activate([
             container.leadingAnchor.constraint(equalTo: glass.leadingAnchor),
             container.topAnchor.constraint(equalTo: glass.topAnchor),
@@ -384,10 +302,7 @@ final class ClipboardPanel: FloatingPanel {
         headerLabel.textColor = .secondaryLabelColor
         headerLabel.maximumNumberOfLines = 1
         headerLabel.cell?.lineBreakMode = .byTruncatingTail
-        // Truncation is a drawing rule; it does nothing about the width the
-        // label *asks* for. Dropping compression resistance below the width
-        // pin above is what makes the label give way and actually truncate,
-        // rather than widening everything around it.
+        // Compression resistance below the width constraint lets long labels truncate.
         headerLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         headerLabel.isHidden = true
         headerLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -407,7 +322,6 @@ final class ClipboardPanel: FloatingPanel {
         tableView.selectionHighlightStyle = .regular
         tableView.allowsMultipleSelection = false
         tableView.allowsEmptySelection = true
-        // Transparent so the glass carries the background.
         tableView.backgroundColor = .clear
         tableView.dataSource = self
         tableView.delegate = self
@@ -430,8 +344,6 @@ final class ClipboardPanel: FloatingPanel {
         scrollView.translatesAutoresizingMaskIntoConstraints = false
     }
 
-    // MARK: - Row content
-
     private func symbolName(for item: ClipboardItem) -> String {
         switch item.kind {
         case .image:
@@ -443,26 +355,17 @@ final class ClipboardPanel: FloatingPanel {
         }
     }
 
-    /// Decodes at thumbnail size on demand and caches the small result. The
 }
-
-// MARK: - Search field
 
 extension ClipboardPanel: NSTextFieldDelegate {
     func controlTextDidChange(_ notification: Notification) {
         controller.setSearchQuery(searchField.stringValue)
-        // The controller decides whether typing counts — it refuses in
-        // chooser mode, which has nothing to filter. Reading the query
-        // back keeps the field showing what the filter actually holds,
-        // instead of stray keystrokes sitting there until the chooser
-        // closes.
+        // Read back the accepted query because the controller refuses typing in chooser mode.
         if searchField.stringValue != controller.searchQuery {
             searchField.stringValue = controller.searchQuery
         }
     }
 
-    /// The four keys the panel steers with. Everything else falls through
-    /// to the field editor and edits the filter.
     func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
         switch commandSelector {
         case #selector(NSResponder.moveUp(_:)):
@@ -480,16 +383,12 @@ extension ClipboardPanel: NSTextFieldDelegate {
     }
 }
 
-// MARK: - Table
-
 extension ClipboardPanel: NSTableViewDataSource {
     func numberOfRows(in tableView: NSTableView) -> Int {
         switch controller.mode {
         case .chooser:
             return Self.chooserRows.count
         case .list:
-            // An empty list still draws one row: the "nothing copied yet"
-            // message.
             return max(controller.visibleItems.count, 1)
         }
     }

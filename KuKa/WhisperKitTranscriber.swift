@@ -7,57 +7,33 @@ struct WhisperKitTranscriber: Transcribing {
     var name: String { "Whisper \(Self.model)" }
 
     private let client: WhisperKitClient
-    private let modelsFolder: URL
+    private let install: ModelInstall
 
     init(client: WhisperKitClient = WhisperKitLibrary(),
          modelsFolder: URL = URL.applicationSupportDirectory.appendingPathComponent("Ku-Ka/whisper-models", isDirectory: true)) {
         self.client = client
-        self.modelsFolder = modelsFolder
+        install = ModelInstall(root: modelsFolder, name: Self.model, label: "Whisper")
     }
-
-    private var installed: URL { modelsFolder.appendingPathComponent(Self.model, isDirectory: true) }
-    private var partial: URL { modelsFolder.appendingPathComponent(".\(Self.model).partial", isDirectory: true) }
 
     @concurrent
     func needsDownload(for locale: Locale) async throws -> Bool {
         _ = try Self.supportedLanguageCode(for: locale)
-        return !FileManager.default.fileExists(atPath: installed.path)
+        return !install.isInstalled
     }
 
     @concurrent
-    func download(for locale: Locale) async throws {
-        try FileManager.default.createDirectory(at: modelsFolder, withIntermediateDirectories: true)
-        excludeModelsFromBackup()
-        let lock: FileLock
-        do {
-            lock = try FileLock.acquire(at: modelsFolder.appendingPathComponent(".lock"))
-        } catch FileLockError.held {
-            throw MeetingStepError("Another Ku-Ka is downloading the Whisper model.")
-        } catch FileLockError.failed(let reason) {
-            throw MeetingStepError("Ku-Ka could not lock the Whisper models folder \(modelsFolder.path): \(reason).")
+    func download(for locale: Locale, onStart: @MainActor () -> Void) async throws {
+        try await install.install { partial in
+            await onStart()
+            try await client.download(model: Self.model, into: partial)
         }
-        defer { lock.release() }
-        guard !FileManager.default.fileExists(atPath: installed.path) else { return }
-        try await client.download(model: Self.model, into: partial)
-        try FileManager.default.moveItem(at: partial, to: installed)
     }
 
     @concurrent
     func load(for locale: Locale) async throws -> any TranscriptionSession {
         let languageCode = try Self.supportedLanguageCode(for: locale)
-        excludeModelsFromBackup()
-        return Session(model: try await client.load(model: Self.model, from: installed), languageCode: languageCode)
-    }
-
-    private func excludeModelsFromBackup() {
-        var folder = modelsFolder
-        var values = URLResourceValues()
-        values.isExcludedFromBackup = true
-        do {
-            try folder.setResourceValues(values)
-        } catch {
-            NSLog("Ku-Ka: could not exclude the Whisper model cache from backups: \(error)")
-        }
+        install.excludeFromBackup()
+        return Session(model: try await client.load(model: Self.model, from: install.folder), languageCode: languageCode)
     }
 
     private static func supportedLanguageCode(for locale: Locale) throws -> String {

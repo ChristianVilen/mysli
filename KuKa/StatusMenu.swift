@@ -6,6 +6,11 @@ enum StatusWarning {
     case screenRecordingMissing
 }
 
+enum RecordingMark {
+    case recording
+    case paused
+}
+
 /// A feature's own group of menu items, ending with its own separator.
 @MainActor
 protocol MenuSection: AnyObject {
@@ -25,8 +30,6 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     let menu = NSMenu()
     var onTilingToggled: ((Bool) -> Void)?
     var onClipboardHistoryToggled: ((Bool) -> Void)?
-    /// Fired when the user picks "Permissions…" — AppDelegate opens the
-    /// onboarding window.
     var onShowPermissions: (() -> Void)?
     var onOpenKeyboardSettings: (() -> Void)?
     /// Fired every time the menu opens, before it is shown.
@@ -49,19 +52,15 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         build()
     }
 
-    /// The status-item image: the app icon, plus a small mark (with a light
-    /// ring for contrast) per active state — Keep Awake gets the accent dot
-    /// in the bottom-right, recording gets a red record mark (a dot with a
-    /// white centre, so it does not rely on colour alone) in the top-right,
-    /// and `warning` gets the bottom-left corner. Separate corners so all
-    /// three can show at once.
-    func icon(keepAwakeActive: Bool, recording: Bool, warning: StatusWarning?) -> NSImage {
+    /// Separate corners let all three marks show at once. Recording and pause also have
+    /// different shapes, so the state does not rely on colour alone.
+    func icon(keepAwakeActive: Bool, recording: RecordingMark?, warning: StatusWarning?) -> NSImage {
         guard let base = NSImage(named: "MenuBarIcon") else {
             return NSImage(systemSymbolName: "camera.viewfinder", accessibilityDescription: "Ku-Ka") ?? NSImage()
         }
         let size = NSSize(width: 18, height: 18)
 
-        guard keepAwakeActive || recording || warning != nil else {
+        guard keepAwakeActive || recording != nil || warning != nil else {
             let icon = (base.copy() as? NSImage) ?? base
             icon.size = size
             icon.isTemplate = false
@@ -80,11 +79,18 @@ final class StatusMenu: NSObject, NSMenuDelegate {
             if keepAwakeActive {
                 drawDot(NSRect(x: rect.maxX - 8, y: rect.minY + 1, width: 7, height: 7), color: .controlAccentColor)
             }
-            if recording {
+            if let recording {
                 let mark = NSRect(x: rect.maxX - 8, y: rect.maxY - 8, width: 7, height: 7)
                 drawDot(mark, color: .systemRed)
                 NSColor.white.setFill()
-                NSBezierPath(ovalIn: mark.insetBy(dx: 2.25, dy: 2.25)).fill()
+                switch recording {
+                case .recording:
+                    NSBezierPath(ovalIn: mark.insetBy(dx: 2.25, dy: 2.25)).fill()
+                case .paused:
+                    let bar = NSRect(x: mark.minX + 2, y: mark.minY + 1.75, width: 1, height: 3.5)
+                    NSBezierPath(rect: bar).fill()
+                    NSBezierPath(rect: bar.offsetBy(dx: 2, dy: 0)).fill()
+                }
             }
             let corner = NSRect(x: rect.minX + 1, y: rect.minY + 1, width: 7, height: 7)
             switch warning {
@@ -150,8 +156,6 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         }
     }
 
-    // MARK: - Build
-
     @objc private func openKeyboardSettings() { onOpenKeyboardSettings?() }
 
     private func build() {
@@ -196,7 +200,6 @@ final class StatusMenu: NSObject, NSMenuDelegate {
             section.buildMenuSection(into: menu)
         }
 
-        // --- Features ---
         let featuresLabel = NSMenuItem(title: "Features", action: nil, keyEquivalent: "")
         featuresLabel.isEnabled = false
         menu.addItem(featuresLabel)
@@ -219,7 +222,6 @@ final class StatusMenu: NSObject, NSMenuDelegate {
 
         menu.addItem(.separator())
 
-        // --- Links ---
         let permissionsItem = NSMenuItem(title: "Permissions…", action: #selector(showPermissions), keyEquivalent: "")
         permissionsItem.target = self
         menu.addItem(permissionsItem)
@@ -239,8 +241,6 @@ final class StatusMenu: NSObject, NSMenuDelegate {
 
         menu.delegate = self
     }
-
-    // MARK: - Actions
 
     @objc private func changeDuration(_ sender: NSMenuItem) {
         settings.thumbnailDuration = Double(sender.tag)
@@ -278,8 +278,6 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     @objc private func openSuggestFeature() {
         NSWorkspace.shared.open(URL(string: "https://github.com/ChristianVilen/ku-ka/issues/new?labels=enhancement")!)
     }
-
-    // MARK: - Menu delegate
 
     func menuWillOpen(_ menu: NSMenu) {
         onMenuWillOpen?()

@@ -4,7 +4,9 @@ import Speech
 protocol Transcribing {
     var name: String { get }
     func needsDownload(for locale: Locale) async throws -> Bool
-    func download(for locale: Locale) async throws
+    /// `onStart` runs right before the download starts. With a download lock, it runs only once
+    /// this Ku-Ka holds the lock and the model is still missing.
+    func download(for locale: Locale, onStart: @MainActor () -> Void) async throws
     func load(for locale: Locale) async throws -> any TranscriptionSession
 }
 
@@ -51,7 +53,8 @@ struct SpeechTranscriberAdapter: Transcribing {
     }
 
     @concurrent
-    func download(for locale: Locale) async throws {
+    func download(for locale: Locale, onStart: @MainActor () -> Void) async throws {
+        await onStart()
         let transcriber = SpeechTranscriber(locale: locale, preset: .transcription)
         if let request = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
             try await request.downloadAndInstall()

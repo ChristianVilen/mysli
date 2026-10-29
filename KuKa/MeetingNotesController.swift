@@ -1,26 +1,29 @@
 import Cocoa
 
+/// Owns the Meeting Notes menu and serial processing queue.
 @MainActor
 final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection {
-    private enum Recorder {
-        case idle
-        case starting
-        case recording(MeetingFolder, since: Date, ActiveRecording, FileLock)
+    private enum Job: Equatable {
+        case process(MeetingFolder)
+        case updateNotes(MeetingFolder)
+
+        var meeting: MeetingFolder {
+            switch self {
+            case .process(let meeting), .updateNotes(let meeting): return meeting
+            }
+        }
     }
 
-    private let permissions: PermissionsManager
+    private let recorder: MeetingRecorder
     private let root: () -> URL
-    private let capture: MeetingAudioCapturing
     private let processor: MeetingProcessor
+    /// The number of open questions of a meeting, or with nil, of every done meeting.
+    private let wordsToCheck: (MeetingFolder?) -> Int
     private let notifier: Notifying
-    /// Returns true when the user chose Open Permissions.
-    private let alertStartFailure: @MainActor (_ reason: String, _ offersPermissions: Bool) -> Bool
     private let openURL: (URL) -> Void
-    private let now: () -> Date
 
-    private var recorder: Recorder = .idle
-    private var queue: [MeetingFolder] = []
-    private var current: (meeting: MeetingFolder, activity: String)?
+    private var queue: [Job] = []
+    private var current: (job: Job, activity: String)?
     private var processingTask: Task<Void, Never>?
     private var menuIsOpen = false
     private var meterTimer: Timer?
@@ -29,55 +32,71 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
     private let meterItem: NSMenuItem
     private let meterView = RecordingAudioMeterView()
     private let recordItem: NSMenuItem
+    private let pauseItem: NSMenuItem
+    private let showControlsItem: NSMenuItem
+    private let restorePositionItem: NSMenuItem
     private let progressItem: NSMenuItem
     private let waitingItem: NSMenuItem
+    private let checkWordsItem: NSMenuItem
     private let retryItem: NSMenuItem
     private let openFolderItem: NSMenuItem
 
+    /// Fires on every change of the recorder's `phase`, Starting and quit included.
     var onStateChange: (() -> Void)?
-    var onShowPermissions: (() -> Void)?
+    /// Nil selects the oldest unfinished review.
+    var onCheckWords: (@MainActor (MeetingFolder?) -> Void)?
 
-    var isRecording: Bool {
-        if case .recording = recorder { return true }
-        return false
-    }
-
-    init(permissions: PermissionsManager,
+    /// Claims the recorder's `onChange` and `onEnded`.
+    init(recorder: MeetingRecorder,
          root: @escaping () -> URL,
-         capture: MeetingAudioCapturing = ScreenCaptureMeetingAudio(),
-         processor: MeetingProcessor = MeetingProcessor(),
+         processor: MeetingProcessor,
+         wordsToCheck: @escaping (MeetingFolder?) -> Int,
          notifier: Notifying = SystemNotifier.shared,
-         alertStartFailure: @escaping @MainActor (String, Bool) -> Bool = MeetingNotesController.showStartFailureAlert,
-         openURL: @escaping (URL) -> Void = { NSWorkspace.shared.open($0) },
-         now: @escaping () -> Date = { Date() }) {
-        self.permissions = permissions
+         openURL: @escaping (URL) -> Void = { NSWorkspace.shared.open($0) }) {
+        self.recorder = recorder
         self.root = root
-        self.capture = capture
         self.processor = processor
+        self.wordsToCheck = wordsToCheck
         self.notifier = notifier
-        self.alertStartFailure = alertStartFailure
         self.openURL = openURL
-        self.now = now
         statusLineItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
         meterItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
         recordItem = NSMenuItem(title: "", action: #selector(recordClicked), keyEquivalent: "")
+        pauseItem = NSMenuItem(title: "", action: #selector(pauseClicked), keyEquivalent: "")
+        showControlsItem = NSMenuItem(title: "Show Meeting Controls", action: #selector(showControlsClicked), keyEquivalent: "")
+        restorePositionItem = NSMenuItem(title: "Restore Default Position", action: #selector(restorePositionClicked),
+                                         keyEquivalent: "")
         progressItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
         waitingItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+        checkWordsItem = NSMenuItem(title: "", action: #selector(checkWordsClicked), keyEquivalent: "")
         retryItem = NSMenuItem(title: "", action: #selector(retryClicked), keyEquivalent: "")
         openFolderItem = NSMenuItem(title: "Open Meetings Folder", action: #selector(openFolderClicked), keyEquivalent: "")
         super.init()
         meterItem.view = meterView
-        for item in [recordItem, retryItem, openFolderItem] { item.target = self }
-        for item in [statusLineItem, meterItem, progressItem, waitingItem, retryItem] { item.isHidden = true }
+        for item in [recordItem, pauseItem, showControlsItem, restorePositionItem, checkWordsItem, retryItem, openFolderItem] {
+            item.target = self
+        }
+        for item in [statusLineItem, meterItem, pauseItem, showControlsItem, restorePositionItem, progressItem, waitingItem,
+                     checkWordsItem, retryItem] {
+            item.isHidden = true
+        }
+        recorder.onChange = { [weak self] in
+            self?.updateMenu()
+            self?.onStateChange?()
+        }
+        recorder.onEnded = { [weak self] in self?.enqueue(.process($0)) }
     }
 
-    isolated deinit { meterTimer?.invalidate() }
+    isolated deinit {
+        meterTimer?.invalidate()
+    }
 
     func buildMenuSection(into menu: NSMenu) {
         let header = NSMenuItem(title: "Meeting Notes", action: nil, keyEquivalent: "")
         header.isEnabled = false
         menu.addItem(header)
-        for item in [statusLineItem, meterItem, recordItem, progressItem, waitingItem, retryItem, openFolderItem] {
+        for item in [statusLineItem, meterItem, recordItem, pauseItem, showControlsItem, restorePositionItem, progressItem,
+                     waitingItem, checkWordsItem, retryItem, openFolderItem] {
             menu.addItem(item)
         }
         menu.addItem(.separator())
@@ -87,7 +106,7 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
     func menuWillOpen() {
         menuIsOpen = true
         updateMenu()
-        reloadFailedMeetingsFromDisk()
+        reloadFromDisk()
     }
 
     func menuTick() {
@@ -101,20 +120,18 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
     }
 
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
-        guard menuItem === recordItem, case .starting = recorder else { return true }
-        return false
+        menuItem !== recordItem || recorder.phase != .starting
     }
 
     func resumeUnfinished() {
         for (meeting, stage) in MeetingFolder.all(in: root()) {
-            if case .pending = stage { enqueue(meeting) }
+            if case .pending = stage { enqueue(.process(meeting)) }
         }
     }
 
+    /// Quit: stops the recording and the processing. Each meeting waits for the next launch.
     func shutDown() {
-        if case .recording(_, _, let handle, _) = recorder { handle.stop() }
-        recorder = .idle
-        updateMenu()
+        recorder.shutDown()
         processingTask?.cancel()
     }
 
@@ -123,86 +140,19 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
     }
 
     @objc private func recordClicked() {
-        Task { await toggleRecording() }
+        Task { await recorder.toggleRecording() }
     }
 
-    func toggleRecording() async {
-        switch recorder {
-        case .idle: await start()
-        case .recording: stop()
-        case .starting: break
-        }
+    @objc private func pauseClicked() {
+        recorder.togglePause()
     }
 
-    private func start() async {
-        recorder = .starting
-        updateMenu()
-        notifier.requestPermission()
-        if let reason = await missingGrant() {
-            recorder = .idle
-            updateMenu()
-            if alertStartFailure(reason, true) { onShowPermissions?() }
-            return
-        }
-        let startedAt = now()
-        do {
-            let meeting = try MeetingFolder.create(in: root(), startingAt: startedAt)
-            do {
-                let lock = try meeting.lock()
-                let handle = try await capture.start(into: meeting) { [weak self] reason in
-                    self?.handleInterruption(of: meeting, reason: reason)
-                }
-                if let reason = handle.endReason {
-                    endRecording(meeting, interruptedBecause: reason)
-                } else {
-                    recorder = .recording(meeting, since: startedAt, handle, lock)
-                    onStateChange?()
-                }
-            } catch {
-                try? FileManager.default.removeItem(at: meeting.url)
-                throw error
-            }
-        } catch {
-            recorder = .idle
-            _ = alertStartFailure(error.localizedDescription, false)
-        }
-        updateMenu()
+    @objc private func showControlsClicked() {
+        recorder.showControls()
     }
 
-    /// Nil when recording can start, otherwise the reason it cannot.
-    private func missingGrant() async -> String? {
-        permissions.refresh()
-        guard permissions.screenRecording else {
-            return "Ku-Ka needs Screen Recording permission to record the other people on the call."
-        }
-        guard permissions.microphone != .denied, await permissions.requestMicrophone() else {
-            return "Ku-Ka needs Microphone permission to record your side of the call."
-        }
-        return nil
-    }
-
-    private func stop() {
-        guard case .recording(let meeting, _, let handle, _) = recorder else { return }
-        handle.stop()
-        recorder = .idle
-        updateMenu()
-        onStateChange?()
-        enqueue(meeting)
-    }
-
-    private func handleInterruption(of meeting: MeetingFolder, reason: String) {
-        guard case .recording(let recording, _, _, _) = recorder, recording == meeting else { return }
-        endRecording(meeting, interruptedBecause: reason)
-    }
-
-    private func endRecording(_ meeting: MeetingFolder, interruptedBecause reason: String) {
-        recorder = .idle
-        updateMenu()
-        onStateChange?()
-        notifier.post(title: "Recording Stopped",
-                      body: "\(reason) Ku-Ka makes notes from what it recorded. To record the rest, choose Start Recording Meeting.",
-                      opening: nil)
-        enqueue(meeting)
+    @objc private func restorePositionClicked() {
+        recorder.restoreDefaultPosition()
     }
 
     @objc private func retryClicked() {
@@ -214,12 +164,20 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
             guard case .failed = stage else { continue }
             do {
                 try meeting.clearFailure()
-                enqueue(meeting)
+                enqueue(.process(meeting))
             } catch {
                 NSLog("Ku-Ka: could not clear the failure of \(meeting.name): \(error)")
             }
         }
-        reloadFailedMeetingsFromDisk()
+        reloadFromDisk()
+    }
+
+    func updateNotes(_ meeting: MeetingFolder) {
+        enqueue(.updateNotes(meeting))
+    }
+
+    @objc private func checkWordsClicked() {
+        onCheckWords?(nil)
     }
 
     @objc private func openFolderClicked() {
@@ -228,9 +186,9 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
         openURL(root)
     }
 
-    private func enqueue(_ meeting: MeetingFolder) {
-        guard !queue.contains(meeting), current?.meeting != meeting else { return }
-        queue.append(meeting)
+    private func enqueue(_ job: Job) {
+        guard !queue.contains(job), current?.job != job else { return }
+        queue.append(job)
         updateMenu()
         guard processingTask == nil else { return }
         processingTask = Task { [weak self] in await self?.processQueue() }
@@ -238,71 +196,114 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
 
     private func processQueue() async {
         while !queue.isEmpty, !Task.isCancelled {
-            let meeting = queue.removeFirst()
-            let outcome = await processor.process(meeting, onStep: { [weak self] step in
-                self?.current = (meeting, step.progressVerb)
-                self?.updateMenu()
-            }, onDownload: { [weak self] in
-                self?.current = (meeting, "Downloading speech model")
-                self?.updateMenu()
-            })
-            current = nil
-            report(outcome, for: meeting)
+            let job = queue.removeFirst()
+            switch job {
+            case .process(let meeting):
+                let outcome = await processor.process(meeting) { [weak self] progress in
+                    self?.current = (job, progress.title)
+                    self?.updateMenu()
+                }
+                current = nil
+                report(outcome, for: meeting)
+            case .updateNotes(let meeting):
+                current = (job, "Updating notes")
+                updateMenu()
+                let outcome = await processor.updateNotes(meeting)
+                current = nil
+                report(outcome, for: meeting)
+            }
         }
         processingTask = nil
         updateMenu()
-        reloadFailedMeetingsFromDisk()
+        reloadFromDisk()
     }
 
     private func report(_ outcome: MeetingOutcome, for meeting: MeetingFolder) {
         // The tool output stays in error.md; a notification is too short for it.
         switch outcome {
         case .done(let summary):
-            notifier.post(title: "Meeting Notes Ready", body: "\(meeting.title). Click to open the summary.", opening: summary)
+            switch wordsToCheck(meeting) {
+            case 0:
+                notifier.post(title: "Meeting Notes Ready", body: "\(meeting.title). Click to open the summary.", onClick: .open(summary))
+            case let open:
+                notifier.post(title: "Meeting Notes Ready",
+                              body: "\(meeting.title). \(Self.wordCount(open)). Click to check them.",
+                              onClick: .checkWords(meeting))
+            }
         case .failed(.transcribe, _):
             notifier.post(title: MeetingStep.transcribe.failureHeading,
                           body: "\(meeting.title). Choose Retry Failed Meeting in the Ku-Ka menu to try again. Click to see what went wrong.",
-                          opening: meeting.url(for: .failure))
+                          onClick: .open(meeting.url(for: .failure)))
         case .failed(.summarize, _):
             notifier.post(title: MeetingStep.summarize.failureHeading,
                           body: "The transcript of \(meeting.title) is ready. Choose Retry Failed Meeting in the Ku-Ka menu to try the summary again. Click to see what went wrong.",
-                          opening: meeting.url(for: .failure))
+                          onClick: .open(meeting.url(for: .failure)))
         case .noSpeech:
             notifier.post(title: "No Speech Detected",
                           body: "\(meeting.title). The audio is in the meeting folder. Click to open it.",
-                          opening: meeting.url)
+                          onClick: .open(meeting.url))
         case .cancelled, .busy, .gone:
             break
         }
     }
 
-    private func updateMenu() {
-        switch recorder {
-        case .idle:
-            statusLineItem.isHidden = true
-        case .starting:
-            statusLineItem.title = "Starting Recording"
-            statusLineItem.isHidden = false
-        case .recording(_, let since, _, _):
-            statusLineItem.title = "● Recording · \(Self.formatElapsed(now().timeIntervalSince(since)))"
-            statusLineItem.isHidden = false
+    /// The review window said that a notification follows, so every outcome but a quit posts one.
+    private func report(_ outcome: NotesUpdateOutcome, for meeting: MeetingFolder) {
+        switch outcome {
+        case .updated(let summary):
+            notifier.post(title: "Notes Updated", body: "\(meeting.title). Click to open the summary.", onClick: .open(summary))
+        case .summaryToolFailed(let message):
+            NSLog("Ku-Ka: could not update the notes of %@: %@", meeting.name, message)
+            notifier.post(title: "Notes Not Updated",
+                          body: "\(meeting.title). The summary tool did not answer, so the summary did not change. The transcript has your answers.",
+                          onClick: .open(meeting.url(for: .summary)))
+        case .failed(let message):
+            NSLog("Ku-Ka: could not update the notes of %@: %@", meeting.name, message)
+            notifier.post(title: "Notes Not Updated",
+                          body: "\(meeting.title). Ku-Ka could not update the notes, so the summary did not change.",
+                          onClick: .open(meeting.url(for: .summary)))
+        case .busy:
+            notifier.post(title: "Notes Not Updated",
+                          body: "\(meeting.title). The meeting folder was in use, for example by another Ku-Ka, so the notes did not change. Click to open Check Words and choose Update Notes again.",
+                          onClick: .checkWords(meeting))
+        case .notReady:
+            notifier.post(title: "Notes Not Updated",
+                          body: "\(meeting.title). The meeting is not finished, or its folder was moved or deleted, so the notes did not change.",
+                          onClick: nil)
+        case .cancelled:
+            break
         }
-        recordItem.title = isRecording ? "Stop Recording Meeting" : "Start Recording Meeting"
-        meterItem.isHidden = !isRecording
+    }
+
+    private var statusLine: String? {
+        guard recorder.phase != .starting else { return "Starting Recording" }
+        guard let recorded = recorder.recordedTime.map(RecordedTime.format) else { return nil }
+        return recorder.phase == .paused ? "Paused · \(recorded)" : "● Recording · \(recorded)"
+    }
+
+    private func updateMenu() {
+        let phase = recorder.phase
+        let statusLine = statusLine
+        statusLineItem.isHidden = statusLine == nil
+        if let statusLine { statusLineItem.title = statusLine }
+        recordItem.title = phase.isCapturing ? "Stop Recording Meeting" : "Start Recording Meeting"
+        pauseItem.title = phase == .paused ? "Resume Recording" : "Pause Recording"
+        for item in [pauseItem, showControlsItem, restorePositionItem, meterItem] { item.isHidden = !phase.isCapturing }
         reconcileMeterTimer()
         progressItem.isHidden = current == nil
         waitingItem.isHidden = current == nil || queue.isEmpty
         if let current {
-            progressItem.title = "\(current.activity): \(current.meeting.title)"
+            progressItem.title = "\(current.activity): \(current.job.meeting.title)"
             waitingItem.title = queue.count == 1 ? "1 more meeting waiting" : "\(queue.count) more meetings waiting"
         }
     }
 
     private func reconcileMeterTimer() {
-        guard menuIsOpen, isRecording else {
+        let phase = recorder.phase
+        guard menuIsOpen, phase.isCapturing else {
             meterTimer?.invalidate()
             meterTimer = nil
-            if !isRecording { meterView.show(.silent) }
+            if !phase.isCapturing { meterView.show(.silent) }
             return
         }
         refreshMeters()
@@ -315,35 +316,24 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
     }
 
     private func refreshMeters() {
-        guard menuIsOpen, case .recording(_, _, let handle, _) = recorder else { return }
-        meterView.show(handle.audioLevels())
+        guard menuIsOpen, let levels = recorder.audioLevels() else { return }
+        meterView.show(levels)
     }
 
-    private func reloadFailedMeetingsFromDisk() {
+    /// Other processes can change failures and word reviews on disk.
+    private func reloadFromDisk() {
         let failed = MeetingFolder.all(in: root()).filter {
             if case .failed = $0.1 { return true }
             return false
         }
         retryItem.isHidden = failed.isEmpty
         retryItem.title = failed.count == 1 ? "Retry Failed Meeting" : "Retry \(failed.count) Failed Meetings"
+        let open = wordsToCheck(nil)
+        checkWordsItem.isHidden = open == 0
+        checkWordsItem.title = "Check Words (\(open))…"
     }
 
-    static func formatElapsed(_ interval: TimeInterval) -> String {
-        let seconds = Int(max(0, interval))
-        let hours = seconds / 3600
-        let minutes = seconds / 60 % 60
-        return hours > 0
-            ? String(format: "%d:%02d:%02d", hours, minutes, seconds % 60)
-            : String(format: "%d:%02d", minutes, seconds % 60)
-    }
-
-    static func showStartFailureAlert(reason: String, offersPermissions: Bool) -> Bool {
-        let alert = NSAlert()
-        alert.messageText = "Recording Did Not Start"
-        alert.informativeText = reason
-        alert.addButton(withTitle: offersPermissions ? "Open Permissions" : "OK")
-        if offersPermissions { alert.addButton(withTitle: "Cancel") }
-        NSApp.activate()
-        return offersPermissions && alert.runModal() == .alertFirstButtonReturn
+    private static func wordCount(_ count: Int) -> String {
+        count == 1 ? "1 word to check" : "\(count) words to check"
     }
 }

@@ -4,19 +4,21 @@ import XCTest
 @testable import KuKa
 
 final class WhisperKitTranscriberTests: XCTestCase {
-    private struct TestError: LocalizedError {
-        let errorDescription: String?
-    }
-
     private let english = Locale(identifier: "en-US")
     private var root: URL!
     private var client: FakeWhisperKitClient!
     private var sut: WhisperKitTranscriber!
+    private var downloadsReported = 0
 
     override func setUp() async throws {
         root = try makeTemporaryDirectory().appendingPathComponent("whisper-models", isDirectory: true)
         client = FakeWhisperKitClient()
         sut = WhisperKitTranscriber(client: client, modelsFolder: root)
+        downloadsReported = 0
+    }
+
+    private func download() async throws {
+        try await sut.download(for: english, onStart: { self.downloadsReported += 1 })
     }
 
     private func errorMessage(_ work: () async throws -> Void) async -> String? {
@@ -96,10 +98,11 @@ final class WhisperKitTranscriberTests: XCTestCase {
     func testADownloadInstallsTheModelOnlyWhenItIsComplete() async throws {
         let neededBefore = try await sut.needsDownload(for: english)
 
-        try await sut.download(for: english)
+        try await download()
 
         let neededAfter = try await sut.needsDownload(for: english)
         XCTAssertEqual([neededBefore, neededAfter], [true, false])
+        XCTAssertEqual(downloadsReported, 1)
         XCTAssertEqual(client.downloads, [root.path + "/.large-v3-v20240930_turbo.partial"])
         XCTAssertEqual(try folderContents(), [".lock", "large-v3-v20240930_turbo"])
         XCTAssertEqual(try String(contentsOf: root.appendingPathComponent("large-v3-v20240930_turbo/model.bin"), encoding: .utf8),
@@ -109,7 +112,7 @@ final class WhisperKitTranscriberTests: XCTestCase {
     func testAFailedDownloadKeepsThePartialFolderAndTheNextDownloadResumesThere() async throws {
         client.downloadError = TestError(errorDescription: "The network connection was lost.")
 
-        let message = await errorMessage { try await sut.download(for: english) }
+        let message = await errorMessage { try await download() }
 
         XCTAssertEqual(message, "The network connection was lost.")
         XCTAssertEqual(try folderContents(), [".large-v3-v20240930_turbo.partial", ".lock"])
@@ -117,7 +120,7 @@ final class WhisperKitTranscriberTests: XCTestCase {
         XCTAssertTrue(stillNeeded)
 
         client.downloadError = nil
-        try await sut.download(for: english)
+        try await download()
 
         XCTAssertEqual(client.downloads, [root.path + "/.large-v3-v20240930_turbo.partial",
                                           root.path + "/.large-v3-v20240930_turbo.partial"])
@@ -127,7 +130,7 @@ final class WhisperKitTranscriberTests: XCTestCase {
     func testAnUnsupportedLanguageThrowsWhetherOrNotTheModelIsInstalled() async throws {
         let esperanto = Locale(identifier: "eo")
         let beforeInstall = await errorMessage { _ = try await sut.needsDownload(for: esperanto) }
-        try await sut.download(for: english)
+        try await download()
 
         let afterInstall = await errorMessage { _ = try await sut.needsDownload(for: esperanto) }
 
@@ -138,15 +141,16 @@ final class WhisperKitTranscriberTests: XCTestCase {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         let otherKuKa = try FileLock.acquire(at: root.appendingPathComponent(".lock"))
 
-        let message = await errorMessage { try await sut.download(for: english) }
+        let message = await errorMessage { try await download() }
 
         XCTAssertEqual(message, "Another Ku-Ka is downloading the Whisper model.")
+        XCTAssertEqual(downloadsReported, 0)
         XCTAssertEqual(client.downloads, [])
         otherKuKa.release()
     }
 
     func testTheModelCacheIsExcludedFromBackupsWhenDownloadedOrLoaded() async throws {
-        try await sut.download(for: english)
+        try await download()
         XCTAssertEqual(try root.resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup, true)
 
         var folder = try XCTUnwrap(root)
@@ -160,7 +164,7 @@ final class WhisperKitTranscriberTests: XCTestCase {
     }
 
     func testTheSessionTranscribesInWhispersLanguageCode() async throws {
-        try await sut.download(for: english)
+        try await download()
         client.segments = [TranscriptionSegment(start: 0.5, end: 1.25, text: " Hyvää huomenta"),
                            TranscriptionSegment(start: 1.5, end: 1.75, text: " .")]
         let audio = try makeAudioFile(named: "them.caf", seconds: 2)
@@ -175,7 +179,7 @@ final class WhisperKitTranscriberTests: XCTestCase {
     }
 
     func testATranscriptionErrorNamesTheTrack() async throws {
-        try await sut.download(for: english)
+        try await download()
         client.transcribeError = TestError(errorDescription: "Out of memory.")
         let audio = try makeAudioFile(named: "me.caf", seconds: 1)
         let session = try await sut.load(for: english)
@@ -186,7 +190,7 @@ final class WhisperKitTranscriberTests: XCTestCase {
     }
 
     func testAnEmptyTrackIsNotSentToTheModel() async throws {
-        try await sut.download(for: english)
+        try await download()
         client.segments = [TranscriptionSegment(start: 0, end: 1, text: " Hello")]
         let audio = try makeAudioFile(named: "me.caf", seconds: 0)
         let session = try await sut.load(for: english)

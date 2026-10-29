@@ -4,8 +4,10 @@ import ScreenCaptureKit
 import os
 
 protocol MeetingAudioCapturing {
+    /// The caller reads the host clock just before this call to set the recording's origin.
+    /// A buffer can start before the origin; `RecordingClock` clips those frames.
     @MainActor
-    func start(into meeting: MeetingFolder,
+    func start(into meeting: MeetingFolder, clock: RecordingClock,
                onInterrupted: @escaping @MainActor (_ reason: String) -> Void) async throws -> ActiveRecording
 }
 
@@ -14,13 +16,21 @@ protocol ActiveRecording: AnyObject {
     /// end before `start` returns, while the caller cannot yet match the
     /// callback to this recording, so the caller checks this afterwards.
     var endReason: String? { get }
+    /// Converted buffers with file positions, for the live view. Omits inserted silence and
+    /// converter drain output. Bounded and lossy (see `LiveAudioFeed`), with one reader per
+    /// stream. Finishes when the recording stops or is interrupted.
+    var writtenAudio: [MeetingTrack: AsyncStream<WrittenAudio>] { get }
     @MainActor func audioLevels() -> RecordingAudioLevels
+    /// Every buffer the sample queue takes after this call is cut by `clock`. The caller reads
+    /// the click time and calls this in one main-actor step. A buffer reaches the queue only
+    /// after its audio was captured, so no buffer already written holds audio from after it.
+    @MainActor func apply(_ clock: RecordingClock)
     func stop()
 }
 
 final class ScreenCaptureMeetingAudio: MeetingAudioCapturing {
     @MainActor
-    func start(into meeting: MeetingFolder,
+    func start(into meeting: MeetingFolder, clock: RecordingClock,
                onInterrupted: @escaping @MainActor (String) -> Void) async throws -> ActiveRecording {
         let content: SCShareableContent
         do {
@@ -45,7 +55,7 @@ final class ScreenCaptureMeetingAudio: MeetingAudioCapturing {
         config.height = 2
         config.minimumFrameInterval = CMTime(value: 1, timescale: 1)
 
-        let recording = try ScreenCaptureRecording(meeting: meeting, onInterrupted: onInterrupted)
+        let recording = try ScreenCaptureRecording(meeting: meeting, clock: clock, onInterrupted: onInterrupted)
         let stream = SCStream(filter: filter, configuration: config, delegate: recording)
         do {
             for type in [SCStreamOutputType.audio, .microphone] {
@@ -86,17 +96,29 @@ extension MeetingTrack {
 }
 
 final class ScreenCaptureRecording:NSObject, ActiveRecording, SCStreamOutput, SCStreamDelegate {
+    /// Where the recording's first buffer, of either track, may start, in seconds after the
+    /// clock's origin. The origin is read just before the capture starts, so a first buffer
+    /// outside this range means the presentation times are not on the host clock, and padding
+    /// to them would write the wrong amount of silence. The other track's first buffer is not
+    /// checked: ScreenCaptureKit can send no system audio while the Mac is silent, as in a
+    /// waiting room, so it can come much later.
+    private static let firstBufferOffsets: ClosedRange<TimeInterval> = -1...60
+
     let queue = DispatchQueue(label: "ku-ka.meeting-audio")
     var stream: SCStream?
     private(set) var endReason: String?
     private let onInterrupted: @MainActor (String) -> Void
     private let writers: [MeetingTrack: AudioTrackWriter]
-    /// Presentation time of the first buffer of any track. Both outputs use
-    /// the host clock (measured), so both writers measure from it and the
-    /// tracks share one timeline.
-    private var timelineStart: CMTime?
+    private let feeds: [MeetingTrack: LiveAudioFeed]
+    /// The latest clock from the controller. Both outputs stamp buffers on the host clock
+    /// (measured), so one clock cuts both tracks on one timeline. The queue copies it once
+    /// per buffer and never changes it.
+    private let clock: OSAllocatedUnfairLock<RecordingClock>
+    private var startedTracks: Set<MeetingTrack> = []
     private var isClosed = false
     private let meter = OSAllocatedUnfairLock(initialState: RecordingAudioMeter())
+
+    var writtenAudio: [MeetingTrack: AsyncStream<WrittenAudio>] { feeds.mapValues(\.audio) }
 
     @MainActor
     func audioLevels() -> RecordingAudioLevels {
@@ -104,23 +126,42 @@ final class ScreenCaptureRecording:NSObject, ActiveRecording, SCStreamOutput, SC
         return snapshot.levels(at: ProcessInfo.processInfo.systemUptime)
     }
 
-    init(meeting: MeetingFolder, onInterrupted: @escaping @MainActor (String) -> Void) throws {
+    @MainActor
+    func apply(_ clock: RecordingClock) {
+        self.clock.withLock {
+            assert($0.origin == clock.origin, "A clock only gains boundaries; its origin never changes.")
+            $0 = clock
+        }
+    }
+
+    init(meeting: MeetingFolder, clock: RecordingClock, onInterrupted: @escaping @MainActor (String) -> Void) throws {
         self.onInterrupted = onInterrupted
         var writers: [MeetingTrack: AudioTrackWriter] = [:]
         for track in MeetingTrack.allCases {
             writers[track] = try AudioTrackWriter(url: meeting.audioURL(track))
         }
         self.writers = writers
+        feeds = Dictionary(uniqueKeysWithValues: MeetingTrack.allCases.map { ($0, LiveAudioFeed()) })
+        self.clock = OSAllocatedUnfairLock(initialState: clock)
     }
 
     func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of type: SCStreamOutputType) {
         guard !isClosed, let track = MeetingTrack(type), sampleBuffer.isValid else { return }
-        let start = timelineStart ?? sampleBuffer.presentationTimeStamp
-        timelineStart = start
+        let clock = self.clock.withLock { $0 }
+        let isRecordingStart = startedTracks.isEmpty
+        if startedTracks.insert(track).inserted {
+            let offset = HostTime(sampleBuffer.presentationTimeStamp) - clock.origin
+            NSLog("Ku-Ka: first %@ buffer starts %.3f s after the clock origin", "\(track)", offset)
+            guard !isRecordingStart || Self.firstBufferOffsets.contains(offset) else {
+                interrupt(reason: "Ku-Ka could not match the audio clock (offset \(Int(offset.rounded())) s).")
+                return
+            }
+        }
         do {
-            if let rms = try writers[track]?.append(sampleBuffer, timelineStart: start) {
+            for audio in try writers[track]?.append(sampleBuffer, clock: clock) ?? [] {
                 let receivedAt = ProcessInfo.processInfo.systemUptime
-                meter.withLock { $0.record(rms: rms, for: track, at: receivedAt) }
+                meter.withLock { $0.record(rms: audio.rms, for: track, at: receivedAt) }
+                feeds[track]?.offer(audio)
             }
         } catch {
             interrupt(reason: "Ku-Ka could not write the audio file (\(error.localizedDescription)).")
@@ -152,12 +193,47 @@ final class ScreenCaptureRecording:NSObject, ActiveRecording, SCStreamOutput, SC
         guard !isClosed else { return }
         isClosed = true
         for writer in writers.values { writer.close() }
+        for feed in feeds.values { feed.finish() }
         meter.withLock { $0 = RecordingAudioMeter() }
     }
 
     private func stopStream() {
         stream?.stopCapture { _ in }
         stream = nil
+    }
+}
+
+/// One converted buffer, exactly as it went into a track's file: 16 kHz mono Int16.
+/// `@unchecked Sendable`: the writer makes a new output buffer for each conversion and never
+/// touches it after returning it.
+struct WrittenAudio: @unchecked Sendable {
+    let buffer: AVAudioPCMBuffer
+    /// File position, in seconds, of the first frame.
+    let filePosition: TimeInterval
+    let rms: Double
+}
+
+/// The hand-off from the sample queue to one live analyzer. When `capacity` buffers wait, the
+/// oldest is dropped, so `offer` never waits and a slow analyzer cannot slow the recording.
+/// The analyzer sees the hole through the next buffer's file position.
+final class LiveAudioFeed: Sendable {
+    /// About 5 s of ScreenCaptureKit's roughly 20 ms buffers.
+    static let capacity = 256
+
+    let audio: AsyncStream<WrittenAudio>
+    private let continuation: AsyncStream<WrittenAudio>.Continuation
+
+    init(capacity: Int = LiveAudioFeed.capacity) {
+        (audio, continuation) = AsyncStream.makeStream(of: WrittenAudio.self,
+                                                       bufferingPolicy: .bufferingNewest(capacity))
+    }
+
+    func offer(_ audio: WrittenAudio) {
+        continuation.yield(audio)
+    }
+
+    func finish() {
+        continuation.finish()
     }
 }
 
@@ -173,36 +249,59 @@ final class AudioTrackWriter {
     /// microphone's format depends on the device (24 kHz for AirPods, 48 kHz
     /// built in), and the device can change in the middle of a call.
     private var converter: AVAudioConverter?
+    /// The run the converter last took input for. Nil after a drain.
+    private var openRun: Int?
 
     init(url: URL) throws {
         file = try AVAudioFile(forWriting: url, settings: Self.fileFormat.settings,
                                commonFormat: .pcmFormatInt16, interleaved: true)
     }
 
-    @discardableResult
-    func append(_ sampleBuffer: CMSampleBuffer, timelineStart: CMTime) throws -> Double? {
-        let frames = AVAudioFrameCount(sampleBuffer.numSamples)
-        guard frames > 0 else { return nil }
+    /// Writes the frames of `sampleBuffer` that `clock` keeps, each at its file position, and
+    /// pads gaps with silence, so each resume leaves the clock's gap. Returns each converted
+    /// buffer it wrote; a buffer inside a pause returns none.
+    func append(_ sampleBuffer: CMSampleBuffer, clock: RecordingClock) throws -> [WrittenAudio] {
+        let frameCount = sampleBuffer.numSamples
+        guard frameCount > 0 else { return [] }
         guard var description = sampleBuffer.formatDescription?.audioStreamBasicDescription,
-              let inputFormat = AVAudioFormat(streamDescription: &description),
-              let input = AVAudioPCMBuffer(pcmFormat: inputFormat, frameCapacity: frames) else {
+              let inputFormat = AVAudioFormat(streamDescription: &description) else {
             throw MeetingCaptureError.unsupportedAudioFormat
         }
-        input.frameLength = frames
-        let status = CMSampleBufferCopyPCMDataIntoAudioBufferList(
-            sampleBuffer, at: 0, frameCount: Int32(frames), into: input.mutableAudioBufferList)
-        guard status == noErr else { throw NSError(domain: NSOSStatusErrorDomain, code: Int(status)) }
+        let cut = clock.cut(start: HostTime(sampleBuffer.presentationTimeStamp), frameCount: frameCount,
+                            sampleRate: inputFormat.sampleRate)
+        var written: [WrittenAudio] = []
+        for piece in cut.pieces {
+            if let openRun, openRun != piece.run { try drain() }
+            let input = try copy(piece.frames, of: sampleBuffer, format: inputFormat)
+            try writeSilence(frames: AudioTimeline.silenceFrames(
+                written: file.framePosition, bufferStart: piece.filePosition, sampleRate: Self.fileFormat.sampleRate))
+            if let audio = try convertAndWrite(input) { written.append(audio) }
+            openRun = piece.run
+        }
+        if cut.endsInPause, openRun != nil { try drain() }
+        return written
+    }
 
-        if converter?.inputFormat != inputFormat {
-            converter = AVAudioConverter(from: inputFormat, to: Self.fileFormat)
+    private func copy(_ frames: Range<Int>, of sampleBuffer: CMSampleBuffer,
+                      format: AVAudioFormat) throws -> AVAudioPCMBuffer {
+        guard let input = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(frames.count)) else {
+            throw MeetingCaptureError.unsupportedAudioFormat
+        }
+        input.frameLength = AVAudioFrameCount(frames.count)
+        let status = CMSampleBufferCopyPCMDataIntoAudioBufferList(
+            sampleBuffer, at: Int32(frames.lowerBound), frameCount: Int32(frames.count), into: input.mutableAudioBufferList)
+        guard status == noErr else { throw NSError(domain: NSOSStatusErrorDomain, code: Int(status)) }
+        return input
+    }
+
+    private func convertAndWrite(_ input: AVAudioPCMBuffer) throws -> WrittenAudio? {
+        if converter?.inputFormat != input.format {
+            converter = AVAudioConverter(from: input.format, to: Self.fileFormat)
         }
         guard let converter else { throw MeetingCaptureError.unsupportedAudioFormat }
 
-        let bufferStart = CMTimeSubtract(sampleBuffer.presentationTimeStamp, timelineStart).seconds
-        try writeSilence(frames: AudioTimeline.silenceFrames(
-            written: file.framePosition, bufferStart: bufferStart, sampleRate: Self.fileFormat.sampleRate))
-
-        let capacity = AVAudioFrameCount((Double(frames) * Self.fileFormat.sampleRate / inputFormat.sampleRate).rounded(.up)) + 1
+        let capacity = AVAudioFrameCount((Double(input.frameLength) * Self.fileFormat.sampleRate
+                                          / input.format.sampleRate).rounded(.up)) + 1
         guard let output = AVAudioPCMBuffer(pcmFormat: Self.fileFormat, frameCapacity: capacity) else {
             throw MeetingCaptureError.unsupportedAudioFormat
         }
@@ -221,8 +320,37 @@ final class AudioTrackWriter {
         }
         if result == .error { throw conversionError ?? NSError(domain: NSOSStatusErrorDomain, code: -1) }
         guard output.frameLength > 0 else { return nil }
+        let position = Double(file.framePosition) / Self.fileFormat.sampleRate
         try file.write(from: output)
-        let samples = UnsafeBufferPointer(start: output.int16ChannelData![0], count: Int(output.frameLength))
+        return WrittenAudio(buffer: output, filePosition: position, rms: Self.rms(of: output))
+    }
+
+    /// Writes the frames the converter still holds back (6 at 48 kHz, measured) and resets
+    /// it, so no pre-pause frame comes out after the resume gap. The drained frames go to the
+    /// file only, not into a `WrittenAudio`.
+    private func drain() throws {
+        openRun = nil
+        guard let converter else { return }
+        defer { converter.reset() }
+        // `convert` reports .endOfStream only on a call that returns no frames.
+        var status = AVAudioConverterOutputStatus.haveData
+        while status == .haveData {
+            guard let output = AVAudioPCMBuffer(pcmFormat: Self.fileFormat, frameCapacity: 1_024) else {
+                throw MeetingCaptureError.unsupportedAudioFormat
+            }
+            var conversionError: NSError?
+            status = converter.convert(to: output, error: &conversionError) { _, inputStatus in
+                inputStatus.pointee = .endOfStream
+                return nil
+            }
+            if status == .error { throw conversionError ?? NSError(domain: NSOSStatusErrorDomain, code: -1) }
+            guard output.frameLength > 0 else { break }
+            try file.write(from: output)
+        }
+    }
+
+    private static func rms(of buffer: AVAudioPCMBuffer) -> Double {
+        let samples = UnsafeBufferPointer(start: buffer.int16ChannelData![0], count: Int(buffer.frameLength))
         let squares = samples.reduce(0.0) { sum, sample in
             let normalized = Double(sample) / 32_768
             return sum + normalized * normalized

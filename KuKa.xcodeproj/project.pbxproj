@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		C30000011 /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = C30000010 /* WhisperKit */; };
+		C30000013 /* SpeakerKit in Frameworks */ = {isa = PBXBuildFile; productRef = C30000012 /* SpeakerKit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -44,6 +45,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				C30000011 /* WhisperKit in Frameworks */,
+				C30000013 /* SpeakerKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -96,6 +98,7 @@
 			name = KuKa;
 			packageProductDependencies = (
 				C30000010 /* WhisperKit */,
+				C30000012 /* SpeakerKit */,
 			);
 			productName = KuKa;
 			productReference = A10000010 /* KuKa.app */;
@@ -337,6 +340,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = C30000001 /* XCRemoteSwiftPackageReference "argmax-oss-swift" */;
 			productName = WhisperKit;
+		};
+		C30000012 /* SpeakerKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C30000001 /* XCRemoteSwiftPackageReference "argmax-oss-swift" */;
+			productName = SpeakerKit;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

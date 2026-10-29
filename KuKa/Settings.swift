@@ -1,7 +1,6 @@
 import Cocoa
 import ServiceManagement
 
-/// Test seam for the login-item registration KuKa can't exercise in tests.
 protocol LoginItemManaging {
     var isEnabled: Bool { get }
     func setEnabled(_ enabled: Bool) throws
@@ -19,7 +18,6 @@ struct SystemLoginItem: LoginItemManaging {
     }
 }
 
-/// Typed access to user preferences: every key and default defined once.
 final class Settings {
     private let defaults: UserDefaults
     private let loginItem: LoginItemManaging
@@ -55,12 +53,43 @@ final class Settings {
         return URL(fileURLWithPath: (path as NSString).expandingTildeInPath, isDirectory: true)
     }
 
+    /// The known-words list, set with `defaults write com.kuka.screenshot knownWordsFile <path>`
+    /// to use a list the user already keeps. Defaults to known-words.md in the meetings folder.
+    var knownWordsFile: URL {
+        guard let path = defaults.string(forKey: "knownWordsFile"), !path.isEmpty else {
+            return meetingsFolder.appendingPathComponent("known-words.md")
+        }
+        return URL(fileURLWithPath: (path as NSString).expandingTildeInPath)
+    }
+
     /// A BCP 47 tag such as "de-DE", set with `defaults write`.
     var meetingLocale: Locale {
         guard let tag = defaults.string(forKey: "meetingLocale"), !tag.isEmpty else {
             return Locale(identifier: "en-US")
         }
         return Locale(identifier: tag)
+    }
+
+    /// The meeting pill's top-right corner in global NS coordinates, stored as [x, y]. Nil
+    /// means the default corner.
+    var meetingControlsTopRight: CGPoint? {
+        get {
+            guard let xy = defaults.array(forKey: "meetingControlsTopRight") as? [Double], xy.count == 2 else { return nil }
+            return CGPoint(x: xy[0], y: xy[1])
+        }
+        set {
+            if let newValue {
+                defaults.set([Double(newValue.x), Double(newValue.y)], forKey: "meetingControlsTopRight")
+            } else {
+                defaults.removeObject(forKey: "meetingControlsTopRight")
+            }
+        }
+    }
+
+    /// The live transcript drawer's height in points.
+    var meetingTranscriptHeight: Double {
+        get { defaults.object(forKey: "meetingTranscriptHeight") as? Double ?? Double(MeetingPanelPlacement.defaultDrawerHeight) }
+        set { defaults.set(newValue, forKey: "meetingTranscriptHeight") }
     }
 
     var didShowScreenshotShortcutSetup: Bool {

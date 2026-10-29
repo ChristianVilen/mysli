@@ -1,7 +1,6 @@
 import XCTest
+import os
 @testable import KuKa
-
-// MARK: - Mock FileManager
 
 class MockFileManager: FileManaging {
     var homeDirectoryForCurrentUser: URL = URL(fileURLWithPath: "/tmp/kuka-test")
@@ -26,8 +25,6 @@ class MockFileManager: FileManaging {
     }
 }
 
-// MARK: - Mock Clipboard
-
 class MockClipboard: ClipboardManaging {
     var copiedCount = 0
     var clearedCount = 0
@@ -44,8 +41,6 @@ class MockClipboard: ClipboardManaging {
         clearedCount += 1
     }
 }
-
-// MARK: - Mock Screen Capture
 
 class MockScreenCapture: ScreenCapturing {
     var imageToReturn: CGImage?
@@ -74,8 +69,6 @@ class MockScreenCapture: ScreenCapturing {
     }
 }
 
-// MARK: - Mock WindowListProvider
-
 class MockWindowListProvider: WindowListProvider {
     var windows: [WindowInfo] = []
 
@@ -83,8 +76,6 @@ class MockWindowListProvider: WindowListProvider {
         windows
     }
 }
-
-// MARK: - Mock WindowControlling (window tiling)
 
 @MainActor
 class MockWindowControlling: WindowControlling {
@@ -105,13 +96,9 @@ class MockWindowControlling: WindowControlling {
     }
 }
 
-// MARK: - Mock StageManagerDetecting
-
 class MockStageManagerDetecting: StageManagerDetecting {
     var isStageManagerEnabled: Bool = false
 }
-
-// MARK: - Fake Sleep Preventer
 
 class FakeSleepPreventer: SleepPreventing {
     private(set) var beginCount = 0
@@ -142,8 +129,6 @@ class FakeSleepPreventer: SleepPreventing {
     }
 }
 
-// MARK: - Fake ImageStore
-
 class FakeImageStore: ImageStoring {
     private(set) var storedImages: [CGImage] = []
     private(set) var combinedCalls: [(top: NSImage, bottom: NSImage)] = []
@@ -171,8 +156,6 @@ class FakeImageStore: ImageStoring {
     }
 }
 
-// MARK: - Fake LoginItem
-
 class FakeLoginItem: LoginItemManaging {
     var isEnabled = false
     var errorToThrow: Error?
@@ -185,14 +168,10 @@ class FakeLoginItem: LoginItemManaging {
     }
 }
 
-// MARK: - Fake Screens
-
 struct FakeScreens: Screens {
     var all: [ScreenGeometry] = []
     var mainIndex: Int?
 }
-
-// MARK: - Fake Pasteboard
 
 class FakePasteboard: PasteboardReading, PasteboardWriting {
     var changeCount = 0
@@ -228,8 +207,6 @@ class FakePasteboard: PasteboardReading, PasteboardWriting {
     }
 }
 
-// MARK: - Fake Keystroke Sender
-
 class FakeKeystrokeSender: KeystrokeSending {
     private(set) var sendCount = 0
 
@@ -239,15 +216,26 @@ class FakeKeystrokeSender: KeystrokeSending {
 }
 
 class FakeNotifier: Notifying {
+    struct Posted {
+        let title: String
+        let body: String
+        let click: NotificationClick?
+
+        var url: URL? {
+            guard case .open(let url)? = click else { return nil }
+            return url
+        }
+    }
+
     private(set) var permissionRequests = 0
-    private(set) var posted: [(title: String, body: String, url: URL?)] = []
+    private(set) var posted: [Posted] = []
 
     func requestPermission() {
         permissionRequests += 1
     }
 
-    func post(title: String, body: String, opening url: URL?) {
-        posted.append((title, body, url))
+    func post(title: String, body: String, onClick click: NotificationClick?) {
+        posted.append(Posted(title: title, body: body, click: click))
     }
 }
 
@@ -255,12 +243,23 @@ class FakeActiveRecording: ActiveRecording {
     var endReason: String?
     var levels = RecordingAudioLevels.silent
     private(set) var stopCount = 0
+    private(set) var appliedClocks: [RecordingClock] = []
+    /// Real feeds: a test offers audio to them, and `stop()` finishes them.
+    let feeds = Dictionary(uniqueKeysWithValues: MeetingTrack.allCases.map { ($0, LiveAudioFeed()) })
+
+    var writtenAudio: [MeetingTrack: AsyncStream<WrittenAudio>] { feeds.mapValues(\.audio) }
 
     @MainActor
     func audioLevels() -> RecordingAudioLevels { levels }
 
+    @MainActor
+    func apply(_ clock: RecordingClock) {
+        appliedClocks.append(clock)
+    }
+
     func stop() {
         stopCount += 1
+        for feed in feeds.values { feed.finish() }
     }
 }
 
@@ -269,11 +268,13 @@ class FakeMeetingAudioCapture: MeetingAudioCapturing {
     /// Ends the capture with this reason before `start` returns.
     var endsWhileStarting: String?
     private(set) var recordings: [FakeActiveRecording] = []
+    private(set) var clocks: [RecordingClock] = []
     private var interruptHandler: (@MainActor (String) -> Void)?
 
     @MainActor
-    func start(into meeting: MeetingFolder,
+    func start(into meeting: MeetingFolder, clock: RecordingClock,
                onInterrupted: @escaping @MainActor (String) -> Void) async throws -> ActiveRecording {
+        clocks.append(clock)
         if let startError { throw startError }
         for track in MeetingTrack.allCases {
             FileManager.default.createFile(atPath: meeting.audioURL(track).path, contents: Data())
@@ -294,10 +295,42 @@ class FakeMeetingAudioCapture: MeetingAudioCapturing {
     }
 }
 
+extension LiveResult {
+    init(track: MeetingTrack, start: TimeInterval, end: TimeInterval, text: String, isFinal: Bool,
+         finalizedThrough: TimeInterval) {
+        self.init(track: track, start: start, end: end, phrases: [TranscriptSegment(start: start, end: end, text: text)],
+                  isFinal: isFinal, finalizedThrough: finalizedThrough)
+    }
+}
+
+class FakeLiveTranscriber: LiveTranscribing {
+    private(set) var starts: [(locale: String, audio: [MeetingTrack: AsyncStream<WrittenAudio>])] = []
+    private var continuation: AsyncStream<LiveUpdate>.Continuation?
+    private let terminated = OSAllocatedUnfairLock(initialState: 0)
+
+    /// Update streams that ended because their reader went away.
+    var terminations: Int { terminated.withLock { $0 } }
+
+    func updates(locale: Locale, audio: [MeetingTrack: AsyncStream<WrittenAudio>]) -> AsyncStream<LiveUpdate> {
+        starts.append((locale.identifier(.bcp47), audio))
+        let (updates, continuation) = AsyncStream.makeStream(of: LiveUpdate.self)
+        continuation.onTermination = { [terminated] _ in terminated.withLock { $0 += 1 } }
+        self.continuation = continuation
+        return updates
+    }
+
+    func send(_ update: LiveUpdate) {
+        continuation?.yield(update)
+    }
+}
+
 class FakeTranscriber: Transcribing {
     let name: String
     var byFileName: [String: Result<TrackTranscript, Error>] = [:]
     var modelIsMissing = false
+    /// False: `download` never calls `onStart`, as when another Ku-Ka holds the download lock.
+    var downloadStarts = true
+    /// A `.download` failure is thrown after `onStart`.
     var failure: (stage: TranscriberFailure.Stage, error: Error)?
     private(set) var downloads: [String] = []
     private(set) var loads: [String] = []
@@ -312,8 +345,9 @@ class FakeTranscriber: Transcribing {
         return modelIsMissing
     }
 
-    func download(for locale: Locale) async throws {
+    func download(for locale: Locale, onStart: @MainActor () -> Void) async throws {
         downloads.append(locale.identifier(.bcp47))
+        if downloadStarts { await onStart() }
         if let failure, failure.stage == .download { throw failure.error }
         modelIsMissing = false
     }
@@ -335,6 +369,34 @@ class FakeTranscriber: Transcribing {
         func transcribe(_ audio: URL) async throws -> TrackTranscript {
             try await transcriber.transcribe(audio)
         }
+    }
+}
+
+class FakeRoomLabeller: RoomLabelling {
+    var result: RoomLabels = .notDiarized
+    var modelIsMissing = false
+    var downloadError: Error?
+    /// `label` cancels the calling task before it returns, as a quit during labelling does.
+    var cancelsItsTask = false
+    var onDownloadEnd: (() -> Void)?
+    var onLabel: (() -> Void)?
+    private(set) var calls: [String] = []
+
+    var needsDownload: Bool { modelIsMissing }
+
+    func download(onStart: @MainActor () -> Void) async throws {
+        calls.append("download")
+        await onStart()
+        defer { onDownloadEnd?() }
+        if let downloadError { throw downloadError }
+        modelIsMissing = false
+    }
+
+    func label(_ microphone: URL) async -> RoomLabels {
+        onLabel?()
+        calls.append("label \(microphone.lastPathComponent)")
+        if cancelsItsTask { withUnsafeCurrentTask { $0?.cancel() } }
+        return result
     }
 }
 

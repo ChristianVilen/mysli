@@ -55,11 +55,52 @@ final class SettingsTests: XCTestCase {
         XCTAssertEqual(sut.meetingsFolder.path, NSHomeDirectory() + "/Notes")
     }
 
+    func testKnownWordsFileDefaultsToKnownWordsMdInTheMeetingsFolderAndFollowsIt() {
+        XCTAssertEqual(sut.knownWordsFile.path, NSHomeDirectory() + "/Meetings/known-words.md")
+
+        defaults.set("~/Notes", forKey: "meetingsFolder")
+        XCTAssertEqual(sut.knownWordsFile.path, NSHomeDirectory() + "/Notes/known-words.md")
+    }
+
+    func testKnownWordsFileReadsThePathSetWithDefaultsWrite() {
+        defaults.set("/Users/test/maps/terms.md", forKey: "knownWordsFile")
+        XCTAssertEqual(sut.knownWordsFile.path, "/Users/test/maps/terms.md")
+
+        defaults.set("~/maps/terms.md", forKey: "knownWordsFile")
+        XCTAssertEqual(sut.knownWordsFile.path, NSHomeDirectory() + "/maps/terms.md")
+    }
+
     func testMeetingLocaleDefaultsToUSEnglishAndReadsTheTagSetWithDefaultsWrite() {
         XCTAssertEqual(sut.meetingLocale.identifier(.bcp47), "en-US")
 
         defaults.set("de-DE", forKey: "meetingLocale")
         XCTAssertEqual(sut.meetingLocale.identifier(.bcp47), "de-DE")
+    }
+
+    func testMeetingControlsTopRightDefaultsToNilAndRoundTrips() {
+        XCTAssertNil(sut.meetingControlsTopRight)
+
+        sut.meetingControlsTopRight = CGPoint(x: 1200.5, y: 840)
+
+        XCTAssertEqual(Settings(defaults: defaults, loginItem: loginItem).meetingControlsTopRight,
+                       CGPoint(x: 1200.5, y: 840))
+    }
+
+    func testMeetingControlsTopRightSetToNilForgetsThePosition() {
+        sut.meetingControlsTopRight = CGPoint(x: 10, y: 20)
+
+        sut.meetingControlsTopRight = nil
+
+        XCTAssertNil(defaults.object(forKey: "meetingControlsTopRight"))
+        XCTAssertNil(sut.meetingControlsTopRight)
+    }
+
+    func testMeetingTranscriptHeightDefaultsTo280AndRoundTrips() {
+        XCTAssertEqual(sut.meetingTranscriptHeight, 280)
+
+        sut.meetingTranscriptHeight = 360
+
+        XCTAssertEqual(Settings(defaults: defaults, loginItem: loginItem).meetingTranscriptHeight, 360)
     }
 
     func testLaunchAtLoginReflectsAndDrivesTheLoginItem() {

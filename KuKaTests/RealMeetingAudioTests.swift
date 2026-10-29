@@ -18,29 +18,42 @@ final class RealMeetingAudioTests: XCTestCase {
         let clock = ContinuousClock()
         var timings: [String] = []
 
-        var start = clock.now
-        if try await transcriber.needsDownload(for: locale) {
-            try await transcriber.download(for: locale)
-            timings.append("download: \(seconds(clock.now - start)) s")
-        } else {
-            timings.append("download: none, the model was installed")
-        }
-        start = clock.now
-        let session = try await transcriber.load(for: locale)
-        timings.append("load: \(seconds(clock.now - start)) s")
         var tracks: [MeetingTrack: TrackTranscript] = [:]
-        for track in [MeetingTrack.system, .microphone] {
+        // A scope of its own, so the Whisper model is released before SpeakerKit loads, as in the app.
+        do {
+            var start = clock.now
+            if try await transcriber.needsDownload(for: locale) {
+                try await transcriber.download(for: locale) {}
+                timings.append("download: \(seconds(clock.now - start)) s")
+            } else {
+                timings.append("download: none, the model was installed")
+            }
             start = clock.now
-            let transcript = try await session.transcribe(audio.appendingPathComponent(track.fileName))
-            let wall = clock.now - start
-            tracks[track] = transcript
-            timings.append("\(track.fileName): audio \(String(format: "%.1f", transcript.duration)) s, wall \(seconds(wall)) s")
+            let session = try await transcriber.load(for: locale)
+            timings.append("load: \(seconds(clock.now - start)) s")
+            for track in [MeetingTrack.system, .microphone] {
+                start = clock.now
+                let transcript = try await session.transcribe(audio.appendingPathComponent(track.fileName))
+                let wall = clock.now - start
+                tracks[track] = transcript
+                timings.append("\(track.fileName): audio \(String(format: "%.1f", transcript.duration)) s, wall \(seconds(wall)) s")
+            }
         }
 
-        let lines = Transcript.merge(tracks)
+        var rooms = RoomLabels.notDiarized
+        if let speakerModelsPath = environment["KUKA_SPEAKER_MODELS"], !speakerModelsPath.isEmpty {
+            let labeller = SpeakerKitRoomLabeller(modelsFolder: URL(fileURLWithPath: speakerModelsPath, isDirectory: true))
+            let downloads = labeller.needsDownload
+            let start = clock.now
+            if downloads { try await labeller.download {} }
+            rooms = await labeller.label(audio.appendingPathComponent(MeetingTrack.microphone.fileName))
+            timings.append("room labels: \(seconds(clock.now - start)) s" + (downloads ? " with a download" : ""))
+        }
+
+        let lines = Transcript.merge(tracks.mapValues(\.segments), rooms: rooms)
         let markdown = Transcript.markdown(lines, title: "Meeting audio in \(audio.lastPathComponent)",
                                            duration: tracks.values.map(\.duration).max() ?? 0,
-                                           by: transcriber.name, after: [])
+                                           by: transcriber.name, after: [], rooms: rooms)
         try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
         try markdown.write(to: output.appendingPathComponent("transcript.md"), atomically: true, encoding: .utf8)
         try (timings.joined(separator: "\n") + "\n").write(to: output.appendingPathComponent("timings.txt"),

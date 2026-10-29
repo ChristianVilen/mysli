@@ -1,9 +1,5 @@
 import Cocoa
 
-/// Owns the "Keep Awake" menu section and drives a `WakeManager`: builds the
-/// inline panel (status line, duration chips, display checkbox) plus the
-/// Turn Off item, reflects session state and the countdown, persists the
-/// display-awake preference, and posts the expiry notification.
 final class KeepAwakeController: NSObject {
     /// Selectable keep-awake durations, in chip order. The chip index is the
     /// only identifier that travels through the panel's callback.
@@ -58,16 +54,11 @@ final class KeepAwakeController: NSObject {
         wakeManager.deactivate()
     }
 
-    /// Starts a keep-awake session. The non-UI activation path; chip clicks
-    /// layer the notification-permission prompt on top of this.
+    /// Does not ask for notification permission; the chip-click path does.
     func activate(_ duration: WakeDuration) {
         wakeManager.activate(duration)
     }
 
-    // MARK: - Menu construction
-
-    /// Appends the full "Keep Awake" section (inline panel, Turn Off, lid
-    /// hint, and a trailing separator) to `menu`.
     func buildMenuSection(into menu: NSMenu) {
         let panelItem = NSMenuItem()
         panelItem.view = panelView
@@ -92,8 +83,6 @@ final class KeepAwakeController: NSObject {
         updateMenu()
     }
 
-    // MARK: - Actions
-
     private func select(_ duration: WakeDuration) {
         // Only timed sessions post an expiry notification, so request
         // permission only for them.
@@ -111,8 +100,6 @@ final class KeepAwakeController: NSObject {
     @objc private func turnOff(_ sender: NSMenuItem) {
         deactivate()
     }
-
-    // MARK: - State
 
     private func handleStateChange() {
         updateMenu()
@@ -138,10 +125,8 @@ final class KeepAwakeController: NSObject {
     }
 
     private func notifyEnded() {
-        // If notification authorization was denied or never requested (indefinite
-        // sessions don't request it), the center silently drops this request.
-        // That's fine — the notification is purely informational.
-        notifier.post(title: "Ku-Ka", body: "Keep-awake ended — your Mac can sleep again.", opening: nil)
+        // The notification center silently drops this if permission was denied or not asked.
+        notifier.post(title: "Ku-Ka", body: "Keep-awake ended — your Mac can sleep again.", onClick: nil)
     }
 
     static func formatRemaining(_ interval: TimeInterval) -> String {

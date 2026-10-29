@@ -38,9 +38,9 @@ final class MeetingFolderTests: XCTestCase {
 
         let meeting = try MeetingFolder.create(in: root, startingAt: localDate(2026, 10, 23, 14, 2))
 
-        XCTAssertEqual(meeting.url.path, root.appendingPathComponent("2026-10-23_14-02").path)
+        XCTAssertEqual(meeting.name, "2026-10-23_14-02")
         var isDirectory: ObjCBool = false
-        XCTAssertTrue(FileManager.default.fileExists(atPath: meeting.url.appendingPathComponent("audio").path,
+        XCTAssertTrue(FileManager.default.fileExists(atPath: root.appendingPathComponent("2026-10-23_14-02/audio").path,
                                                      isDirectory: &isDirectory))
         XCTAssertTrue(isDirectory.boolValue)
     }
@@ -85,6 +85,69 @@ final class MeetingFolderTests: XCTestCase {
         XCTAssertNil(meeting.stage(), "the lock file does not make a folder a meeting")
     }
 
+    func testTheRoomLabelsMarkerDoesNotChangeTheStage() throws {
+        let meeting = try MeetingFolder.create(in: try makeTemporaryDirectory(), startingAt: localDate(2026, 10, 23, 14, 2))
+
+        try meeting.markRoomLabelsStarted()
+        XCTAssertTrue(meeting.roomLabelsStarted)
+        XCTAssertNil(meeting.stage(), "the marker does not make a folder a meeting")
+
+        FileManager.default.createFile(atPath: meeting.audioURL(.microphone).path, contents: Data())
+        XCTAssertEqual(meeting.stage(), .pending(.transcribe))
+
+        try meeting.write("# Transcript", to: .transcript)
+        XCTAssertEqual(meeting.stage(), .pending(.summarize))
+
+        try meeting.clearRoomLabelsStarted()
+        try meeting.clearRoomLabelsStarted()
+        XCTAssertFalse(meeting.roomLabelsStarted)
+        XCTAssertEqual(meeting.stage(), .pending(.summarize))
+    }
+
+    func testTheHeardCopyAndTheReviewFilesNeverChangeTheStage() throws {
+        let root = try makeTemporaryDirectory()
+        let stages: [(MeetingStage?, [MeetingDocument], Bool)] = [
+            (nil, [], false),
+            (.pending(.transcribe), [], true),
+            (.failed(.transcribe), [.failure], true),
+            (.pending(.summarize), [.transcript], false),
+            (.failed(.summarize), [.transcript, .failure], false),
+            (.done, [.transcript, .summary], false),
+        ]
+        let extras: [[MeetingDocument]] = [[.heardTranscript], [.questions], [.skipped], [.heardTranscript, .questions, .skipped]]
+        var minute = 0
+        for (stage, documents, hasAudio) in stages {
+            for extra in extras {
+                minute += 1
+                let meeting = try MeetingFolder.create(in: root, startingAt: localDate(2026, 10, 23, 14, minute))
+                if hasAudio { FileManager.default.createFile(atPath: meeting.audioURL(.microphone).path, contents: Data()) }
+                for document in documents + extra { try meeting.write("text", to: document) }
+
+                XCTAssertEqual(meeting.stage(), stage, "\(documents.map(\.rawValue)) with \(extra.map(\.rawValue))")
+            }
+        }
+    }
+
+    func testWithoutAHeardCopyTheTranscriptWithoutItsNoteBecomesTheCopy() throws {
+        let meeting = try MeetingFolder.create(in: try makeTemporaryDirectory(), startingAt: localDate(2026, 10, 23, 14, 2))
+        try meeting.write("**[00:00:01] Them:** Ask Konvio.\n\n---\n\nKnown words applied: Convio → Konvio (1).\n", to: .transcript)
+
+        let first = try meeting.heardTranscript()
+        try meeting.write("**[00:00:01] Them:** Changed later.\n", to: .transcript)
+        let second = try meeting.heardTranscript()
+
+        XCTAssertEqual(first, "**[00:00:01] Them:** Ask Konvio.\n")
+        XCTAssertEqual(second, first)
+        XCTAssertEqual(try meeting.read(.heardTranscript), first)
+    }
+
+    func testWithoutATranscriptThereIsNoHeardTranscript() throws {
+        let meeting = try MeetingFolder.create(in: try makeTemporaryDirectory(), startingAt: localDate(2026, 10, 23, 14, 2))
+
+        XCTAssertThrowsError(try meeting.heardTranscript())
+        XCTAssertFalse(FileManager.default.fileExists(atPath: meeting.url(for: .heardTranscript).path))
+    }
+
     func testClearFailureCanRunTwice() throws {
         let meeting = try MeetingFolder.create(in: try makeTemporaryDirectory(), startingAt: localDate(2026, 10, 23, 14, 2))
         try meeting.write("# Transcript", to: .transcript)
@@ -110,6 +173,50 @@ final class MeetingFolderTests: XCTestCase {
         XCTAssertEqual(meetings.map { $0.0.name }, ["2026-10-23_14-02", "2026-10-24_09-00"])
         XCTAssertEqual(meetings.map { $0.1 }, [.done, .pending(.summarize)])
         XCTAssertEqual(MeetingFolder.all(in: root.appendingPathComponent("missing")).map { $0.0.name }, [])
+    }
+
+    func testAllFindsTheMeetingsOfAMeetingsFolderThatIsASymlink() throws {
+        let base = try makeTemporaryDirectory()
+        let target = base.appendingPathComponent("Cloud Meetings", isDirectory: true)
+        let root = base.appendingPathComponent("Meetings", isDirectory: true)
+        try FileManager.default.createDirectory(at: target, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: root, withDestinationURL: target)
+        let meeting = try MeetingFolder.create(in: root, startingAt: localDate(2026, 10, 23, 14, 2))
+        try meeting.write("# Summary", to: .summary)
+
+        let listed = MeetingFolder.all(in: root)
+
+        XCTAssertEqual(listed.map(\.0), [meeting])
+        XCTAssertEqual(listed.map(\.1), [.done])
+    }
+
+    /// The temporary folder is under /var, which is a symlink to /private/var, and the meetings
+    /// folder here is inside one more symlinked folder.
+    func testEveryWayToNameOneMeetingGivesOneEqualValue() throws {
+        let base = try makeTemporaryDirectory()
+        XCTAssertTrue(base.path.hasPrefix("/var/"), base.path)
+        let target = base.appendingPathComponent("Cloud Drive", isDirectory: true)
+        let link = base.appendingPathComponent("Drive", isDirectory: true)
+        try FileManager.default.createDirectory(at: target, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: target)
+        let root = link.appendingPathComponent("Meetings", isDirectory: true)
+        let name = "2026-10-23_14-02"
+        let beforeTheMeetingsFolder = MeetingFolder(url: root.appendingPathComponent(name, isDirectory: true))
+        let created = try MeetingFolder.create(in: root, startingAt: localDate(2026, 10, 23, 14, 2))
+        try created.write("# Transcript", to: .transcript)
+        let listed = try XCTUnwrap(MeetingFolder.all(in: root).first?.0)
+        let throughTheTarget = MeetingFolder(url: target.appendingPathComponent("Meetings").appendingPathComponent(name))
+        let underPrivate = MeetingFolder(url: URL(fileURLWithPath: "/private" + root.path).appendingPathComponent(name))
+        let clicked = NotificationClick(userInfo: NotificationClick.checkWords(created).userInfo)
+        let other = try MeetingFolder.create(in: root, startingAt: localDate(2026, 10, 23, 15, 0))
+
+        XCTAssertEqual(created, listed)
+        XCTAssertEqual(beforeTheMeetingsFolder, listed)
+        XCTAssertEqual(throughTheTarget, listed)
+        XCTAssertEqual(underPrivate, listed)
+        XCTAssertEqual(clicked, .checkWords(listed))
+        XCTAssertEqual(Set([created, listed, beforeTheMeetingsFolder, throughTheTarget, underPrivate]).count, 1)
+        XCTAssertNotEqual(other, created)
     }
 
     func testDiscardAudioTrashesTheAudioFolderOnlyWhileItExists() throws {

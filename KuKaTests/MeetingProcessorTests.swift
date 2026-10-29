@@ -2,69 +2,14 @@ import XCTest
 @testable import KuKa
 
 @MainActor
-final class MeetingProcessorTests: XCTestCase {
-    private struct TestError: LocalizedError {
-        let errorDescription: String?
-    }
-
-    private var whisper: FakeTranscriber!
-    private var apple: FakeTranscriber!
-    private var runner: FakeCommandRunner!
-    private var trashed: [String] = []
-    private var steps: [MeetingStep] = []
-
-    override func setUp() async throws {
-        whisper = makeTranscriber(named: "Whisper")
-        apple = makeTranscriber(named: "Apple")
-        runner = FakeCommandRunner()
-        runner.results["agy"] = .success(CommandResult(termination: .exited(0), stdout: "## Summary\nShip Friday.", stderr: ""))
-        trashed = []
-        steps = []
-    }
-
-    private func makeTranscriber(named name: String) -> FakeTranscriber {
-        let transcriber = FakeTranscriber(name: name)
-        transcriber.byFileName["them.caf"] = .success(TrackTranscript(
-            segments: [TranscriptSegment(start: 1, end: 3, text: "Let's ship on Friday")], duration: 60))
-        transcriber.byFileName["me.caf"] = .success(TrackTranscript(
-            segments: [TranscriptSegment(start: 4, end: 5, text: "Sounds good")], duration: 59))
-        return transcriber
-    }
-
-    private func makeProcessor(transcribers: [Transcribing]? = nil) -> MeetingProcessor {
-        MeetingProcessor(
-            transcribers: transcribers ?? [whisper, apple],
-            summarizer: Summarizer(runner: runner, home: URL(fileURLWithPath: "/Users/test"), isExecutable: { _ in true }),
-            trash: { [unowned self] url in
-                trashed.append(url.lastPathComponent)
-                try FileManager.default.removeItem(at: url)
-            },
-            now: { localDate(2026, 10, 23, 15, 0) })
-    }
-
-    private func makeMeeting() throws -> MeetingFolder {
-        let meeting = try MeetingFolder.create(in: try makeTemporaryDirectory(), startingAt: localDate(2026, 10, 23, 14, 2))
-        for track in MeetingTrack.allCases {
-            FileManager.default.createFile(atPath: meeting.audioURL(track).path, contents: Data())
-        }
-        return meeting
-    }
-
-    private func process(_ meeting: MeetingFolder, with processor: MeetingProcessor? = nil) async -> MeetingOutcome {
-        await (processor ?? makeProcessor()).process(meeting) { [unowned self] in steps.append($0) }
-    }
-
-    private func audioExists(_ meeting: MeetingFolder) -> Bool {
-        FileManager.default.fileExists(atPath: meeting.audioURL(.system).path)
-    }
-
+final class MeetingProcessorTests: MeetingProcessorTestCase {
     func testFirstRunWritesTranscriptAndSummaryAndTrashesTheAudio() async throws {
         let meeting = try makeMeeting()
 
         let outcome = await process(meeting)
 
         XCTAssertEqual(outcome, .done(summary: meeting.url(for: .summary)))
-        XCTAssertEqual(steps, [.transcribe, .summarize])
+        XCTAssertEqual(progress, [.step(.transcribe), .step(.summarize)])
         XCTAssertEqual(try meeting.read(.transcript), """
         # Meeting on 2026-10-23 at 14:02
 
@@ -72,7 +17,7 @@ final class MeetingProcessorTests: XCTestCase {
 
         Transcript by Whisper.
 
-        "Me" is the person who recorded the meeting. "Them" is everyone else on the call.
+        "Me" is the microphone of the Mac that recorded the meeting. It hears the person who recorded the meeting and anyone in the same room. "Them" is everyone else on the call.
 
         **[00:00:01] Them:** Let's ship on Friday
 
@@ -85,29 +30,32 @@ final class MeetingProcessorTests: XCTestCase {
         ## Summary
         Ship Friday.
 
-        ---
-
-        Summary by `agy`.
-
         """)
         XCTAssertEqual(trashed, ["audio"])
         XCTAssertEqual(meeting.stage(), .done)
     }
 
+    func testTheSummaryFromAFallbackCLIHasNoFooter() async throws {
+        let meeting = try makeMeeting()
+        runner.results["agy"] = .success(CommandResult(termination: .exited(1), stdout: "", stderr: "authentication failed"))
+        runner.results["claude"] = .reply(defaultNotes)
+
+        let outcome = await process(meeting)
+
+        XCTAssertEqual(outcome, .done(summary: meeting.url(for: .summary)))
+        XCTAssertEqual(try meeting.read(.summary), "# Meeting on 2026-10-23 at 14:02\n\n## Summary\nShip Friday.\n")
+    }
+
     func testAMissingSpeechModelIsDownloadedForTheConfiguredLanguageFirst() async throws {
         let meeting = try makeMeeting()
         whisper.modelIsMissing = true
-        var downloadsReported = 0
-        let processor = MeetingProcessor(
-            transcribers: [whisper, apple],
-            summarizer: Summarizer(runner: runner, home: URL(fileURLWithPath: "/Users/test"), isExecutable: { _ in true }),
-            locale: { Locale(identifier: "de-DE") },
-            trash: { try FileManager.default.removeItem(at: $0) })
+        let processor = makeMeetingProcessor(transcribers: [whisper, apple], roomLabeller: labeller, runner: runner,
+                                             locale: Locale(identifier: "de-DE"))
 
-        let outcome = await processor.process(meeting, onStep: { _ in }, onDownload: { downloadsReported += 1 })
+        let outcome = await process(meeting, with: processor)
 
         XCTAssertEqual(outcome, .done(summary: meeting.url(for: .summary)))
-        XCTAssertEqual(downloadsReported, 1)
+        XCTAssertEqual(progress, [.step(.transcribe), .downloading(.speech), .step(.transcribe), .step(.summarize)])
         XCTAssertEqual(whisper.downloads, ["de-DE"])
         XCTAssertEqual(whisper.loads, ["de-DE"])
     }
@@ -152,7 +100,7 @@ final class MeetingProcessorTests: XCTestCase {
 
             \(row.bullet)
 
-            "Me" is the person who recorded the meeting. "Them" is everyone else on the call.
+            "Me" is the microphone of the Mac that recorded the meeting. It hears the person who recorded the meeting and anyone in the same room. "Them" is everyone else on the call.
 
             **[00:00:01] Them:** Let's ship on Friday
 
@@ -169,12 +117,25 @@ final class MeetingProcessorTests: XCTestCase {
         let meeting = try makeMeeting()
         whisper.modelIsMissing = true
         whisper.failure = (.download, MeetingStepError("The Internet connection appears to be offline."))
-        var events: [String] = []
 
-        _ = await makeProcessor().process(meeting, onStep: { events.append($0.progressVerb) },
-                                          onDownload: { events.append("Downloading") })
+        _ = await process(meeting)
 
-        XCTAssertEqual(events, ["Transcribing", "Downloading", "Transcribing", "Summarizing"])
+        XCTAssertEqual(progress, [.step(.transcribe), .downloading(.speech), .step(.transcribe), .step(.summarize)])
+    }
+
+    func testNoSpeechModelDownloadShowsWhileAnotherKuKaHoldsTheDownloadLock() async throws {
+        let meeting = try makeMeeting()
+        whisper.modelIsMissing = true
+        whisper.downloadStarts = false
+        whisper.failure = (.download, MeetingStepError("Another Ku-Ka is downloading the Whisper model."))
+
+        let outcome = await process(meeting)
+
+        XCTAssertEqual(outcome, .done(summary: meeting.url(for: .summary)))
+        XCTAssertEqual(progress, [.step(.transcribe), .step(.summarize)])
+        XCTAssertTrue(try meeting.read(.transcript).contains(
+            "- Whisper could not download its model: Another Ku-Ka is downloading the Whisper model."))
+        XCTAssertEqual(apple.loads, ["en-US"])
     }
 
     func testFallbackDiagnosticsStayOnDiskButDoNotEnterTheSummaryPrompt() async throws {
@@ -272,7 +233,7 @@ final class MeetingProcessorTests: XCTestCase {
 
         Transcript by Whisper.
 
-        "Me" is the person who recorded the meeting. "Them" is everyone else on the call.
+        "Me" is the microphone of the Mac that recorded the meeting. It hears the person who recorded the meeting and anyone in the same room. "Them" is everyone else on the call.
 
         No speech was detected.
 
@@ -305,7 +266,7 @@ final class MeetingProcessorTests: XCTestCase {
         let outcome = await process(meeting)
 
         XCTAssertEqual(outcome, .busy)
-        XCTAssertEqual(steps, [])
+        XCTAssertEqual(progress, [])
         XCTAssertEqual(meeting.stage(), .pending(.transcribe))
         otherWriter.release()
     }
@@ -318,7 +279,7 @@ final class MeetingProcessorTests: XCTestCase {
         let outcome = await process(meeting)
 
         XCTAssertEqual(outcome, .failed(.transcribe, message: "Ku-Ka could not lock the meeting folder \(meeting.url.path): Permission denied."))
-        XCTAssertEqual(steps, [])
+        XCTAssertEqual(progress, [])
     }
 
     func testASummaryFailureKeepsTheTranscriptAndListsEachCLI() async throws {
@@ -351,7 +312,7 @@ final class MeetingProcessorTests: XCTestCase {
         let outcome = await process(meeting)
 
         XCTAssertEqual(outcome, .failed(.transcribe, message: "An earlier attempt failed. See error.md in the meeting folder."))
-        XCTAssertEqual(steps, [])
+        XCTAssertEqual(progress, [])
     }
 
     func testRetryResumesAtTheFailedStep() async throws {
@@ -359,14 +320,14 @@ final class MeetingProcessorTests: XCTestCase {
         runner.results["agy"] = .success(CommandResult(termination: .exited(1), stdout: "", stderr: ""))
         _ = await process(meeting)
         try meeting.clearFailure()
-        runner.results["claude"] = .success(CommandResult(termination: .exited(0), stdout: "## Summary\nShip Friday.", stderr: ""))
+        runner.results["claude"] = .reply(defaultNotes)
         whisper.byFileName["them.caf"] = .failure(TestError(errorDescription: "must not transcribe again"))
-        steps = []
+        progress = []
 
         let outcome = await process(meeting)
 
         XCTAssertEqual(outcome, .done(summary: meeting.url(for: .summary)))
-        XCTAssertEqual(steps, [.summarize])
+        XCTAssertEqual(progress, [.step(.summarize)])
         XCTAssertFalse(FileManager.default.fileExists(atPath: meeting.url(for: .failure).path))
     }
 
@@ -381,13 +342,13 @@ final class MeetingProcessorTests: XCTestCase {
             let meeting = try makeMeeting()
             for document in row.files { try meeting.write("# \(document.rawValue)", to: document) }
             if !row.keepAudio { try FileManager.default.removeItem(at: meeting.audioURL(.system).deletingLastPathComponent()) }
-            steps = []
+            progress = []
             trashed = []
 
             let outcome = await process(meeting)
 
             XCTAssertEqual(outcome, .done(summary: meeting.url(for: .summary)), row.name)
-            XCTAssertEqual(steps, row.steps, row.name)
+            XCTAssertEqual(progress, row.steps.map { .step($0) }, row.name)
             XCTAssertEqual(trashed, row.trashed, row.name)
         }
     }
@@ -396,8 +357,8 @@ final class MeetingProcessorTests: XCTestCase {
         let meeting = try makeMeeting()
         let processor = makeProcessor(transcribers: [SuspendedTranscriber(name: "Whisper"), apple])
         let run = Task { await process(meeting, with: processor) }
-        await waitUntil { !steps.isEmpty }
-        XCTAssertEqual(steps, [.transcribe])
+        await waitUntil { !progress.isEmpty }
+        XCTAssertEqual(progress, [.step(.transcribe)])
 
         run.cancel()
 
@@ -429,12 +390,9 @@ final class MeetingProcessorTests: XCTestCase {
         let meeting = try makeMeeting()
         let suspended = SuspendedTranscriber(name: "Whisper")
         suspended.modelIsMissing = true
-        var downloading = false
-        let run = Task {
-            await makeProcessor(transcribers: [suspended, apple]).process(meeting, onStep: { _ in },
-                                                                          onDownload: { downloading = true })
-        }
-        await waitUntil { downloading }
+        suspended.downloadWaits = true
+        let run = Task { await process(meeting, with: makeProcessor(transcribers: [suspended, apple])) }
+        await waitUntil { progress.contains(.downloading(.speech)) }
 
         run.cancel()
 
@@ -458,16 +416,5 @@ private final class CancelledReturningTranscriber: FakeTranscriber {
         withUnsafeCurrentTask { $0?.cancel() }
         return TrackTranscript(segments: empty ? [] : [TranscriptSegment(start: 0, end: 1, text: "Synthetic speech")],
                                duration: 61)
-    }
-}
-
-private final class SuspendedTranscriber: FakeTranscriber {
-    override func download(for locale: Locale) async throws {
-        try await Task.sleep(for: .seconds(60))
-    }
-
-    override func transcribe(_ audio: URL) async throws -> TrackTranscript {
-        try await Task.sleep(for: .seconds(60))
-        return TrackTranscript(segments: [], duration: 0)
     }
 }
