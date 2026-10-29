@@ -29,6 +29,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         recorder: meetingRecorder,
         root: { [settings] in settings.meetingsFolder },
         processor: MeetingProcessor(roomLabeller: SpeakerKitRoomLabeller(),
+                                    summarizer: Summarizer(context: MeetingContextFile(url: { [settings] in settings.meetingContextFile })),
                                     knownWords: { [knownWords] in knownWords.read() },
                                     locale: { [settings] in settings.meetingLocale }),
         wordsToCheck: { [knownWords, settings] in

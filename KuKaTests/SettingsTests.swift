@@ -26,6 +26,16 @@ final class SettingsTests: XCTestCase {
         XCTAssertEqual(Settings(defaults: defaults, loginItem: loginItem).thumbnailDuration, 15)
     }
 
+    func testMeetingContextHasNoDefaultAndReadsEachNewPath() {
+        XCTAssertNil(sut.meetingContextFile)
+        defaults.set("", forKey: "meetingContextFile")
+        XCTAssertNil(sut.meetingContextFile)
+        defaults.set("~/context.md", forKey: "meetingContextFile")
+        XCTAssertEqual(sut.meetingContextFile?.path, NSHomeDirectory() + "/context.md")
+        defaults.set("/other/context.md", forKey: "meetingContextFile")
+        XCTAssertEqual(sut.meetingContextFile?.path, "/other/context.md")
+    }
+
     func testWindowTilingDefaultsToTrueAndRoundTrips() {
         XCTAssertTrue(sut.windowTilingEnabled)
         sut.windowTilingEnabled = false

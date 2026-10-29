@@ -65,6 +65,11 @@ final class Settings {
         return URL(fileURLWithPath: (path as NSString).expandingTildeInPath)
     }
 
+    var meetingContextFile: URL? {
+        guard let path = defaults.string(forKey: "meetingContextFile"), !path.isEmpty else { return nil }
+        return URL(fileURLWithPath: (path as NSString).expandingTildeInPath)
+    }
+
     /// A BCP 47 tag such as "de-DE", set with `defaults write`.
     var meetingLocale: Locale {
         guard let tag = defaults.string(forKey: "meetingLocale"), !tag.isEmpty else {

@@ -77,7 +77,7 @@ The first meeting downloads the Whisper model, about 1.5 GB, to `~/Library/Appli
 
 The first meeting also downloads the room-label model, about 11 MB, to `~/Library/Application Support/Ku-Ka/speaker-models`. Ku-Ka excludes it from Time Machine backups too, and the menu shows **Downloading speaker model** meanwhile. After that, room labels need no network. If the download fails, that meeting keeps "Me", and the next meeting tries again.
 
-Only the transcript text goes to the AI tool. With it goes each known word (see below) that occurs in the transcript, as its forms only. The notes and dates in your list of known words stay on your Mac. Audio never leaves your Mac. `agy` keeps a copy of each transcript in its own conversation history; `claude` runs without saving a session. Ku-Ka moves the audio files to the Trash when the transcript is written, so you can still restore them from there.
+The transcript text goes to the AI tool. With it goes each known word (see below) that occurs in the transcript, as its forms only. The notes and dates in your list of known words stay on your Mac. If you enable a meeting-context file, its whole text also goes to the AI provider on every summary use, as described below. Audio never leaves your Mac. `agy` keeps the prompt, including any context, in its own conversation history; `claude` runs without saving a session. Ku-Ka moves the audio files to the Trash when the transcript is written, so you can still restore them from there.
 
 If nobody spoke, the meeting ends without a summary and keeps its audio, so you can listen to it. If a step fails, the meeting folder gets an `error.md` with the reason, and the menu shows **Retry Failed Meeting**. Retry continues from the step that failed. If Ku-Ka quits or crashes during a meeting, it finishes the notes from the saved audio the next time it starts. If it crashed while it told the voices apart, that meeting gets no room labels, and the top of the transcript says why. To give up on a meeting, delete its folder. **Open Meetings Folder** in the menu opens the folder that holds them.
 
@@ -112,6 +112,39 @@ The AI tool also tells Ku-Ka which words it thinks speech recognition got wrong.
 Update Notes makes `transcript.md` again from the text that speech recognition wrote and from the list. So a change that you made to `transcript.md` by hand is lost. To fix a word, add it to the list instead.
 
 Recording needs the Screen Recording permission (for the sound your Mac plays) and the Microphone permission. Ku-Ka asks for Microphone the first time you start a recording.
+
+### Optional meeting context
+
+You can give the summary background about project terms, vendors, and people. Create a short UTF-8 Markdown file, for example `~/meeting-context.md`:
+
+```markdown
+# Project context
+- Konvio is the passenger portal project.
+- Brightlane supplies the network equipment.
+- Aino and Jyri work on the portal.
+```
+
+Enable the file in Terminal:
+
+```bash
+defaults write com.kuka.screenshot meetingContextFile "$HOME/meeting-context.md"
+```
+
+Ku-Ka reads the setting and file again each time it makes a summary, including **Retry Failed Meeting** and **Update Notes**. You can edit the file or change its path without restarting Ku-Ka. Existing notes stay unchanged until a summary runs again. Update Notes is available through the known-word review flow described above.
+
+The whole accepted file goes to the CLI provider on every use: Google for `agy`, or Anthropic for `claude`. If both CLIs run during fallback, the context can reach both providers. This includes people and terms that the transcript does not mention. Choose the contents with that disclosure in mind. This file is separate from `knownWordsFile`, which sends only matching word forms, never the list's notes or dates.
+
+The prompt treats context as background data, never as instructions. The transcript takes priority when they disagree. Context must not add decisions, action owners, or other claims that the transcript does not support. An action owner must still be a name supported by the transcript or "Unclear". Context does not change the transcript. The CLI still runs in an empty working folder with the existing fixed PATH, invocation options, fallback order, and ten-minute timeout. Ku-Ka passes the context as text in the prompt; it adds no tool access or project-file access.
+
+The file must be no larger than **16 KiB (16,384 bytes)**, measured as UTF-8 bytes. This keeps the background short and limits how much data each prompt adds. Ku-Ka reads at most one byte beyond the cap to detect an oversized file. It skips the whole file if it is too large; it never sends a truncated version. An unset or empty path, a missing file, or an empty or whitespace-only file adds no context block. An unreadable file, invalid UTF-8, a NUL byte, or a path that is not a regular file also adds no block. Ku-Ka logs those errors and oversized files to the macOS log, without the file contents, and continues the summary without context.
+
+To stop sending context on future summary uses, remove the setting:
+
+```bash
+defaults delete com.kuka.screenshot meetingContextFile
+```
+
+This leaves your file in place. It does not remove context already sent to a provider or saved in `agy` history.
 
 ## Requirements
 
