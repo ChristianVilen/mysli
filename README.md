@@ -23,9 +23,9 @@ A lightweight macOS menu bar app that replaces the default `Shift+Command+4` scr
 
 ## Keep Awake
 
-Pick **Keep Awake For** a preset (30 minutes, 1, 2, or 4 hours, or "Until I turn it off") from the menu bar and Ku-Ka will keep your Mac from going to sleep while it's working through something long, like an overnight agent run. The menu-bar icon is tinted while it's on, and the menu shows how much time is left.
+Choose a duration in the menu's **Keep Awake** section. The choices are 30 minutes, 1, 2, or 4 hours, and until turned off. A colored dot on the menu-bar icon marks an active session, and the menu shows how much time is left.
 
-It stops the system from sleeping but still lets the display turn off, so you're not burning the screen for nothing. One caveat: closing a laptop's lid still sleeps the Mac unless it's plugged in with an external display attached — no app can get around that. Keep the lid open or run it docked.
+Keep display awake is on by default, so both the system and display stay awake. To let the display sleep and lock on its normal schedule, clear **Keep display awake during Keep Awake** in **Settings…**. One caveat: closing a laptop's lid still sleeps the Mac unless it's plugged in with an external display attached — no app can get around that. Keep the lid open or run it docked.
 
 ## Window Tiling
 
@@ -39,7 +39,7 @@ If you use Stage Manager (the macOS feature that shows recent apps as small thum
 
 With more than one display, the window is tiled on the screen it overlaps the most. This differs from the screenshot features, which follow the cursor.
 
-The whole feature can be turned on and off with the **Window Tiling** checkbox in the menu bar menu (under Settings); the choice is remembered across restarts. While it's off, the hotkeys pass through to other apps. The keys themselves aren't configurable.
+The whole feature can be turned on and off with the **Enable window tiling** checkbox in **Settings…**; the choice is remembered across restarts. While it's off, the hotkeys pass through to other apps. The keys themselves aren't configurable.
 
 ## Clipboard History
 
@@ -51,11 +51,11 @@ Text and images both get recorded, including screenshots Ku-Ka itself saves to y
 
 The history lives in memory only — nothing is written to disk, so it's empty again after a restart. It holds at most 100 items; images are capped at about 100 MB in total, with the oldest images dropped first. A single item over 50 MB is not recorded. Copies that your password manager marks as sensitive are never recorded.
 
-The whole feature can be turned on and off with the **Clipboard History** checkbox in the menu bar menu (under Settings); the choice is remembered across restarts. While it's off, Ku-Ka stops recording, clears the history it collected, and gives `Shift+Command+C` back to other apps. With the feature on, Ku-Ka takes that shortcut from Chrome and Arc (Inspect Element), Xcode (Activate Console), VS Code (Open External Terminal), and Finder (Computer window).
+The whole feature can be turned on and off with the **Record clipboard history** checkbox in **Settings…**; the choice is remembered across restarts. While it's off, Ku-Ka stops recording, clears the history it collected, and gives `Shift+Command+C` back to other apps. With the feature on, Ku-Ka takes that shortcut from Chrome and Arc (Inspect Element), Xcode (Activate Console), VS Code (Open External Terminal), and Finder (Computer window).
 
 ## Meeting Notes
 
-Calendar recording reminders are off by default. Eligible events offer **Start Recording**, then **Stop Recording** or **Continue Recording** at the end. Ku-Ka never starts or stops automatically. A calendar recording keeps the event title in its menu status and note headings. This branch supplies the integration for the Settings window in #43 but adds no switch yet. See the [integration contract and limits](docs/calendar-recording-reminders.md).
+Calendar recording reminders are off by default. Eligible events offer **Start Recording**, then **Stop Recording** or **Continue Recording** at the end. Ku-Ka never starts or stops automatically. A calendar recording keeps the event title in its menu status and note headings. Turn them on with **Calendar reminders** in Settings. The first time, macOS asks for Calendar and notification access, and Settings says what to allow when access is missing. See the [integration contract and limits](docs/calendar-recording-reminders.md).
 
 When a call starts, open the Ku-Ka menu and choose **Start Recording Meeting**. Ku-Ka records your microphone and the sound your Mac plays, so any call app works. If Start cannot record, for example because a permission is missing, an alert says why.
 
@@ -71,7 +71,7 @@ The live transcript uses Apple's speech recognition, and only for a language who
 
 While recording, open the menu to check the **Microphone** and **Mac audio** meters below the timer. Each meter shows the sound level on that track. An empty meter can mean silence, that no audio is arriving, or that the recording is paused. A reading clears after half a second without new audio. The meters update only while the menu is open.
 
-Ku-Ka then transcribes the call on your Mac with Whisper (the `large-v3-v20240930_turbo` model, through WhisperKit) and asks an AI command-line tool for a summary. It tries Antigravity (`agy`) first and Claude Code (`claude`) if that fails. Install at least one of them in `/opt/homebrew/bin`, `/usr/local/bin`, or `~/.local/bin`, and log in to it once in Terminal. A notification tells you when the notes are ready; click it to open the summary, or the review window when there are words to check (see below). Ku-Ka asks for notification permission the first time you start a recording. Each meeting gets its own folder, for example `~/Meetings/2026-10-23_14-02/`, with `transcript.md` and `summary.md`.
+Ku-Ka then transcribes the call on your Mac with Whisper (the `large-v3-v20240930_turbo` model, through WhisperKit) and asks an AI command-line tool for a summary. The default summary choice, Automatic, tries Antigravity (`agy`) first and Claude Code (`claude`) if that fails. In **Settings…**, you can select either tool to use only that provider. Install at least one of them in `/opt/homebrew/bin`, `/usr/local/bin`, or `~/.local/bin`, and log in to it once in Terminal. A notification tells you when the notes are ready; click it to open the summary, or the review window when there are words to check (see below). Ku-Ka asks for notification permission the first time you start a recording. Each meeting gets its own folder, for example `~/Meetings/2026-10-23_14-02/`, with `transcript.md` and `summary.md`.
 
 By default, "Them" is everyone else on the call, from the sound your Mac plays. The optional Teams speaker-name feature below can name supported remote lines after Stop. Your Mac's microphone hears you and anyone in the same room. Ku-Ka tells those voices apart on your Mac and labels them "Room 1", "Room 2", and so on, in the order they first speak. Ku-Ka never guesses which voice is you. Two people with similar voices can share a label, and one person can get two. A voice with fewer than 5 words gets no label of its own: its lines take the label of the voice that spoke nearest in time. When Ku-Ka finds only one voice, the microphone lines say "Me". If Ku-Ka cannot tell the voices apart, the microphone lines also say "Me", and the top of the transcript says why. Ku-Ka does not try on a microphone track longer than 3 hours. In the summary, an action item has a person's name only when the transcript says who will do it. Otherwise its owner is "Unclear". Headphones give the cleanest transcript. On speakers, your microphone also hears the other people. Ku-Ka removes those repeated lines from the microphone lines when it finds them. It also removes the lines of a microphone voice that speaks almost only while the other people speak and mostly repeats their words, because that voice is their echo.
 
@@ -83,7 +83,7 @@ The transcript text goes to the AI tool. With it goes each known word (see below
 
 If nobody spoke, the meeting ends without a summary and keeps its audio, so you can listen to it. If a step fails, the meeting folder gets an `error.md` with the reason, and the menu shows **Retry Failed Meeting**. Retry continues from the step that failed. If Ku-Ka quits or crashes during a meeting, it finishes the notes from the saved audio the next time it starts. If it crashed while it told the voices apart, that meeting gets no room labels, and the top of the transcript says why. To give up on a meeting, delete its folder. **Open Meetings Folder** in the menu opens the folder that holds them.
 
-To keep new meetings in another folder, choose **Choose Meetings Folder…** in the menu. Select a folder or create one, then click **Choose**. The new folder applies immediately, including **Open Meetings Folder**. Cancel leaves the setting unchanged. Ku-Ka does not move existing meetings. A recording or a meeting already waiting for notes finishes in its original folder.
+To keep new meetings in another folder, open **Settings…** and click **Choose…** beside **Meetings folder**. Select a folder or create one, then click **Choose**. The new folder applies immediately, including **Open Meetings Folder**. Cancel leaves the setting unchanged. Ku-Ka does not move existing meetings. A recording or a meeting already waiting for notes finishes in its original folder.
 
 You can also set the path in Terminal:
 
@@ -119,7 +119,7 @@ Recording needs the Screen Recording permission (for the sound your Mac plays) a
 
 This feature is off by default. Its rules come from public source code and tests with fake Accessibility trees. **It has not been verified during a real Teams call.** Teams can change its UI, hide its speaking indicator, or keep the last speaker highlighted. Names can be missing or wrong.
 
-To opt in, run this command and restart Ku-Ka before your next recording:
+To opt in, turn on **Teams speaker names** in Settings. It applies from the next recording. You can also run this command and restart Ku-Ka before your next recording:
 
 ```bash
 defaults write com.kuka.screenshot teamsSpeakerNamesEnabled -bool true
@@ -155,7 +155,7 @@ To see the lines of the last two hours, run this command:
 
 Use the full path `/usr/bin/log`, because zsh has its own `log` command. These log lines hold only reason codes, counts, and scan times. They never hold a name or other text from Teams.
 
-To turn the feature off for future recordings, run this command and restart Ku-Ka:
+To turn the feature off for future recordings, turn off **Teams speaker names** in Settings, or run this command and restart Ku-Ka:
 
 ```bash
 defaults write com.kuka.screenshot teamsSpeakerNamesEnabled -bool false
@@ -174,7 +174,7 @@ You can give the summary background about project terms, vendors, and people. Cr
 - Aino and Jyri work on the portal.
 ```
 
-Enable the file in Terminal:
+In **Settings…**, click **Choose…** beside **Background file**. You can also set the path in Terminal:
 
 ```bash
 defaults write com.kuka.screenshot meetingContextFile "$HOME/meeting-context.md"
@@ -182,13 +182,13 @@ defaults write com.kuka.screenshot meetingContextFile "$HOME/meeting-context.md"
 
 Ku-Ka reads the setting and file again each time it makes a summary, including **Retry Failed Meeting** and **Update Notes**. You can edit the file or change its path without restarting Ku-Ka. Existing notes stay unchanged until a summary runs again. Update Notes is available through the known-word review flow described above.
 
-The whole accepted file goes to the CLI provider on every use: Google for `agy`, or Anthropic for `claude`. If both CLIs run during fallback, the context can reach both providers. This includes people and terms that the transcript does not mention. Choose the contents with that disclosure in mind. This file is separate from `knownWordsFile`, which sends only matching word forms, never the list's notes or dates.
+The whole accepted file goes to the CLI provider on every use: Google for `agy`, or Anthropic for `claude`. If both CLIs run with Automatic, the context can reach both providers. This includes people and terms that the transcript does not mention. Choose the contents with that disclosure in mind. This file is separate from `knownWordsFile`, which sends only matching word forms, never the list's notes or dates.
 
 The prompt treats context as background data, never as instructions. The transcript takes priority when they disagree. Context must not add decisions, action owners, or other claims that the transcript does not support. An action owner must still be a name supported by the transcript or "Unclear". Context does not change the transcript. The CLI still runs in an empty working folder with the existing fixed PATH, invocation options, fallback order, and ten-minute timeout. Ku-Ka passes the context as text in the prompt; it adds no tool access or project-file access.
 
 The file must be no larger than **16 KiB (16,384 bytes)**, measured as UTF-8 bytes. This keeps the background short and limits how much data each prompt adds. Ku-Ka reads at most one byte beyond the cap to detect an oversized file. It skips the whole file if it is too large; it never sends a truncated version. An unset or empty path, a missing file, or an empty or whitespace-only file adds no context block. An unreadable file, invalid UTF-8, a NUL byte, or a path that is not a regular file also adds no block. Ku-Ka logs those errors and oversized files to the macOS log, without the file contents, and continues the summary without context.
 
-To stop sending context on future summary uses, remove the setting:
+To stop sending context, click **Clear** beside **Background file** in Settings. You can also remove the setting in Terminal:
 
 ```bash
 defaults delete com.kuka.screenshot meetingContextFile
@@ -296,25 +296,43 @@ The folder is created automatically if it doesn't exist.
 
 ## Menu Bar Options
 
-- **Launch at Login** — Toggle to start Ku-Ka automatically when you log in
-- **Window Tiling** — Turn the tiling hotkeys on or off (remembered across restarts)
-- **Clipboard History** — Turn clipboard recording and the `Shift+Command+C` hotkey on or off (remembered across restarts)
-- **Thumbnail Duration** — Choose how long the floating thumbnail stays visible: 3 seconds, 5 seconds, 15 seconds, or Forever (until dismissed)
-- **Keep Awake** — Keep the Mac from sleeping for a preset time (30 minutes, 1, 2, or 4 hours, or until turned off), with a "Keep display awake" checkbox
+- **Settings…** opens one native window. Command-comma opens it while Ku-Ka is active, and Command-W closes it. Changes save immediately.
+- **Keep Awake** keeps the Mac awake for 30 minutes, 1, 2, or 4 hours, or until turned off. **Turn Off** ends the session.
 - **Start Recording Meeting** and **Stop Recording Meeting** start and stop a meeting recording. While Ku-Ka records, a line above them shows the recorded time, and "Paused" while the recording is paused. While Ku-Ka makes notes, a line shows the step and how many meetings wait.
 - **Pause Recording** or **Resume Recording**, **Show Meeting Controls**, and **Restore Default Position** appear while a meeting records or is paused.
 - **Check Words** appears when meetings have words to check, with their number. It opens the review window on the oldest of those meetings.
 - **Retry Failed Meeting** appears when a meeting's transcription or summary failed.
 - **Open Meetings Folder** opens the folder that holds the meeting notes.
-- **Choose Meetings Folder…** selects where new meetings are saved, without moving existing meetings.
 - **Quit Ku-Ka** — Exit the app
 
+## Settings
+
+Open **Settings…** in the menu to change persistent preferences. A sidebar switches between two pages. **Settings** has General, Screenshots, and Meeting Notes groups. **Instructions** lists the keyboard shortcuts and explains each feature.
+
+| Preference | Default and choices |
+|---|---|
+| Launch at login | Current macOS login-item state. A failed change shows the error and the actual state. |
+| Enable window tiling | On |
+| Record clipboard history | On |
+| Keep display awake during Keep Awake | On |
+| Show thumbnail for | 5 seconds. Choices are 3, 5, 15 seconds, and Forever. Existing custom values stay intact until changed. |
+| Meetings folder | `~/Meetings`. Choosing another folder does not move existing meetings. |
+| Summary tool | Automatic tries Antigravity, then Claude Code. Antigravity (agy) and Claude Code (claude) each use only that tool. |
+| Background file | None. Choose an optional file, or Clear the preference without deleting the file. The complete accepted file goes to the selected provider with the transcript. |
+| Calendar recording reminders | Off. Turning it on asks for Calendar and notification access. A line under the switch says what to allow when access is missing. |
+| Teams speaker names | Off. Experimental. Applies from the next recording. |
+
+The summary tool is read when each queued job starts. A running job keeps its choice. Opening Settings does not write preferences.
+
 ## File Structure
+
 
 ```
 KuKa/
 ├── main.swift           # App entry point
 ├── AppDelegate.swift    # Menu bar setup, wires hotkey → overlay → capture → thumbnail → editor
+├── SettingsWindowController.swift # Native Settings form and actions
+├── OrdinaryWindowActivation.swift # Shared activation while ordinary windows are open
 ├── HotkeyManager.swift  # Desired shortcuts, feature toggles, retry and wake recovery
 ├── HotkeyShortcut.swift # Shortcut definitions and registration failures
 ├── HotkeyRegistration.swift # Registration state, reconciliation, conflict checks and failed-release recovery
@@ -361,8 +379,8 @@ KuKa/
 ## Known Limitations
 
 - Turn off the matching macOS screenshot shortcuts to let Ku-Ka register `Shift+Command+3/4`. With those macOS bindings off, quitting Ku-Ka leaves those two shortcuts unassigned until you restore them in System Settings.
-- `Ctrl+Option+Left/Right/Return` are intercepted globally while window tiling is enabled, even inside apps that use those same keys for something else. Turn off **Window Tiling** in the menu to give the keys back to other apps.
-- `Shift+Command+C` is intercepted globally while clipboard history is enabled, including in apps that use it for something else. Turn off **Clipboard History** in the menu to give the key back.
+- `Ctrl+Option+Left/Right/Return` are intercepted globally while window tiling is enabled, even inside apps that use those same keys for something else. Clear **Enable window tiling** in Settings to give the keys back to other apps.
+- `Shift+Command+C` is intercepted globally while clipboard history is enabled, including in apps that use it for something else. Clear **Record clipboard history** in Settings to give the key back.
 - The automatic paste can't reach password fields or apps that block synthetic key events. The item is still on the clipboard, so pasting it by hand (`Cmd+V`) works.
 - No preferences UI for changing the shortcut keys, including the window tiling hotkeys
 - Some windows can't be tiled — apps that don't let their windows be moved or resized through the Accessibility API, and Ku-Ka's own windows. The hotkey then does nothing; there is no error message.

@@ -341,7 +341,7 @@ final class TeamsSpeakerLifecycleTests: XCTestCase {
             segments: [TranscriptSegment(start: 1, end: 3, text: "Hello")], duration: 3))
         return MeetingNotesController(recorder: recorder, root: { [unowned self] in root },
                                       processor: makeMeetingProcessor(transcribers: [transcriber], runner: runner),
-                                      wordsToCheck: { _ in 0 }, setRoot: { _ in }, notifier: FakeNotifier())
+                                      wordsToCheck: { _ in 0 }, summaryTool: { .automatic }, notifier: FakeNotifier())
     }
 }
 

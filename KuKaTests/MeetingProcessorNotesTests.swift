@@ -32,7 +32,7 @@ final class MeetingProcessorNotesTests: MeetingProcessorTestCase {
         let meeting = try makeMeeting()
         var heardCopyBeforeSummarizing: String?
 
-        _ = await makeProcessor().process(meeting) { event in
+        _ = await makeProcessor().process(meeting, tool: .automatic) { event in
             if event == .step(.summarize) { heardCopyBeforeSummarizing = try? meeting.read(.heardTranscript) }
         }
 
@@ -220,7 +220,7 @@ final class MeetingProcessorNotesTests: MeetingProcessorTestCase {
         ```
         """)
 
-        let outcome = await makeProcessor().updateNotes(meeting)
+        let outcome = await makeProcessor().updateNotes(meeting, tool: .automatic)
 
         XCTAssertEqual(outcome, .updated(summary: meeting.url(for: .summary)))
         XCTAssertTrue(try meeting.read(.transcript).hasSuffix(correctedLines + "\n---\n\nKnown words applied: Convio → Konvio (1).\n"))
@@ -243,7 +243,7 @@ final class MeetingProcessorNotesTests: MeetingProcessorTestCase {
         ```
         """)
 
-        let outcome = await makeProcessor().updateNotes(meeting)
+        let outcome = await makeProcessor().updateNotes(meeting, tool: .automatic)
 
         XCTAssertEqual(outcome, .updated(summary: meeting.url(for: .summary)))
         XCTAssertEqual(try meeting.read(.summary), "# Meeting on 2026-10-23 at 14:02\n\n## Summary\nAsk Convio.\n")
@@ -256,7 +256,7 @@ final class MeetingProcessorNotesTests: MeetingProcessorTestCase {
         runner.results["agy"] = .success(CommandResult(termination: .exited(1), stdout: "", stderr: "authentication failed"))
         runner.results["claude"] = .success(CommandResult(termination: .timedOut, stdout: "", stderr: ""))
 
-        let outcome = await makeProcessor().updateNotes(meeting)
+        let outcome = await makeProcessor().updateNotes(meeting, tool: .automatic)
 
         XCTAssertEqual(outcome, .summaryToolFailed(message: "agy exited with status 1: authentication failed\nclaude took too long and was stopped"))
         XCTAssertEqual(try meeting.read(.summary), summary)
@@ -271,7 +271,7 @@ final class MeetingProcessorNotesTests: MeetingProcessorTestCase {
         try FileManager.default.removeItem(at: meeting.url(for: .heardTranscript))
         try FileManager.default.removeItem(at: meeting.url(for: .transcript))
 
-        let outcome = await makeProcessor().updateNotes(meeting)
+        let outcome = await makeProcessor().updateNotes(meeting, tool: .automatic)
 
         guard case .failed(let message) = outcome else { return XCTFail("\(outcome)") }
         XCTAssertTrue(message.contains("transcript.md"), message)
@@ -284,17 +284,17 @@ final class MeetingProcessorNotesTests: MeetingProcessorTestCase {
         let done = try await makeDoneMeeting()
         let callsBefore = runner.calls.count
         let otherWriter = try done.lock()
-        let busy = await makeProcessor().updateNotes(done)
+        let busy = await makeProcessor().updateNotes(done, tool: .automatic)
         otherWriter.release()
 
         let unfinished = try makeMeeting()
         try removeAudio(of: unfinished)
         try unfinished.write("**[00:00:01] Them:** Ask Convio.\n", to: .transcript)
-        let notReady = await makeProcessor().updateNotes(unfinished)
+        let notReady = await makeProcessor().updateNotes(unfinished, tool: .automatic)
 
         let gone = try makeMeeting()
         try FileManager.default.removeItem(at: gone.url)
-        let missing = await makeProcessor().updateNotes(gone)
+        let missing = await makeProcessor().updateNotes(gone, tool: .automatic)
 
         XCTAssertEqual(busy, .busy)
         XCTAssertEqual(notReady, .notReady)
@@ -309,7 +309,7 @@ final class MeetingProcessorNotesTests: MeetingProcessorTestCase {
         let summary = try meeting.read(.summary)
         let waiting = WaitingCommandRunner()
         let processor = makeProcessor(runner: waiting)
-        let run = Task { await processor.updateNotes(meeting) }
+        let run = Task { await processor.updateNotes(meeting, tool: .automatic) }
         await waitUntil { waiting.started }
 
         run.cancel()

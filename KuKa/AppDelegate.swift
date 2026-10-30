@@ -15,7 +15,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     )
     private lazy var thumbnailStack = ThumbnailStackManager(store: imageStore)
     private var editorWindow: EditorWindow?
-    private let keepAwake = KeepAwakeController()
+    private lazy var keepAwake = KeepAwakeController(keepDisplayAwake: settings.keepDisplayAwake)
     private let windowTiling = WindowTilingController()
     private let clipboardHistory = ClipboardHistoryController()
     private lazy var clipboardPanel = ClipboardPanel(controller: clipboardHistory)
@@ -36,7 +36,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         wordsToCheck: { [knownWords, settings] in
             WordReview.openQuestionCount(of: $0, in: settings.meetingsFolder, knownWords: knownWords.read())
         },
-        setRoot: { [settings] in settings.meetingsFolder = $0 }
+        summaryTool: { [settings] in settings.summaryTool }
     )
     private lazy var meetingControlsPanel = MeetingControlsPanel(recorder: meetingRecorder, settings: settings)
     private(set) var calendarReminders: CalendarReminderController?
@@ -48,11 +48,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         requestUpdate: { [weak self] in self?.meetingNotes.updateNotes($0) }
     )
     private lazy var wordReviewWindow = WordReviewWindowController(controller: wordReview)
-    private lazy var statusMenu = StatusMenu(settings: settings, sections: [keepAwake, meetingNotes])
+    private lazy var statusMenu = StatusMenu(sections: [keepAwake, meetingNotes])
+    private lazy var settingsWindow = SettingsWindowController(settings: settings)
     private let permissions = PermissionsManager()
     private var onboardingController: OnboardingWindowController?
-    /// False in UI-test runs, where permission handling is skipped entirely
-    /// (also keeps the warning badge off the status icon there).
+    // False until setupPermissions() reads the grants. Hotkey setup calls updateStatus() before that,
+    // and grants that were not read yet must not show warnings or open screenshot setup.
     private var permissionHandlingEnabled = false
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
@@ -77,27 +78,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        let isTesting = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
-            || CommandLine.arguments.contains("--uitesting")
         setupMenuBar()
         setupThumbnailStack()
         setupKeepAwake()
         setupClipboardHistory()
         setupMeetingNotes()
-        if !isTesting {
-            UNUserNotificationCenter.current().delegate = SystemNotifier.shared
-            SystemNotifier.shared.onCheckWords = { [weak self] in self?.wordReviewWindow.show($0) }
-            setupCalendarReminders()
-            setupHotkey()
-            setupPermissions()
-            // Polling the real pasteboard during unit/UI test runs would
-            // ingest whatever the developer happens to have copied, so this
-            // stays behind the same isTesting gate as setupPermissions().
-            if settings.clipboardHistoryEnabled {
-                clipboardHistory.enable()
-            }
-            meetingNotes.resumeUnfinished()
+        UNUserNotificationCenter.current().delegate = SystemNotifier.shared
+        SystemNotifier.shared.onCheckWords = { [weak self] in self?.wordReviewWindow.show($0) }
+        setupCalendarReminders()
+        setupHotkey()
+        setupPermissions()
+        if settings.clipboardHistoryEnabled {
+            clipboardHistory.enable()
         }
+        meetingNotes.resumeUnfinished()
     }
 
     private func setupCalendarReminders() {
@@ -107,6 +101,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             store: CalendarReminderStore(defaults: .standard))
         SystemNotifier.shared.onCalendarReminder = { [weak controller] action, token in
             await controller?.handle(action, token: token)
+        }
+        controller.onStatusChange = { [weak self, weak controller] in
+            guard let controller else { return }
+            self?.settingsWindow.showCalendarStatus(controller.status)
         }
         calendarReminderStartup = Task { [weak self] in
             guard !Task.isCancelled, let self else { return }
@@ -172,20 +170,28 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupMenuBar() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         updateStatus()
-        statusMenu.onTilingToggled = { [weak self] enabled in
+        statusMenu.onShowSettings = { [weak self] in
+            self?.settingsWindow.show()
+            Task { await self?.calendarReminders?.refresh() }
+        }
+        statusItem.menu = statusMenu.menu
+        NSApp.mainMenu = statusMenu.applicationMenu()
+        settingsWindow.onTilingChanged = { [weak self] enabled in
             self?.hotkeyManager.tilingEnabled = enabled
         }
+        settingsWindow.onCalendarRemindersChanged = { [weak self] enabled in
+            Task { await self?.calendarReminders?.setEnabled(enabled) }
+        }
+        settingsWindow.onDisplayAwakeChanged = { [weak self] in self?.keepAwake.setDisplayAwake($0) }
+        settingsWindow.onMeetingsFolderChanged = { [weak self] _ in self?.meetingNotes.meetingsFolderChanged() }
         statusMenu.onShowPermissions = { [weak self] in self?.showOnboarding() }
         statusMenu.onOpenKeyboardSettings = { [weak self] in self?.permissions.openSettings(.keyboardShortcuts) }
-        statusItem.menu = statusMenu.menu
     }
 
-    /// Binds callbacks once at launch, before presentation. Safe in tests: it does not read
-    /// the real pasteboard, unlike `clipboardHistory.enable()`.
     private func setupClipboardHistory() {
         clipboardPanel.bindController()
 
-        statusMenu.onClipboardHistoryToggled = { [weak self] enabled in
+        settingsWindow.onClipboardChanged = { [weak self] enabled in
             guard let self else { return }
             hotkeyManager.clipboardHistoryEnabled = enabled
             if enabled {
@@ -254,8 +260,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         keepAwake.onStateChange = { [weak self] in self?.updateStatus() }
     }
 
-    /// Not behind the `isTesting` gate: binding the panel and the review window touches no
-    /// hardware and no disk and writes no setting, and both stay hidden until they are needed.
     private func setupMeetingNotes() {
         meetingNotes.onStateChange = { [weak self] in
             self?.updateStatus()

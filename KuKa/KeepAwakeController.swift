@@ -11,11 +11,8 @@ final class KeepAwakeController: NSObject {
         ("∞", .indefinite),
     ]
 
-    static let displayAwakeDefaultsKey = "keepDisplayAwake"
-
     private let wakeManager: WakeManager
     private let now: () -> Date
-    private let defaults: UserDefaults
     private let notifier: Notifying
 
     let panelView: KeepAwakePanelView
@@ -29,11 +26,10 @@ final class KeepAwakeController: NSObject {
 
     init(wakeManager: WakeManager = WakeManager(),
          now: @escaping () -> Date = { Date() },
-         defaults: UserDefaults = .standard,
+         keepDisplayAwake: Bool,
          notifier: Notifying = SystemNotifier.shared) {
         self.wakeManager = wakeManager
         self.now = now
-        self.defaults = defaults
         self.notifier = notifier
         panelView = KeepAwakePanelView(presets: Self.presets)
         turnOffItem = NSMenuItem(title: "Turn Off", action: #selector(turnOff(_:)), keyEquivalent: "")
@@ -41,10 +37,7 @@ final class KeepAwakeController: NSObject {
         turnOffItem.target = self
         turnOffItem.isHidden = true
         panelView.onSelectDuration = { [weak self] duration in self?.select(duration) }
-        panelView.onToggleDisplayAwake = { [weak self] isOn in self?.setDisplayAwake(isOn) }
-        // Defaults to on: a dark, locked screen reads as "the feature didn't
-        // work", so keeping the display awake is the least surprising default.
-        wakeManager.keepDisplayAwake = defaults.object(forKey: Self.displayAwakeDefaultsKey) as? Bool ?? true
+        wakeManager.keepDisplayAwake = keepDisplayAwake
         wakeManager.onStateChange = { [weak self] in self?.handleStateChange() }
         wakeManager.onExpire = { [weak self] in self?.notifyEnded() }
     }
@@ -92,8 +85,7 @@ final class KeepAwakeController: NSObject {
         activate(duration)
     }
 
-    private func setDisplayAwake(_ isOn: Bool) {
-        defaults.set(isOn, forKey: Self.displayAwakeDefaultsKey)
+    func setDisplayAwake(_ isOn: Bool) {
         wakeManager.keepDisplayAwake = isOn
     }
 
@@ -121,7 +113,6 @@ final class KeepAwakeController: NSObject {
         }
 
         panelView.showSelection(session?.duration)
-        panelView.displayAwakeCheckbox.state = wakeManager.keepDisplayAwake ? .on : .off
     }
 
     private func notifyEnded() {

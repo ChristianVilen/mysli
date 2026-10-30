@@ -15,7 +15,7 @@ final class MeetingContextProcessingTests: MeetingProcessorTestCase {
                                          trash: { try FileManager.default.removeItem(at: $0) })
         runner.results["agy"] = .success(CommandResult(termination: .exited(1), stdout: "", stderr: "failed"))
         runner.results["claude"] = .success(CommandResult(termination: .exited(1), stdout: "", stderr: "failed"))
-        guard case .failed(.summarize, _) = await processor.process(meeting, progress: { _ in }) else {
+        guard case .failed(.summarize, _) = await processor.process(meeting, tool: .automatic, progress: { _ in }) else {
             return XCTFail("Expected the summary step to fail")
         }
         XCTAssertTrue(try XCTUnwrap(runner.calls.last?.input).contains("Initial background"))
@@ -23,11 +23,11 @@ final class MeetingContextProcessingTests: MeetingProcessorTestCase {
         try Data("Retry background".utf8).write(to: contextURL)
         runner.results["agy"] = .reply(defaultNotes)
         try meeting.clearFailure()
-        let retried = await processor.process(meeting, progress: { _ in })
+        let retried = await processor.process(meeting, tool: .automatic, progress: { _ in })
         XCTAssertEqual(retried, .done(summary: meeting.url(for: .summary)))
         XCTAssertTrue(try XCTUnwrap(runner.calls.last?.arguments.last).contains("Retry background"))
         try Data("Updated background".utf8).write(to: contextURL)
-        let updated = await processor.updateNotes(meeting)
+        let updated = await processor.updateNotes(meeting, tool: .automatic)
         XCTAssertEqual(updated, .updated(summary: meeting.url(for: .summary)))
         XCTAssertTrue(try XCTUnwrap(runner.calls.last?.arguments.last).contains("Updated background"))
         XCTAssertFalse(try meeting.read(.transcript).contains("background"))

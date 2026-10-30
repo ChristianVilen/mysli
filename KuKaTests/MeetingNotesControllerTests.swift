@@ -23,46 +23,29 @@ final class MeetingNotesControllerTests: MeetingNotesTestCase {
         XCTAssertEqual(status.toolTip, title)
         XCTAssertEqual(status.accessibilityLabel(), "● Recording · 0:00 · \(title)")
     }
-    func testTheMenuOffersToChooseTheMeetingsFolder() {
-        XCTAssertNotNil(item(titled: "Choose Meetings Folder…"))
+
+    private func changeFolder(to folder: URL) {
+        root = folder
+        sut.meetingsFolderChanged()
     }
 
-    private func chooseFolder() throws {
-        let choose = try XCTUnwrap(item(titled: "Choose Meetings Folder…"))
-        _ = (choose.target as? NSObject)?.perform(choose.action, with: choose)
-    }
-
-    func testChoosingAFolderImmediatelyChangesOpenAndTheNextRecording() async throws {
+    func testChangingTheFolderImmediatelyChangesOpenAndTheNextRecording() async throws {
         let previous = try XCTUnwrap(root)
-        pickedFolder = previous.deletingLastPathComponent().appendingPathComponent("New notes", isDirectory: true)
+        let newFolder = previous.deletingLastPathComponent().appendingPathComponent("New notes", isDirectory: true)
         try leftoverMeeting(at: clock, failure: "Failed")
         sut.menuWillOpen()
         let retry = try XCTUnwrap(item(titled: "Retry Failed Meeting"))
 
-        try chooseFolder()
+        changeFolder(to: newFolder)
 
-        XCTAssertEqual(pickerRoots, [previous])
-        XCTAssertEqual(savedRoots, [pickedFolder!])
-        XCTAssertFalse(FileManager.default.fileExists(atPath: pickedFolder!.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: newFolder.path))
         XCTAssertTrue(retry.isHidden)
         let open = try XCTUnwrap(item(titled: "Open Meetings Folder"))
         _ = (open.target as? NSObject)?.perform(open.action, with: open)
-        XCTAssertEqual(opened, [pickedFolder!])
+        XCTAssertEqual(opened, [newFolder])
         await recorder.toggleRecording()
-        XCTAssertEqual(MeetingFolder.all(in: pickedFolder!).count, 1)
+        XCTAssertEqual(MeetingFolder.all(in: newFolder).count, 1)
         XCTAssertEqual(MeetingFolder.all(in: previous).count, 1)
-    }
-
-    func testCancellingThePickerChangesNothingAndCreatesNoFolder() throws {
-        let previous = try XCTUnwrap(root)
-        let titles = visibleTitles
-        try chooseFolder()
-        XCTAssertEqual(pickerRoots, [previous])
-        XCTAssertEqual(savedRoots, [])
-        XCTAssertEqual(root, previous)
-        XCTAssertEqual(visibleTitles, titles)
-        XCTAssertEqual(recorder.phase, .idle)
-        XCTAssertFalse(FileManager.default.fileExists(atPath: previous.path))
     }
 
     func testChangingTheFolderKeepsTheActiveAndQueuedMeetingsAtTheirOriginalPaths() async throws {
@@ -72,27 +55,26 @@ final class MeetingNotesControllerTests: MeetingNotesTestCase {
         await recorder.toggleRecording()
         let active = try XCTUnwrap(MeetingFolder.all(in: previous).last?.0)
         sut.resumeUnfinished()
-        pickedFolder = previous.deletingLastPathComponent().appendingPathComponent("Other notes")
+        let newFolder = previous.deletingLastPathComponent().appendingPathComponent("Other notes")
 
-        try chooseFolder()
+        changeFolder(to: newFolder)
         recorder.stopRecording()
         await sut.waitUntilIdle()
 
         XCTAssertEqual(queued.stage(), .done)
         XCTAssertEqual(nextQueued.stage(), .done)
         XCTAssertEqual(active.stage(), .done)
-        XCTAssertFalse(FileManager.default.fileExists(atPath: pickedFolder!.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: newFolder.path))
         XCTAssertEqual(notifier.posted.compactMap(\.url).map { $0.deletingLastPathComponent() },
                        [queued.url, nextQueued.url, active.url])
     }
 
-    func testSelectingASymlinkKeepsMeetingFolderIdentity() async throws {
+    func testAFolderThatIsASymlinkKeepsMeetingFolderIdentity() async throws {
         let actual = try XCTUnwrap(root)
         try FileManager.default.createDirectory(at: actual, withIntermediateDirectories: true)
         let link = actual.deletingLastPathComponent().appendingPathComponent("linked-notes")
         try FileManager.default.createSymbolicLink(at: link, withDestinationURL: actual)
-        pickedFolder = link
-        try chooseFolder()
+        changeFolder(to: link)
         await recorder.toggleRecording()
         XCTAssertEqual(MeetingFolder.all(in: link).map(\.0), MeetingFolder.all(in: actual).map(\.0))
         XCTAssertEqual(MeetingFolder.all(in: actual).count, 1)
@@ -103,7 +85,7 @@ final class MeetingNotesControllerTests: MeetingNotesTestCase {
     }
 
     func testTheIdleMenuOffersToStartRecording() {
-        XCTAssertEqual(visibleTitles, ["Meeting Notes", "Start Recording Meeting", "Open Meetings Folder", "Choose Meetings Folder…", ""])
+        XCTAssertEqual(visibleTitles, ["Meeting Notes", "Start Recording Meeting", "Open Meetings Folder", ""])
         XCTAssertEqual(recorder.phase, .idle)
     }
 
@@ -142,7 +124,7 @@ final class MeetingNotesControllerTests: MeetingNotesTestCase {
         sut.menuTick()
 
         XCTAssertEqual(visibleTitles, ["Meeting Notes", "● Recording · 4:05", "Stop Recording Meeting", "Pause Recording",
-                                       "Show Meeting Controls", "Restore Default Position", "Open Meetings Folder", "Choose Meetings Folder…", ""])
+                                       "Show Meeting Controls", "Restore Default Position", "Open Meetings Folder", ""])
     }
 
     func testTheRecordedTimeStopsWhilePausedAndLeavesOutThePause() async {
@@ -171,13 +153,13 @@ final class MeetingNotesControllerTests: MeetingNotesTestCase {
         XCTAssertEqual(stateChanges, 0)
         XCTAssertEqual(capture.recordings.count, 0)
         XCTAssertEqual(meetingNames(), [])
-        XCTAssertEqual(visibleTitles, ["Meeting Notes", "Start Recording Meeting", "Open Meetings Folder", "Choose Meetings Folder…", ""])
+        XCTAssertEqual(visibleTitles, ["Meeting Notes", "Start Recording Meeting", "Open Meetings Folder", ""])
     }
 
     func testTheMenuOffersPauseWhileRecordingAndResumeWhilePaused() async throws {
         await recorder.toggleRecording()
         XCTAssertEqual(visibleTitles, ["Meeting Notes", "● Recording · 0:00", "Stop Recording Meeting", "Pause Recording",
-                                       "Show Meeting Controls", "Restore Default Position", "Open Meetings Folder", "Choose Meetings Folder…", ""])
+                                       "Show Meeting Controls", "Restore Default Position", "Open Meetings Folder", ""])
 
         hostTime = HostTime(seconds: 1_010)
         let pause = try XCTUnwrap(item(titled: "Pause Recording"))
@@ -185,7 +167,7 @@ final class MeetingNotesControllerTests: MeetingNotesTestCase {
 
         XCTAssertEqual(recorder.phase, .paused)
         XCTAssertEqual(visibleTitles, ["Meeting Notes", "Paused · 0:10", "Stop Recording Meeting", "Resume Recording",
-                                       "Show Meeting Controls", "Restore Default Position", "Open Meetings Folder", "Choose Meetings Folder…", ""])
+                                       "Show Meeting Controls", "Restore Default Position", "Open Meetings Folder", ""])
 
         hostTime = HostTime(seconds: 1_040)
         let resume = try XCTUnwrap(item(titled: "Resume Recording"))
@@ -206,7 +188,7 @@ final class MeetingNotesControllerTests: MeetingNotesTestCase {
         XCTAssertEqual(recorder.phase, .idle)
         XCTAssertEqual(capture.recordings.first?.stopCount, 1)
         XCTAssertEqual(notifications, ["Meeting Notes Ready: Meeting on 2026-10-23 at 14:02. Click to open the summary."])
-        XCTAssertEqual(visibleTitles, ["Meeting Notes", "Start Recording Meeting", "Open Meetings Folder", "Choose Meetings Folder…", ""])
+        XCTAssertEqual(visibleTitles, ["Meeting Notes", "Start Recording Meeting", "Open Meetings Folder", ""])
     }
 
     func testAnInterruptionWhilePausedEndsTheMeeting() async {
@@ -280,8 +262,7 @@ final class MeetingNotesControllerTests: MeetingNotesTestCase {
         let handle = try XCTUnwrap(capture.recordings.last)
         handle.levels = RecordingAudioLevels(microphone: 0.2, system: 0.8)
         menu.removeAllItems()
-        let statusMenu = StatusMenu(settings: Settings(defaults: UserDefaults(suiteName: "MeterMenuTests")!,
-                                                       loginItem: FakeLoginItem()), sections: [sut])
+        let statusMenu = StatusMenu(sections: [sut])
         statusMenu.menuWillOpen(statusMenu.menu)
         defer { statusMenu.menuDidClose(statusMenu.menu) }
         let meterItem = try XCTUnwrap(statusMenu.menu.items.first { $0.view != nil })
@@ -330,7 +311,7 @@ final class MeetingNotesControllerTests: MeetingNotesTestCase {
         XCTAssertEqual(notifier.posted.last?.url?.resolvingSymlinksInPath(), meeting.url(for: .summary).resolvingSymlinksInPath(),
                        "a click opens the summary")
         XCTAssertEqual(notifier.permissionRequests, 1, "asked at Start, not at the first notice")
-        XCTAssertEqual(visibleTitles, ["Meeting Notes", "Start Recording Meeting", "Open Meetings Folder", "Choose Meetings Folder…", ""])
+        XCTAssertEqual(visibleTitles, ["Meeting Notes", "Start Recording Meeting", "Open Meetings Folder", ""])
     }
 
     func testCaptureEndingOnItsOwnSaysSoAtOnceAndProcessesWhatWasRecorded() async throws {
@@ -366,7 +347,7 @@ final class MeetingNotesControllerTests: MeetingNotesTestCase {
         XCTAssertEqual(alerts, ["No display is available to capture audio from."])
         XCTAssertEqual(permissionWindows, 0)
         XCTAssertEqual(notifications, [])
-        XCTAssertEqual(visibleTitles, ["Meeting Notes", "Start Recording Meeting", "Open Meetings Folder", "Choose Meetings Folder…", ""])
+        XCTAssertEqual(visibleTitles, ["Meeting Notes", "Start Recording Meeting", "Open Meetings Folder", ""])
     }
 
     func testMissingScreenRecordingSaysWhyAndOffersThePermissionsWindow() async {
@@ -378,7 +359,7 @@ final class MeetingNotesControllerTests: MeetingNotesTestCase {
         XCTAssertEqual(permissionWindows, 1)
         XCTAssertEqual(capture.recordings.count, 0)
         XCTAssertEqual(meetingNames(), [])
-        XCTAssertEqual(visibleTitles, ["Meeting Notes", "Start Recording Meeting", "Open Meetings Folder", "Choose Meetings Folder…", ""])
+        XCTAssertEqual(visibleTitles, ["Meeting Notes", "Start Recording Meeting", "Open Meetings Folder", ""])
     }
 
     func testASecondClickWhileTheMicrophonePromptIsUpStartsNothing() async {
@@ -414,7 +395,7 @@ final class MeetingNotesControllerTests: MeetingNotesTestCase {
     func testRetryRunsFailedMeetingsFromTheStepThatFailed() async throws {
         let failed = try leftoverMeeting(at: localDate(2026, 10, 22, 10, 0), failure: "agy exited with status 1", transcript: true)
         sut.menuWillOpen()
-        XCTAssertEqual(visibleTitles, ["Meeting Notes", "Start Recording Meeting", "Retry Failed Meeting", "Open Meetings Folder", "Choose Meetings Folder…", ""])
+        XCTAssertEqual(visibleTitles, ["Meeting Notes", "Start Recording Meeting", "Retry Failed Meeting", "Open Meetings Folder", ""])
 
         let retry = try XCTUnwrap(item(titled: "Retry Failed Meeting"))
         _ = (retry.target as? NSObject)?.perform(retry.action, with: retry)
@@ -423,7 +404,7 @@ final class MeetingNotesControllerTests: MeetingNotesTestCase {
         XCTAssertEqual(failed.stage(), .done)
         XCTAssertEqual(try failed.read(.summary).components(separatedBy: "\n").first, "# Meeting on 2026-10-22 at 10:00")
         XCTAssertEqual(notifications, ["Meeting Notes Ready: Meeting on 2026-10-22 at 10:00. Click to open the summary."])
-        XCTAssertEqual(visibleTitles, ["Meeting Notes", "Start Recording Meeting", "Open Meetings Folder", "Choose Meetings Folder…", ""])
+        XCTAssertEqual(visibleTitles, ["Meeting Notes", "Start Recording Meeting", "Open Meetings Folder", ""])
     }
 
     func testTheRetryItemCountsTheFailedMeetings() throws {
@@ -456,7 +437,7 @@ final class MeetingNotesControllerTests: MeetingNotesTestCase {
 
         XCTAssertEqual(visibleTitles, ["Meeting Notes", "Start Recording Meeting",
                                        "Transcribing: Meeting on 2026-10-22 at 09:00", "1 more meeting waiting",
-                                       "Open Meetings Folder", "Choose Meetings Folder…", ""])
+                                       "Open Meetings Folder", ""])
     }
 
     func testTheProgressItemSaysTranscribingAgainOnceTheSpeechModelIsDownloaded() async throws {
@@ -471,7 +452,7 @@ final class MeetingNotesControllerTests: MeetingNotesTestCase {
 
         XCTAssertEqual(suspended.downloads, ["en-US"])
         XCTAssertEqual(visibleTitles, ["Meeting Notes", "Start Recording Meeting",
-                                       "Transcribing: Meeting on 2026-10-22 at 09:00", "Open Meetings Folder", "Choose Meetings Folder…", ""])
+                                       "Transcribing: Meeting on 2026-10-22 at 09:00", "Open Meetings Folder", ""])
     }
 
     func testQuittingWhileRecordingClosesTheFilesAndLeavesTheMeetingForTheNextLaunch() async throws {

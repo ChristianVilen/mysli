@@ -1,19 +1,5 @@
 import Cocoa
 
-@MainActor
-enum MeetingsFolderPicker {
-    static func choose(current: URL) -> URL? {
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.allowsMultipleSelection = false
-        panel.canCreateDirectories = true
-        panel.directoryURL = current
-        panel.prompt = "Choose"
-        return panel.runModal() == .OK ? panel.url : nil
-    }
-}
-
 /// Owns the Meeting Notes menu and serial processing queue.
 @MainActor
 final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection {
@@ -40,12 +26,11 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
     private let recorder: MeetingRecorder
     private let root: () -> URL
     private let processor: MeetingProcessor
+    private let summaryTool: () -> SummaryTool
     /// The number of open questions of a meeting, or with nil, of every done meeting.
     private let wordsToCheck: (MeetingFolder?) -> Int
     private let notifier: Notifying
     private let openURL: (URL) -> Void
-    private let chooseFolder: @MainActor (URL) -> URL?
-    private let setRoot: (URL) -> Void
 
     private var queue: [Job] = []
     private var current: (job: Job, activity: String)?
@@ -65,7 +50,6 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
     private let checkWordsItem: NSMenuItem
     private let retryItem: NSMenuItem
     private let openFolderItem: NSMenuItem
-    private let chooseFolderItem: NSMenuItem
 
     /// Fires on every change of the recorder's `phase`, Starting and quit included.
     var onStateChange: (() -> Void)?
@@ -77,18 +61,16 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
          root: @escaping () -> URL,
          processor: MeetingProcessor,
          wordsToCheck: @escaping (MeetingFolder?) -> Int,
-         chooseFolder: @escaping @MainActor (URL) -> URL? = MeetingsFolderPicker.choose,
-         setRoot: @escaping (URL) -> Void,
+         summaryTool: @escaping () -> SummaryTool,
          notifier: Notifying = SystemNotifier.shared,
          openURL: @escaping (URL) -> Void = { NSWorkspace.shared.open($0) }) {
         self.recorder = recorder
         self.root = root
         self.processor = processor
+        self.summaryTool = summaryTool
         self.wordsToCheck = wordsToCheck
         self.notifier = notifier
         self.openURL = openURL
-        self.chooseFolder = chooseFolder
-        self.setRoot = setRoot
         statusLineItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
         meterItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
         recordItem = NSMenuItem(title: "", action: #selector(recordClicked), keyEquivalent: "")
@@ -101,11 +83,9 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
         checkWordsItem = NSMenuItem(title: "", action: #selector(checkWordsClicked), keyEquivalent: "")
         retryItem = NSMenuItem(title: "", action: #selector(retryClicked), keyEquivalent: "")
         openFolderItem = NSMenuItem(title: "Open Meetings Folder", action: #selector(openFolderClicked), keyEquivalent: "")
-        chooseFolderItem = NSMenuItem(title: "Choose Meetings Folder…", action: #selector(chooseFolderClicked), keyEquivalent: "")
         super.init()
         meterItem.view = meterView
-        for item in [recordItem, pauseItem, showControlsItem, restorePositionItem, checkWordsItem, retryItem, openFolderItem,
-                     chooseFolderItem] {
+        for item in [recordItem, pauseItem, showControlsItem, restorePositionItem, checkWordsItem, retryItem, openFolderItem] {
             item.target = self
         }
         for item in [statusLineItem, meterItem, pauseItem, showControlsItem, restorePositionItem, progressItem, waitingItem,
@@ -128,7 +108,7 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
         header.isEnabled = false
         menu.addItem(header)
         for item in [statusLineItem, meterItem, recordItem, pauseItem, showControlsItem, restorePositionItem, progressItem,
-                     waitingItem, checkWordsItem, retryItem, openFolderItem, chooseFolderItem] {
+                     waitingItem, checkWordsItem, retryItem, openFolderItem] {
             menu.addItem(item)
         }
         menu.addItem(.separator())
@@ -220,9 +200,7 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
         openURL(root)
     }
 
-    @objc private func chooseFolderClicked() {
-        guard let chosen = chooseFolder(root()) else { return }
-        setRoot(chosen)
+    func meetingsFolderChanged() {
         reloadFromDisk()
     }
 
@@ -237,10 +215,11 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
     private func processQueue() async {
         while !queue.isEmpty, !Task.isCancelled {
             let job = queue.removeFirst()
+            let tool = summaryTool()
             switch job {
             case .process(let recording):
                 let meeting = recording.folder
-                let outcome = await processor.process(meeting, speakers: recording.speakers) { [weak self] progress in
+                let outcome = await processor.process(meeting, speakers: recording.speakers, tool: tool) { [weak self] progress in
                     self?.current = (job, progress.title)
                     self?.updateMenu()
                 }
@@ -249,7 +228,7 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
             case .updateNotes(let meeting):
                 current = (job, "Updating notes")
                 updateMenu()
-                let outcome = await processor.updateNotes(meeting)
+                let outcome = await processor.updateNotes(meeting, tool: tool)
                 current = nil
                 report(outcome, for: meeting)
             }

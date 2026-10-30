@@ -3,17 +3,10 @@ import XCTest
 
 @MainActor
 final class StatusMenuTests: XCTestCase {
-    private var defaults: UserDefaults!
-    private var loginItem: FakeLoginItem!
-    private var settings: Settings!
     private var meetingsRoot: URL!
     private var sut: StatusMenu!
 
     override func setUp() async throws {
-        defaults = UserDefaults(suiteName: "StatusMenuTests")!
-        defaults.removePersistentDomain(forName: "StatusMenuTests")
-        loginItem = FakeLoginItem()
-        settings = Settings(defaults: defaults, loginItem: loginItem)
         meetingsRoot = try makeTemporaryDirectory()
         let recorder = MeetingRecorder(
             permissions: PermissionsManager(isAccessibilityTrusted: { true }, hasScreenCaptureAccess: { true },
@@ -26,15 +19,11 @@ final class StatusMenuTests: XCTestCase {
             root: { [unowned self] in meetingsRoot },
             processor: makeMeetingProcessor(),
             wordsToCheck: { [unowned self] in WordReview.openQuestionCount(of: $0, in: meetingsRoot, knownWords: .empty) },
-            chooseFolder: { _ in nil },
-            setRoot: { [unowned self] in meetingsRoot = $0 },
+            summaryTool: { .automatic },
             notifier: FakeNotifier())
-        sut = StatusMenu(settings: settings, sections: [KeepAwakeController(defaults: defaults), meetingNotes])
-    }
-
-    override func tearDown() {
-        defaults.removePersistentDomain(forName: "StatusMenuTests")
-        super.tearDown()
+        let keepAwake = KeepAwakeController(wakeManager: WakeManager(preventer: FakeSleepPreventer()),
+                                             keepDisplayAwake: true, notifier: FakeNotifier())
+        sut = StatusMenu(sections: [keepAwake, meetingNotes])
     }
 
     private func item(titled title: String) -> NSMenuItem? {
@@ -89,22 +78,64 @@ final class StatusMenuTests: XCTestCase {
         XCTAssertNil(item(titled: "Open Keyboard Settings…"))
     }
 
-    func testMenuContainsCoreItems() {
-        for title in ["Launch at Login", "Window Tiling", "Clipboard History", "3 Seconds", "5 Seconds", "15 Seconds", "Forever", "Quit Ku-Ka"] {
-            XCTAssertNotNil(item(titled: title), "missing menu item: \(title)")
+    func testMenuContainsSettingsAndOperationalItemsOnly() throws {
+        let preferenceTitles = ["Settings…", "Settings", "Launch at Login", "Window Tiling", "Clipboard History",
+                                "Thumbnail Duration", "3 Seconds", "5 Seconds", "15 Seconds", "Forever",
+                                "Choose Meetings Folder…"]
+        XCTAssertEqual(menuItems.filter { preferenceTitles.contains($0.title) }.map(\.title), ["Settings…"])
+        for title in ["Start Recording Meeting", "Open Meetings Folder", "Permissions…", "Quit Ku-Ka"] {
+            XCTAssertNotNil(item(titled: title))
         }
+        let settingsItem = try XCTUnwrap(item(titled: "Settings…"))
+        XCTAssertEqual(settingsItem.keyEquivalent, ",")
+        XCTAssertEqual(settingsItem.keyEquivalentModifierMask, .command)
+        var shown = 0
+        sut.onShowSettings = { shown += 1 }
+        click(settingsItem)
+        XCTAssertEqual(shown, 1)
     }
 
     func testFeaturesSectionListsClipboardHistoryShortcut() {
         XCTAssertNotNil(item(titled: "⌘⇧C to open clipboard history"), "missing clipboard history feature line")
     }
 
+    func testApplicationMenuGivesOrdinaryWindowsTheStandardCommands() throws {
+        let commands = sut.applicationMenu().items.flatMap { $0.submenu?.items ?? [] }
+        let expected: [(title: String, key: String, modifiers: NSEvent.ModifierFlags, action: Selector)] = [
+            ("Quit Ku-Ka", "q", .command, #selector(NSApplication.terminate(_:))),
+            ("Close", "w", .command, #selector(NSWindow.performClose(_:))),
+            ("Undo", "z", .command, Selector(("undo:"))),
+            ("Redo", "z", [.command, .shift], Selector(("redo:"))),
+            ("Cut", "x", .command, #selector(NSText.cut(_:))),
+            ("Copy", "c", .command, #selector(NSText.copy(_:))),
+            ("Paste", "v", .command, #selector(NSText.paste(_:))),
+            ("Select All", "a", .command, #selector(NSText.selectAll(_:)))
+        ]
+        for command in expected {
+            let item = try XCTUnwrap(commands.first { $0.title == command.title }, command.title)
+            XCTAssertEqual(item.keyEquivalent, command.key, command.title)
+            XCTAssertEqual(item.keyEquivalentModifierMask, command.modifiers, command.title)
+            XCTAssertEqual(item.action, command.action, command.title)
+            XCTAssertNil(item.target, "\(command.title) must reach the key window through the responder chain")
+        }
+    }
+
+    func testCommandCommaInApplicationMenuOpensSettings() throws {
+        var opened = 0
+        sut.onShowSettings = { opened += 1 }
+        let event = try XCTUnwrap(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: .command,
+            timestamp: 0, windowNumber: 0, context: nil, characters: ",", charactersIgnoringModifiers: ",",
+            isARepeat: false, keyCode: 43))
+        XCTAssertTrue(sut.applicationMenu().performKeyEquivalent(with: event))
+        XCTAssertEqual(opened, 1)
+    }
+
     func testMeetingNotesSectionFollowsKeepAwake() throws {
         let titles = menuItems.filter { !$0.isHidden }.map(\.title)
         let lidHint = try XCTUnwrap(titles.firstIndex(of: "Closing the lid still sleeps your Mac"))
 
-        XCTAssertEqual(Array(titles[(lidHint + 1)...(lidHint + 7)]),
-                       ["", "Meeting Notes", "Start Recording Meeting", "Open Meetings Folder", "Choose Meetings Folder…", "", "Features"])
+        XCTAssertEqual(Array(titles[(lidHint + 1)...(lidHint + 6)]),
+                       ["", "Meeting Notes", "Start Recording Meeting", "Open Meetings Folder", "", "Features"])
     }
 
     func testOpeningTheMenuShowsFailedMeetingsFromDisk() throws {
@@ -134,55 +165,6 @@ final class StatusMenuTests: XCTestCase {
         let header = try XCTUnwrap(titles.firstIndex(of: "Meeting Notes"))
         XCTAssertEqual(Array(titles[header...(header + 4)]),
                        ["Meeting Notes", "Start Recording Meeting", "Check Words (1)…", "Retry Failed Meeting", "Open Meetings Folder"])
-    }
-
-    func testTilingToggleWritesSettingsFiresCallbackAndFlipsCheckmark() {
-        let tiling = item(titled: "Window Tiling")!
-        XCTAssertEqual(tiling.state, .on, "tiling defaults to enabled")
-        var callbackValue: Bool?
-        sut.onTilingToggled = { callbackValue = $0 }
-
-        click(tiling)
-
-        XCTAssertFalse(settings.windowTilingEnabled)
-        XCTAssertEqual(callbackValue, false)
-        XCTAssertEqual(tiling.state, .off)
-    }
-
-    func testClipboardHistoryToggleWritesSettingsFiresCallbackAndFlipsCheckmark() {
-        let clipboardHistory = item(titled: "Clipboard History")!
-        XCTAssertEqual(clipboardHistory.state, .on, "clipboard history defaults to enabled")
-        var callbackValue: Bool?
-        sut.onClipboardHistoryToggled = { callbackValue = $0 }
-
-        click(clipboardHistory)
-
-        XCTAssertFalse(settings.clipboardHistoryEnabled)
-        XCTAssertEqual(callbackValue, false)
-        XCTAssertEqual(clipboardHistory.state, .off)
-    }
-
-    func testDurationPickIsExclusiveAndPersisted() {
-        let fifteen = item(titled: "15 Seconds")!
-        XCTAssertEqual(item(titled: "5 Seconds")!.state, .on, "default duration is checked")
-
-        click(fifteen)
-
-        XCTAssertEqual(settings.thumbnailDuration, 15)
-        XCTAssertEqual(fifteen.state, .on)
-        for title in ["3 Seconds", "5 Seconds", "Forever"] {
-            XCTAssertEqual(item(titled: title)!.state, .off, "\(title) should be unchecked")
-        }
-    }
-
-    func testLaunchAtLoginToggleDrivesTheLoginSeam() {
-        let login = item(titled: "Launch at Login")!
-        XCTAssertEqual(login.state, .off)
-
-        click(login)
-
-        XCTAssertEqual(loginItem.setCalls, [true])
-        XCTAssertEqual(login.state, .on)
     }
 
     func testIconDiffersWhenKeepAwakeIsActive() {

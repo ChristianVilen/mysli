@@ -98,7 +98,7 @@ final class MeetingProcessorRoomLabelTests: MeetingProcessorTestCase {
         labeller.onDownloadEnd = { events.append("download ended") }
         labeller.onLabel = { events.append("label") }
 
-        let outcome = await makeProcessor().process(meeting) { events.append($0.title) }
+        let outcome = await makeProcessor().process(meeting, tool: .automatic) { events.append($0.title) }
 
         XCTAssertEqual(outcome, .done(summary: meeting.url(for: .summary)))
         XCTAssertEqual(events, ["Transcribing", "Downloading speaker model", "download ended", "Transcribing", "label",

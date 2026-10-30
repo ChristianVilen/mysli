@@ -35,8 +35,8 @@ final class WordReviewWindowTests: XCTestCase {
             requestUpdate: { [unowned self] in requested.append($0) },
             openURL: { [unowned self] in opened.append($0) })
         sut = WordReviewWindowController(controller: controller,
-                                         setActivationPolicy: { [unowned self] in policies.append($0) },
-                                         activate: { [unowned self] in activations += 1 })
+                                         activation: .fake(setPolicy: { [unowned self] in policies.append($0) },
+                                                           activateApp: { [unowned self] in activations += 1 }))
         sut.bindController()
     }
 

@@ -77,6 +77,14 @@ class MockWindowListProvider: WindowListProvider {
     }
 }
 
+extension OrdinaryWindowActivation {
+    /// Never changes the test host's activation policy or brings it to the front.
+    static func fake(setPolicy: @escaping (NSApplication.ActivationPolicy) -> Void = { _ in },
+                     activateApp: @escaping () -> Void = {}) -> OrdinaryWindowActivation {
+        OrdinaryWindowActivation(setPolicy: setPolicy, activateApp: activateApp)
+    }
+}
+
 @MainActor
 class MockWindowControlling: WindowControlling {
     var focusedWindowToReturn: FocusedWindow?

@@ -55,7 +55,7 @@ struct MeetingProcessor {
     }
 
     /// Asks no new questions and leaves both review files alone.
-    func updateNotes(_ meeting: MeetingFolder) async -> NotesUpdateOutcome {
+    func updateNotes(_ meeting: MeetingFolder, tool: SummaryTool) async -> NotesUpdateOutcome {
         let lock: FileLock
         do {
             lock = try meeting.lock()
@@ -67,7 +67,7 @@ struct MeetingProcessor {
         defer { lock.release() }
         guard meeting.stage() == .done else { return .notReady }
         do {
-            switch try await correctAndSummarize(meeting).result {
+            switch try await correctAndSummarize(meeting, tool: tool).result {
             case .written(let notes, _, _, _):
                 try meeting.write(SummaryDocument.markdown(title: meeting.title, body: notes), to: .summary)
             case .failed(let failures):
@@ -81,7 +81,7 @@ struct MeetingProcessor {
         return .updated(summary: meeting.url(for: .summary))
     }
 
-    func process(_ meeting: MeetingFolder, speakers: TeamsSpeakerEvidence = .empty,
+    func process(_ meeting: MeetingFolder, speakers: TeamsSpeakerEvidence = .empty, tool: SummaryTool,
                  progress: (MeetingProgress) -> Void) async -> MeetingOutcome {
         let lock: FileLock
         do {
@@ -113,7 +113,7 @@ struct MeetingProcessor {
                     case .transcribe:
                         guard try await transcribe(meeting, speakers: speakers, progress: progress) else { return .noSpeech }
                     case .summarize:
-                        try await summarize(meeting)
+                        try await summarize(meeting, tool: tool)
                     }
                 } catch {
                     if Task.isCancelled { return .cancelled }
@@ -238,7 +238,7 @@ struct MeetingProcessor {
         throw MeetingStepError(failures.map(\.description).joined(separator: "\n"))
     }
 
-    private func summarize(_ meeting: MeetingFolder) async throws {
+    private func summarize(_ meeting: MeetingFolder, tool: SummaryTool) async throws {
         // Trash the audio here, not right after writing transcript.md: this
         // step runs only once transcript.md exists, so it also cleans up after
         // a crash between the two.
@@ -247,7 +247,7 @@ struct MeetingProcessor {
         } catch {
             NSLog("Ku-Ka: could not move meeting audio to the Trash: \(error)")
         }
-        let summary = try await correctAndSummarize(meeting)
+        let summary = try await correctAndSummarize(meeting, tool: tool)
         switch summary.result {
         case .written(let notes, let suspects, _, _):
             // The questions, or the removal of old ones, go before `summary.md`, which marks the meeting done.
@@ -261,14 +261,14 @@ struct MeetingProcessor {
     /// Rebuilds `transcript.md` from the heard copy, so corrections never apply twice and a removed
     /// list line undoes its replacement. This also replaces hand edits to `transcript.md`.
     /// Throws only for meeting-folder reads or writes; the caller handles CLI failure and writes `summary.md`.
-    private func correctAndSummarize(_ meeting: MeetingFolder) async throws
+    private func correctAndSummarize(_ meeting: MeetingFolder, tool: SummaryTool) async throws
         -> (result: SummaryResult, content: String, list: KnownWordsList) {
         let heard = try meeting.heardTranscript()
         let list = knownWords()
         let corrected = Transcript.corrected(heard, by: list.corrector)
         try meeting.write(corrected.markdown, to: .transcript)
         let content = Transcript.contentForSummary(corrected.body)
-        let result = await summarizer.summarize(transcript: content, knownWords: list.relevant(to: content))
+        let result = await summarizer.summarize(transcript: content, knownWords: list.relevant(to: content), tool: tool)
         if case .written(_, _, let cli, let earlier) = result, !earlier.isEmpty {
             NSLog("Ku-Ka: %@ wrote the notes of %@. Tried first: %@", cli.rawValue, meeting.name,
                   earlier.map(\.description).joined(separator: "; "))

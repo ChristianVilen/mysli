@@ -19,6 +19,19 @@ final class SettingsTests: XCTestCase {
         super.tearDown()
     }
 
+    func testSummaryToolDefaultsAndUnknownValuesDoNotWriteAndChoicesPersist() {
+        XCTAssertEqual(sut.summaryTool, .automatic)
+        XCTAssertNil(defaults.object(forKey: "summaryTool"))
+        defaults.set("future", forKey: "summaryTool")
+        XCTAssertEqual(sut.summaryTool, .automatic)
+        XCTAssertEqual(defaults.string(forKey: "summaryTool"), "future")
+        for tool in SummaryTool.allCases {
+            sut.summaryTool = tool
+            XCTAssertEqual(defaults.string(forKey: "summaryTool"), tool.rawValue)
+            XCTAssertEqual(Settings(defaults: defaults, loginItem: loginItem).summaryTool, tool)
+        }
+    }
+
     func testTeamsSpeakerNamesAreOptInAndPersistWithTheDocumentedKey() {
         XCTAssertFalse(sut.teamsSpeakerNamesEnabled)
         sut.teamsSpeakerNamesEnabled = true
@@ -33,6 +46,21 @@ final class SettingsTests: XCTestCase {
         sut.thumbnailDuration = 15
         XCTAssertEqual(sut.thumbnailDuration, 15)
         XCTAssertEqual(Settings(defaults: defaults, loginItem: loginItem).thumbnailDuration, 15)
+    }
+
+    func testDisplayAwakeKeepsItsTrueDefaultAndExistingKey() {
+        XCTAssertTrue(sut.keepDisplayAwake)
+        XCTAssertNil(defaults.object(forKey: "keepDisplayAwake"))
+        sut.keepDisplayAwake = false
+        XCTAssertEqual(defaults.object(forKey: "keepDisplayAwake") as? Bool, false)
+        XCTAssertFalse(Settings(defaults: defaults, loginItem: loginItem).keepDisplayAwake)
+    }
+
+    func testContextSetterSavesThePathAndNilRemovesTheKey() {
+        sut.meetingContextFile = URL(fileURLWithPath: "/Users/example/background.md")
+        XCTAssertEqual(defaults.string(forKey: "meetingContextFile"), "/Users/example/background.md")
+        sut.meetingContextFile = nil
+        XCTAssertNil(defaults.object(forKey: "meetingContextFile"))
     }
 
     func testMeetingContextHasNoDefaultAndReadsEachNewPath() {

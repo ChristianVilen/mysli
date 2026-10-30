@@ -48,6 +48,17 @@ final class Settings {
         set { defaults.set(newValue, forKey: "clipboardHistoryEnabled") }
     }
 
+    /// On by default: a dark, locked screen looks like Keep Awake did not work.
+    var keepDisplayAwake: Bool {
+        get { defaults.object(forKey: "keepDisplayAwake") as? Bool ?? true }
+        set { defaults.set(newValue, forKey: "keepDisplayAwake") }
+    }
+
+    var summaryTool: SummaryTool {
+        get { defaults.string(forKey: "summaryTool").flatMap(SummaryTool.init(rawValue:)) ?? .automatic }
+        set { defaults.set(newValue.rawValue, forKey: "summaryTool") }
+    }
+
     /// Defaults to ~/Meetings, not ~/Documents or ~/Desktop: with iCloud
     /// "Desktop & Documents" on, those sync to iCloud, and meeting audio must
     /// stay on this Mac.
@@ -71,8 +82,14 @@ final class Settings {
     }
 
     var meetingContextFile: URL? {
-        guard let path = defaults.string(forKey: "meetingContextFile"), !path.isEmpty else { return nil }
-        return URL(fileURLWithPath: (path as NSString).expandingTildeInPath)
+        get {
+            guard let path = defaults.string(forKey: "meetingContextFile"), !path.isEmpty else { return nil }
+            return URL(fileURLWithPath: (path as NSString).expandingTildeInPath)
+        }
+        set {
+            if let newValue { defaults.set(newValue.path, forKey: "meetingContextFile") }
+            else { defaults.removeObject(forKey: "meetingContextFile") }
+        }
     }
 
     var teamsSpeakerNamesEnabled: Bool {
@@ -117,11 +134,16 @@ final class Settings {
 
     var launchAtLogin: Bool { loginItem.isEnabled }
 
-    func setLaunchAtLogin(_ enabled: Bool) {
+    @discardableResult
+    func setLaunchAtLogin(_ enabled: Bool) -> String? {
         do {
             try loginItem.setEnabled(enabled)
+            guard loginItem.isEnabled == enabled else {
+                return "Check Ku-Ka in System Settings, General, Login Items & Extensions. macOS has not applied this change."
+            }
+            return nil
         } catch {
-            NSLog("Launch at login toggle failed: \(error)")
+            return error.localizedDescription
         }
     }
 }

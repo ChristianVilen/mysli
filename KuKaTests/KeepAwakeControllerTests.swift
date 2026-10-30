@@ -2,12 +2,9 @@ import XCTest
 @testable import KuKa
 
 final class KeepAwakeControllerTests: XCTestCase {
-    private static let defaultsSuite = "KeepAwakeControllerTests"
-
     private var clock: Date!
     private var preventer: FakeSleepPreventer!
     private var manager: WakeManager!
-    private var defaults: UserDefaults!
     private var controller: KeepAwakeController!
     private var menu: NSMenu!
 
@@ -16,9 +13,8 @@ final class KeepAwakeControllerTests: XCTestCase {
         clock = Date(timeIntervalSince1970: 1_000_000)
         preventer = FakeSleepPreventer()
         manager = WakeManager(preventer: preventer, now: { self.clock })
-        defaults = UserDefaults(suiteName: Self.defaultsSuite)!
-        defaults.removePersistentDomain(forName: Self.defaultsSuite)
-        controller = KeepAwakeController(wakeManager: manager, now: { self.clock }, defaults: defaults)
+        controller = KeepAwakeController(wakeManager: manager, now: { self.clock }, keepDisplayAwake: true,
+                                         notifier: FakeNotifier())
         menu = NSMenu()
         controller.buildMenuSection(into: menu)
     }
@@ -40,13 +36,6 @@ final class KeepAwakeControllerTests: XCTestCase {
     private func clickChip(_ chip: String) {
         panel.durationControl.selectedSegment = chipIndex(chip)
         panel.durationClicked(panel.durationControl)
-    }
-
-    /// Flips the checkbox and fires its action, as a click would.
-    private func toggleDisplayCheckbox() {
-        let box = panel.displayAwakeCheckbox
-        box.state = box.state == .on ? .off : .on
-        panel.displayAwakeToggled(box)
     }
 
     /// Invokes an item's target/action exactly as a click would, without
@@ -117,24 +106,20 @@ final class KeepAwakeControllerTests: XCTestCase {
 
     // MARK: - Keep display awake preference
 
-    func testDisplayAwakeDefaultsToOn() {
-        XCTAssertEqual(panel.displayAwakeCheckbox.state, .on)
-        XCTAssertTrue(manager.keepDisplayAwake)
-
-        clickChip("∞")
-        XCTAssertEqual(preventer.lastKeepDisplayAwake, true)
+    func testTheSavedDisplayPreferenceReachesThePowerAssertion() {
+        let preventer = FakeSleepPreventer()
+        let controller = KeepAwakeController(wakeManager: WakeManager(preventer: preventer, now: { self.clock }),
+                                             now: { self.clock }, keepDisplayAwake: false, notifier: FakeNotifier())
+        controller.activate(.indefinite)
+        XCTAssertEqual(preventer.lastKeepDisplayAwake, false)
+        controller.deactivate()
     }
 
-    func testTogglingDisplayCheckboxUpdatesManagerAndPersists() {
-        toggleDisplayCheckbox()
-
-        XCTAssertFalse(manager.keepDisplayAwake)
-        XCTAssertEqual(defaults.object(forKey: KeepAwakeController.displayAwakeDefaultsKey) as? Bool, false)
-
-        // A fresh controller (fresh app launch) reads the persisted value.
-        let newManager = WakeManager(preventer: FakeSleepPreventer(), now: { self.clock })
-        _ = KeepAwakeController(wakeManager: newManager, now: { self.clock }, defaults: defaults)
-        XCTAssertFalse(newManager.keepDisplayAwake)
+    func testChangingDisplayPreferenceUpdatesActivePowerAssertion() {
+        clickChip("∞")
+        controller.setDisplayAwake(false)
+        XCTAssertEqual(preventer.lastKeepDisplayAwake, false)
+        XCTAssertTrue(controller.isActive)
     }
 
     // MARK: - State-change hook (drives the status-bar icon)

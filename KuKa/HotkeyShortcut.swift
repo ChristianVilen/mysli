@@ -15,6 +15,25 @@ enum HotkeyShortcut: CaseIterable {
         }
     }
 
+    var keycap: Keycap {
+        switch self {
+        case .captureFullScreen: return Keycap(symbol: "3", name: "3")
+        case .captureArea: return Keycap(symbol: "4", name: "4")
+        case .clipboardHistory, .center: return Keycap(symbol: "C", name: "C")
+        case .tileLeft: return Keycap(symbol: "←", name: "Left Arrow")
+        case .tileRight: return Keycap(symbol: "→", name: "Right Arrow")
+        case .maximize: return Keycap(symbol: "↵", name: "Return")
+        }
+    }
+
+    /// In the order macOS menus show modifiers.
+    var modifierKeycaps: [Keycap] {
+        [(controlKey, Keycap(symbol: "⌃", name: "Control")), (optionKey, Keycap(symbol: "⌥", name: "Option")),
+         (shiftKey, Keycap(symbol: "⇧", name: "Shift")), (cmdKey, Keycap(symbol: "⌘", name: "Command"))]
+            .filter { modifiers & UInt32($0.0) != 0 }
+            .map(\.1)
+    }
+
     var isTiling: Bool {
         switch self {
         case .tileLeft, .tileRight, .maximize, .center: return true
@@ -51,6 +70,12 @@ enum HotkeyShortcut: CaseIterable {
         case .center: return .tile(.center)
         }
     }
+}
+
+struct Keycap: Equatable {
+    let symbol: String
+    /// What VoiceOver says for the symbol.
+    let name: String
 }
 
 enum HotkeyRegistrationFailure: Equatable {

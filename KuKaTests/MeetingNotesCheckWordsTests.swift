@@ -59,7 +59,7 @@ final class MeetingNotesCheckWordsTests: MeetingNotesTestCase {
         try reviewedMeeting(at: localDate(2026, 10, 24, 9, 0), asking: ["Quorix"], skipped: 1)
         sut.menuWillOpen()
 
-        XCTAssertEqual(visibleTitles, ["Meeting Notes", "Start Recording Meeting", "Check Words (3)…", "Open Meetings Folder", "Choose Meetings Folder…", ""])
+        XCTAssertEqual(visibleTitles, ["Meeting Notes", "Start Recording Meeting", "Check Words (3)…", "Open Meetings Folder", ""])
     }
 
     func testCheckWordsLeavesOutTheQuestionsWhoseWordTheListLearnedSince() throws {
@@ -69,7 +69,7 @@ final class MeetingNotesCheckWordsTests: MeetingNotesTestCase {
 
         sut.menuWillOpen()
 
-        XCTAssertEqual(visibleTitles, ["Meeting Notes", "Start Recording Meeting", "Check Words (1)…", "Open Meetings Folder", "Choose Meetings Folder…", ""])
+        XCTAssertEqual(visibleTitles, ["Meeting Notes", "Start Recording Meeting", "Check Words (1)…", "Open Meetings Folder", ""])
     }
 
     func testTheMenuListsTheProgressThenCheckWordsThenRetry() async throws {
@@ -86,7 +86,7 @@ final class MeetingNotesCheckWordsTests: MeetingNotesTestCase {
 
         XCTAssertEqual(visibleTitles, ["Meeting Notes", "Start Recording Meeting",
                                        "Transcribing: Meeting on 2026-10-22 at 09:00", "1 more meeting waiting",
-                                       "Check Words (1)…", "Retry Failed Meeting", "Open Meetings Folder", "Choose Meetings Folder…", ""])
+                                       "Check Words (1)…", "Retry Failed Meeting", "Open Meetings Folder", ""])
     }
 
     func testAMeetingsFolderThatIsASymlinkKeepsRecoveryRetryAndCheckWords() async throws {
@@ -101,7 +101,7 @@ final class MeetingNotesCheckWordsTests: MeetingNotesTestCase {
 
         sut.menuWillOpen()
         XCTAssertEqual(visibleTitles, ["Meeting Notes", "Start Recording Meeting", "Check Words (1)…", "Retry Failed Meeting",
-                                       "Open Meetings Folder", "Choose Meetings Folder…", ""])
+                                       "Open Meetings Folder", ""])
         sut.resumeUnfinished()
         await sut.waitUntilIdle()
 
@@ -133,11 +133,11 @@ final class MeetingNotesCheckWordsTests: MeetingNotesTestCase {
 
         XCTAssertEqual(visibleTitles, ["Meeting Notes", "Start Recording Meeting",
                                        "Summarizing: Meeting on 2026-10-22 at 09:00", "1 more meeting waiting",
-                                       "Open Meetings Folder", "Choose Meetings Folder…", ""])
+                                       "Open Meetings Folder", ""])
         gate.letOneThrough()
         await waitUntil { gate.runs == 2 && gate.waiting == 1 }
         XCTAssertEqual(visibleTitles, ["Meeting Notes", "Start Recording Meeting",
-                                       "Updating notes: Meeting on 2026-10-23 at 09:00", "Open Meetings Folder", "Choose Meetings Folder…", ""])
+                                       "Updating notes: Meeting on 2026-10-23 at 09:00", "Open Meetings Folder", ""])
         gate.letOneThrough()
         await sut.waitUntilIdle()
         XCTAssertEqual(notifications, ["Meeting Notes Ready: Meeting on 2026-10-22 at 09:00. Click to open the summary.",

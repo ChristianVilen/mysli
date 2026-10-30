@@ -28,25 +28,18 @@ extension MenuSection {
 @MainActor
 final class StatusMenu: NSObject, NSMenuDelegate {
     let menu = NSMenu()
-    var onTilingToggled: ((Bool) -> Void)?
-    var onClipboardHistoryToggled: ((Bool) -> Void)?
+    var onShowSettings: (() -> Void)?
     var onShowPermissions: (() -> Void)?
     var onOpenKeyboardSettings: (() -> Void)?
     /// Fired every time the menu opens, before it is shown.
     var onMenuWillOpen: (() -> Void)?
 
-    private let settings: Settings
     private let sections: [MenuSection]
     private var refreshTimer: Timer?
-    private var launchAtLoginItem: NSMenuItem!
-    private var windowTilingItem: NSMenuItem!
-    private var clipboardHistoryItem: NSMenuItem!
-    private var durationItems: [NSMenuItem] = []
     private var hotkeyWarningItems: [NSMenuItem] = []
     private var renderedHealth: HotkeyHealth?
 
-    init(settings: Settings, sections: [MenuSection]) {
-        self.settings = settings
+    init(sections: [MenuSection]) {
         self.sections = sections
         super.init()
         build()
@@ -158,42 +151,38 @@ final class StatusMenu: NSObject, NSMenuDelegate {
 
     @objc private func openKeyboardSettings() { onOpenKeyboardSettings?() }
 
-    private func build() {
-        let settingsLabel = NSMenuItem(title: "Settings", action: nil, keyEquivalent: "")
-        settingsLabel.isEnabled = false
-        menu.addItem(settingsLabel)
-
-        launchAtLoginItem = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
-        launchAtLoginItem.target = self
-        launchAtLoginItem.state = settings.launchAtLogin ? .on : .off
-        menu.addItem(launchAtLoginItem)
-
-        windowTilingItem = NSMenuItem(title: "Window Tiling", action: #selector(toggleWindowTiling), keyEquivalent: "")
-        windowTilingItem.target = self
-        windowTilingItem.state = settings.windowTilingEnabled ? .on : .off
-        menu.addItem(windowTilingItem)
-
-        clipboardHistoryItem = NSMenuItem(title: "Clipboard History", action: #selector(toggleClipboardHistory), keyEquivalent: "")
-        clipboardHistoryItem.target = self
-        clipboardHistoryItem.state = settings.clipboardHistoryEnabled ? .on : .off
-        menu.addItem(clipboardHistoryItem)
-
-        menu.addItem(.separator())
-
-        let durationLabel = NSMenuItem(title: "Thumbnail Duration", action: nil, keyEquivalent: "")
-        durationLabel.isEnabled = false
-        menu.addItem(durationLabel)
-
-        let currentDuration = settings.thumbnailDuration
-        for (title, tag) in [("3 Seconds", 3), ("5 Seconds", 5), ("15 Seconds", 15), ("Forever", 0)] {
-            let item = NSMenuItem(title: title, action: #selector(changeDuration(_:)), keyEquivalent: "")
-            item.target = self
-            item.tag = tag
-            item.state = Double(tag) == currentDuration ? .on : .off
-            menu.addItem(item)
-            durationItems.append(item)
+    /// The menu bar while an ordinary window makes Ku-Ka a regular app. Without these items,
+    /// Command-W, Command-Q, and copy and paste do nothing in Ku-Ka's windows.
+    func applicationMenu() -> NSMenu {
+        let redo = NSMenuItem(title: "Redo", action: Selector(("redo:")), keyEquivalent: "z")
+        redo.keyEquivalentModifierMask = [.command, .shift]
+        let menus: [(title: String, items: [NSMenuItem])] = [
+            ("Ku-Ka", [settingsItem(), .separator(),
+                       NSMenuItem(title: "Quit Ku-Ka", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")]),
+            ("File", [NSMenuItem(title: "Close", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")]),
+            ("Edit", [NSMenuItem(title: "Undo", action: Selector(("undo:")), keyEquivalent: "z"), redo, .separator(),
+                      NSMenuItem(title: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x"),
+                      NSMenuItem(title: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c"),
+                      NSMenuItem(title: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v"),
+                      NSMenuItem(title: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")])
+        ]
+        let mainMenu = NSMenu()
+        for (title, items) in menus {
+            let submenu = NSMenu(title: title)
+            items.forEach(submenu.addItem)
+            mainMenu.addItem(withTitle: title, action: nil, keyEquivalent: "").submenu = submenu
         }
+        return mainMenu
+    }
 
+    private func settingsItem() -> NSMenuItem {
+        let item = NSMenuItem(title: "Settings…", action: #selector(showSettings), keyEquivalent: ",")
+        item.target = self
+        return item
+    }
+
+    private func build() {
+        menu.addItem(settingsItem())
         menu.addItem(.separator())
 
         for section in sections {
@@ -242,30 +231,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         menu.delegate = self
     }
 
-    @objc private func changeDuration(_ sender: NSMenuItem) {
-        settings.thumbnailDuration = Double(sender.tag)
-        for item in durationItems { item.state = .off }
-        sender.state = .on
-    }
-
-    @objc private func toggleWindowTiling() {
-        let enabled = !settings.windowTilingEnabled
-        settings.windowTilingEnabled = enabled
-        windowTilingItem.state = enabled ? .on : .off
-        onTilingToggled?(enabled)
-    }
-
-    @objc private func toggleClipboardHistory() {
-        let enabled = !settings.clipboardHistoryEnabled
-        settings.clipboardHistoryEnabled = enabled
-        clipboardHistoryItem.state = enabled ? .on : .off
-        onClipboardHistoryToggled?(enabled)
-    }
-
-    @objc private func toggleLaunchAtLogin() {
-        settings.setLaunchAtLogin(!settings.launchAtLogin)
-        launchAtLoginItem.state = settings.launchAtLogin ? .on : .off
-    }
+    @objc private func showSettings() { onShowSettings?() }
 
     @objc private func showPermissions() {
         onShowPermissions?()

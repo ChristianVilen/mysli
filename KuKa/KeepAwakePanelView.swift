@@ -1,25 +1,16 @@
 import Cocoa
 
-/// The inline Keep Awake panel embedded as a custom view in the status menu:
-/// a status line, a row of duration chips, and a "Keep display awake"
-/// checkbox. Pure view — it reports interactions through closures and holds
-/// no session state; `KeepAwakeController` owns the state and pushes updates
-/// into the exposed controls.
 final class KeepAwakePanelView: NSView {
     let titleLabel = NSTextField(labelWithString: "Keep Awake")
     let durationControl: NSSegmentedControl
-    let displayAwakeCheckbox: NSButton
     private let durations: [WakeDuration]
 
     /// Fired with the duration of the clicked chip.
     var onSelectDuration: ((WakeDuration) -> Void)?
-    /// Fired with the checkbox's new on/off state.
-    var onToggleDisplayAwake: ((Bool) -> Void)?
 
     init(presets: [(chip: String, duration: WakeDuration)]) {
         durations = presets.map(\.duration)
         durationControl = NSSegmentedControl(labels: presets.map(\.chip), trackingMode: .selectOne, target: nil, action: nil)
-        displayAwakeCheckbox = NSButton(checkboxWithTitle: "Keep display awake", target: nil, action: nil)
         super.init(frame: .zero)
 
         titleLabel.font = .menuFont(ofSize: 13)
@@ -30,12 +21,7 @@ final class KeepAwakePanelView: NSView {
         durationControl.controlSize = .small
         durationControl.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
 
-        displayAwakeCheckbox.target = self
-        displayAwakeCheckbox.action = #selector(displayAwakeToggled(_:))
-        displayAwakeCheckbox.controlSize = .small
-        displayAwakeCheckbox.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
-
-        let stack = NSStackView(views: [titleLabel, durationControl, displayAwakeCheckbox])
+        let stack = NSStackView(views: [titleLabel, durationControl])
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 6
@@ -62,10 +48,5 @@ final class KeepAwakePanelView: NSView {
     @objc func durationClicked(_ sender: NSSegmentedControl) {
         onSelectDuration?(durations[sender.selectedSegment])
         enclosingMenuItem?.menu?.cancelTracking()
-    }
-
-    /// The checkbox is a preference, not a command — the menu stays open.
-    @objc func displayAwakeToggled(_ sender: NSButton) {
-        onToggleDisplayAwake?(sender.state == .on)
     }
 }

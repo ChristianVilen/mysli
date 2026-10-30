@@ -15,7 +15,7 @@ final class OnboardingWindowControllerTests: XCTestCase {
         )
         permissions.refresh()
         let controller = OnboardingWindowController(
-            permissions: permissions, settings: Settings(defaults: defaults), setActivationPolicy: { _ in }
+            permissions: permissions, settings: Settings(defaults: defaults), activation: .fake()
         )
         defer { controller.close() }
 
@@ -50,7 +50,7 @@ final class OnboardingWindowControllerTests: XCTestCase {
         )
         permissions.refresh()
         let controller = OnboardingWindowController(
-            permissions: permissions, settings: Settings(defaults: defaults), setActivationPolicy: { _ in }
+            permissions: permissions, settings: Settings(defaults: defaults), activation: .fake()
         )
         defer { controller.close() }
         controller.show(.checklist)
@@ -73,7 +73,7 @@ final class OnboardingWindowControllerTests: XCTestCase {
         )
         permissions.refresh()
         let controller = OnboardingWindowController(
-            permissions: permissions, settings: Settings(defaults: defaults), setActivationPolicy: { _ in }
+            permissions: permissions, settings: Settings(defaults: defaults), activation: .fake()
         )
         defer { controller.close() }
         let issues = [HotkeyRegistrationIssue(shortcut: .captureArea, failure: .systemConflict)]
@@ -99,7 +99,7 @@ final class OnboardingWindowControllerTests: XCTestCase {
         )
         permissions.refresh()
         let controller = OnboardingWindowController(
-            permissions: permissions, settings: Settings(defaults: defaults), setActivationPolicy: { _ in }
+            permissions: permissions, settings: Settings(defaults: defaults), activation: .fake()
         )
         defer { controller.close() }
         let issues = [HotkeyRegistrationIssue(shortcut: .captureArea, failure: .systemConflict)]
@@ -109,7 +109,7 @@ final class OnboardingWindowControllerTests: XCTestCase {
         controller.close()
 
         let nextLaunch = OnboardingWindowController(
-            permissions: permissions, settings: Settings(defaults: defaults), setActivationPolicy: { _ in }
+            permissions: permissions, settings: Settings(defaults: defaults), activation: .fake()
         )
         defer { nextLaunch.close() }
         XCTAssertFalse(nextLaunch.showScreenshotSetupIfNeeded(issues: issues))
@@ -129,7 +129,7 @@ final class OnboardingWindowControllerTests: XCTestCase {
         let controller = OnboardingWindowController(
             permissions: permissions,
             settings: Settings(defaults: defaults),
-            setActivationPolicy: { policies.append($0) }
+            activation: .fake(setPolicy: { policies.append($0) })
         )
         defer { controller.close() }
 
@@ -149,7 +149,7 @@ final class OnboardingWindowControllerTests: XCTestCase {
             openURL: { opened.append($0.absoluteString); return true }
         )
         permissions.refresh()
-        let controller = OnboardingWindowController(permissions: permissions, setActivationPolicy: { _ in })
+        let controller = OnboardingWindowController(permissions: permissions, activation: .fake())
         defer { controller.close() }
         controller.show(.checklist)
 

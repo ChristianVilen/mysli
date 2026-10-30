@@ -16,14 +16,14 @@ final class MeetingProcessorTests: MeetingProcessorTestCase {
         knownWords = KnownWordsList(markdown: "- Friday → **Monday** ✓")
         let processor = makeProcessor()
 
-        let outcome = await processor.process(meeting, speakers: evidence) { _ in }
+        let outcome = await processor.process(meeting, speakers: evidence, tool: .automatic) { _ in }
         XCTAssertEqual(outcome, .done(summary: meeting.url(for: .summary)))
         XCTAssertTrue(try meeting.read(.heardTranscript).contains("Friday (Teams):** Let's ship on Friday"))
         XCTAssertTrue(try meeting.read(.transcript).contains("Friday (Teams):** Let's ship on Monday"))
         XCTAssertTrue(runner.calls.last?.arguments.last?.contains("Friday (Teams):** Let's ship on Monday") == true)
 
         knownWords = KnownWordsList(markdown: "- Friday → **Tuesday** ✓")
-        let updated = await processor.updateNotes(meeting)
+        let updated = await processor.updateNotes(meeting, tool: .automatic)
         XCTAssertEqual(updated, .updated(summary: meeting.url(for: .summary)))
         XCTAssertTrue(try meeting.read(.transcript).contains("Friday (Teams):** Let's ship on Tuesday"))
         XCTAssertTrue(runner.calls.last?.arguments.last?.contains("Friday (Teams):** Let's ship on Tuesday") == true)
@@ -42,7 +42,7 @@ final class MeetingProcessorTests: MeetingProcessorTestCase {
         let scanned = try makeMeeting()
         let processor = makeProcessor()
 
-        let outcome = await processor.process(scanned, speakers: evidence) { _ in }
+        let outcome = await processor.process(scanned, speakers: evidence, tool: .automatic) { _ in }
 
         XCTAssertEqual(outcome, .done(summary: scanned.url(for: .summary)))
         XCTAssertEqual(try scanned.read(.transcript), """
@@ -64,7 +64,7 @@ final class MeetingProcessorTests: MeetingProcessorTestCase {
         XCTAssertFalse(runner.calls.last?.arguments.last?.contains("Teams speaker names") ?? true)
 
         let unscanned = try makeMeeting()
-        _ = await processor.process(unscanned, speakers: .empty) { _ in }
+        _ = await processor.process(unscanned, speakers: .empty, tool: .automatic) { _ in }
         XCTAssertFalse(try unscanned.read(.transcript).contains("Teams speaker names"))
     }
 

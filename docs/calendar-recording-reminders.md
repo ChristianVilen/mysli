@@ -12,7 +12,7 @@ Read `controller.status` and assign `controller.onStatusChange: (() -> Void)?` t
 
 Only `setEnabled(true) async` requests Calendar and notification access. `resume() async` restores the saved preference without prompting. `refresh() async` rechecks grants and events. Settings can call it when its window opens or returns from System Settings. The driver also checks every 60 seconds. Denied Calendar access requires a grant in System Settings. Enable does not repeat a denied Calendar prompt.
 
-Suggested explanation text is "Calendar events offer recording reminders. Ku-Ka never starts or stops recording automatically." This branch adds no Settings switch or window. Those controls belong to [#43](https://github.com/ChristianVilen/ku-ka/issues/43).
+Suggested explanation text is "Calendar events offer recording reminders. Ku-Ka never starts or stops recording automatically." The Settings window's **Calendar reminders** switch ([#43](https://github.com/ChristianVilen/ku-ka/issues/43)) uses this explanation and follows this contract. `AppDelegate` awaits `setEnabled(_:)` for the switch, shows each status change in the window, and calls `refresh()` when Settings opens.
 
 ## Ownership and shared files
 
@@ -26,7 +26,7 @@ The controller holds one optional offer whose kind carries the event and, for an
 
 `AppDelegate` constructs the integration outside its test-host guard only. Its existing `meetingNotes.onStateChange` updates the status icon and forwards `recorderDidChange()`. It does not replace recorder callbacks. Quit cancels startup and shuts down calendar watchers before meeting processing. The notification adapter removes stale pending and delivered requests with the `calendar-recording.` prefix at launch, while preserving other requests and categories.
 
-The #43 owner must reconcile `AppDelegate.swift` and `Settings.swift`. `MeetingNotesController.swift` adds a title to its existing disabled recording line. The visible suffix is limited to 48 characters. The tooltip and accessibility label retain the full title. Manual recording keeps its existing status. `Info.plist` adds `NSCalendarsFullAccessUsageDescription`. Source folders remain synchronized with Xcode, with no project-file entries.
+The Settings work in #43 reconciled `AppDelegate.swift` and `Settings.swift` with this integration. `MeetingNotesController.swift` adds a title to its existing disabled recording line. The visible suffix is limited to 48 characters. The tooltip and accessibility label retain the full title. Manual recording keeps its existing status. `Info.plist` adds `NSCalendarsFullAccessUsageDescription`. Source folders remain synchronized with Xcode, with no project-file entries.
 
 ## Eligibility and limits
 

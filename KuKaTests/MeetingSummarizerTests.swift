@@ -2,6 +2,34 @@ import XCTest
 @testable import KuKa
 
 final class MeetingSummarizerTests: XCTestCase {
+    func testToolCandidateOrder() {
+        XCTAssertEqual(SummaryTool.automatic.candidates, [.antigravity, .claude])
+        XCTAssertEqual(SummaryTool.antigravity.candidates, [.antigravity])
+        XCTAssertEqual(SummaryTool.claude.candidates, [.claude])
+        XCTAssertEqual(SummaryTool.allCases.map(\.title), ["Automatic", "Antigravity (agy)", "Claude Code (claude)"])
+    }
+
+    func testAnExplicitToolNeverFallsBackToTheOtherProvider() async {
+        for (tool, cli) in [(SummaryTool.antigravity, SummaryCLI.antigravity), (.claude, .claude)] {
+            let failing = FakeCommandRunner()
+            failing.results[cli.rawValue] = .success(CommandResult(termination: .exited(2), stdout: "", stderr: "denied"))
+            let failed = await summarizer(failing).summarize(transcript: transcript, knownWords: .none, tool: tool)
+            XCTAssertEqual(failed, .failed([SummaryFailure(cli: cli, reason: .exited(status: 2, stderrTail: "denied"))]))
+            XCTAssertEqual(failing.calls.map { $0.executable.lastPathComponent }, [cli.rawValue])
+
+            let missing = FakeCommandRunner()
+            let other = cli == .claude ? "agy" : "claude"
+            let notInstalled = await summarizer(missing, installed: ["/opt/homebrew/bin/" + other])
+                .summarize(transcript: transcript, knownWords: .none, tool: tool)
+            XCTAssertEqual(notInstalled, .failed([SummaryFailure(cli: cli, reason: .notInstalled(searched: [
+                "/opt/homebrew/bin/" + cli.rawValue,
+                "/usr/local/bin/" + cli.rawValue,
+                "/Users/test/.local/bin/" + cli.rawValue,
+            ]))]))
+            XCTAssertTrue(missing.calls.isEmpty)
+        }
+    }
+
     func testContextIsBackgroundAndKeepsKnownWordsReviewAndTranscriptRules() {
         let background = "Project: Konvio\nPeople: Aino\n"
         let prompt = SummaryPrompt.make(transcript: transcript, knownWords: knownWords, context: background)
@@ -25,7 +53,7 @@ final class MeetingSummarizerTests: XCTestCase {
         runner.results["claude"] = .reply(defaultNotes)
         let summarizer = Summarizer(runner: runner, home: URL(fileURLWithPath: "/Users/test"),
                                     isExecutable: { _ in true }, context: MeetingContextFile(url: { file }))
-        _ = await summarizer.summarize(transcript: transcript, knownWords: knownWords)
+        _ = await summarizer.summarize(transcript: transcript, knownWords: knownWords, tool: .automatic)
         let expected = SummaryPrompt.make(transcript: transcript, knownWords: knownWords, context: "Konvio background")
         XCTAssertEqual(runner.calls.map(\.arguments), [
             ["--sandbox", "--disable-slash-commands", "-p", expected],
@@ -36,7 +64,7 @@ final class MeetingSummarizerTests: XCTestCase {
         let path = ["/opt/homebrew/bin", "/usr/local/bin", "/Users/test/.local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"]
         XCTAssertEqual(runner.calls.map(\.searchPath), [path, path])
         try Data("Changed background".utf8).write(to: file)
-        _ = await summarizer.summarize(transcript: transcript, knownWords: .none)
+        _ = await summarizer.summarize(transcript: transcript, knownWords: .none, tool: .automatic)
         XCTAssertTrue(try XCTUnwrap(runner.calls.last?.input).contains("Changed background"))
     }
 
@@ -48,7 +76,7 @@ final class MeetingSummarizerTests: XCTestCase {
         let summarizer = Summarizer(runner: runner, isExecutable: { _ in true },
                                     context: MeetingContextFile(url: { file }))
 
-        let result = await summarizer.summarize(transcript: transcript, knownWords: .none)
+        let result = await summarizer.summarize(transcript: transcript, knownWords: .none, tool: .automatic)
 
         XCTAssertEqual(result, .written(markdown: defaultNotes, suspects: [], by: .antigravity, after: []))
         let sent = try XCTUnwrap(runner.calls.first?.arguments.last)
@@ -105,7 +133,7 @@ final class MeetingSummarizerTests: XCTestCase {
         runner.results["agy"] = .success(CommandResult(
             termination: .exited(0), stdout: "## Summary\nShip Friday.\n\n```ku-ka-review\n\(askConvio)\n```\n", stderr: ""))
 
-        let result = await summarizer(runner).summarize(transcript: transcript, knownWords: .none)
+        let result = await summarizer(runner).summarize(transcript: transcript, knownWords: .none, tool: .automatic)
 
         XCTAssertEqual(result, .written(markdown: "## Summary\nShip Friday.", suspects: [suspect("Convio", quote: "Ask Convio.")],
                                         by: .antigravity, after: []))
@@ -117,7 +145,7 @@ final class MeetingSummarizerTests: XCTestCase {
         runner.results["agy"] = .success(CommandResult(termination: .exited(0), stdout: "```ku-ka-review\n\(askConvio)\n```\n", stderr: ""))
         runner.results["claude"] = .success(CommandResult(termination: .exited(0), stdout: "## Summary\nShip Friday.", stderr: ""))
 
-        let result = await summarizer(runner).summarize(transcript: transcript, knownWords: .none)
+        let result = await summarizer(runner).summarize(transcript: transcript, knownWords: .none, tool: .automatic)
 
         XCTAssertEqual(result, .written(markdown: "## Summary\nShip Friday.", suspects: [], by: .claude, after: [
             SummaryFailure(cli: .antigravity, reason: .emptyOutput),
@@ -129,7 +157,7 @@ final class MeetingSummarizerTests: XCTestCase {
         runner.results["agy"] = .success(CommandResult(termination: .exited(1), stdout: "", stderr: ""))
         runner.results["claude"] = .success(CommandResult(termination: .exited(0), stdout: "## Summary", stderr: ""))
 
-        _ = await summarizer(runner).summarize(transcript: transcript, knownWords: knownWords)
+        _ = await summarizer(runner).summarize(transcript: transcript, knownWords: knownWords, tool: .automatic)
 
         XCTAssertEqual(runner.calls.map(\.arguments), [
             ["--sandbox", "--disable-slash-commands", "-p", prompt],
@@ -145,7 +173,7 @@ final class MeetingSummarizerTests: XCTestCase {
         runner.results["agy"] = .success(CommandResult(termination: .exited(1), stdout: "", stderr: "authentication failed\n"))
         runner.results["claude"] = .success(CommandResult(termination: .exited(0), stdout: "## Summary\nShip Friday.\n", stderr: ""))
 
-        let result = await summarizer(runner).summarize(transcript: transcript, knownWords: .none)
+        let result = await summarizer(runner).summarize(transcript: transcript, knownWords: .none, tool: .automatic)
 
         XCTAssertEqual(result, .written(markdown: "## Summary\nShip Friday.", suspects: [], by: .claude, after: [
             SummaryFailure(cli: .antigravity, reason: .exited(status: 1, stderrTail: "authentication failed\n")),
@@ -156,7 +184,7 @@ final class MeetingSummarizerTests: XCTestCase {
         let runner = FakeCommandRunner()
         runner.results["claude"] = .success(CommandResult(termination: .exited(0), stdout: "## Summary", stderr: ""))
 
-        let result = await summarizer(runner, installed: ["/Users/test/.local/bin/claude"]).summarize(transcript: transcript, knownWords: .none)
+        let result = await summarizer(runner, installed: ["/Users/test/.local/bin/claude"]).summarize(transcript: transcript, knownWords: .none, tool: .automatic)
 
         XCTAssertEqual(result, .written(markdown: "## Summary", suspects: [], by: .claude, after: [
             SummaryFailure(cli: .antigravity, reason: .notInstalled(searched: [
@@ -171,7 +199,7 @@ final class MeetingSummarizerTests: XCTestCase {
         runner.results["agy"] = .success(CommandResult(termination: .exited(0), stdout: " \n", stderr: ""))
         runner.results["claude"] = .success(CommandResult(termination: .timedOut, stdout: "", stderr: ""))
 
-        let result = await summarizer(runner).summarize(transcript: transcript, knownWords: .none)
+        let result = await summarizer(runner).summarize(transcript: transcript, knownWords: .none, tool: .automatic)
 
         XCTAssertEqual(result, .failed([
             SummaryFailure(cli: .antigravity, reason: .emptyOutput),
@@ -185,7 +213,7 @@ final class MeetingSummarizerTests: XCTestCase {
         runner.results["claude"] = .success(CommandResult(
             termination: .exited(2), stdout: "", stderr: String(repeating: "x", count: 700) + String(repeating: "y", count: 300)))
 
-        let result = await summarizer(runner).summarize(transcript: transcript, knownWords: .none)
+        let result = await summarizer(runner).summarize(transcript: transcript, knownWords: .none, tool: .automatic)
 
         XCTAssertEqual(result, .failed([
             SummaryFailure(cli: .antigravity, reason: .couldNotLaunch(CocoaError(.fileReadNoPermission).localizedDescription)),
