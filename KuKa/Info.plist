@@ -24,5 +24,7 @@
 	<string>Ku-Ka needs Screen Recording permission to take screenshots and to record call audio for Meeting Notes.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Ku-Ka records your microphone only while you record a meeting. It transcribes the audio on this Mac.</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>Ku-Ka reads calendar event titles and times to offer recording reminders. It never changes your calendars or starts or stops recording automatically.</string>
 </dict>
 </plist>

@@ -55,6 +55,8 @@ The whole feature can be turned on and off with the **Clipboard History** checkb
 
 ## Meeting Notes
 
+Calendar recording reminders are off by default. Eligible events offer **Start Recording**, then **Stop Recording** or **Continue Recording** at the end. Ku-Ka never starts or stops automatically. A calendar recording keeps the event title in its menu status and note headings. This branch supplies the integration for the Settings window in #43 but adds no switch yet. See the [integration contract and limits](docs/calendar-recording-reminders.md).
+
 When a call starts, open the Ku-Ka menu and choose **Start Recording Meeting**. Ku-Ka records your microphone and the sound your Mac plays, so any call app works. If Start cannot record, for example because a permission is missing, an alert says why.
 
 While Ku-Ka records, a small panel floats near the top-right corner of the screen. It shows the recorded time and has a pause button, a stop button, and a button that opens the live transcript. A click on the panel does not take the keyboard away from your call app. To move the panel, drag it. Ku-Ka remembers where you put it, and **Restore Default Position** in the menu puts it back. **Hide panel** in the header of the live transcript hides it while the recording goes on, and **Show Meeting Controls** in the menu brings it back. The menu bar icon also shows a red dot in its top-right corner, with a white centre while Ku-Ka records and two white bars while the recording is paused.

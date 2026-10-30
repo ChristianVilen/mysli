@@ -38,6 +38,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setRoot: { [settings] in settings.meetingsFolder = $0 }
     )
     private lazy var meetingControlsPanel = MeetingControlsPanel(recorder: meetingRecorder, settings: settings)
+    private(set) var calendarReminders: CalendarReminderController?
+    private var calendarReminderStartup: Task<Void, Never>?
     private lazy var wordReview = WordReviewController(
         root: { [settings] in settings.meetingsFolder },
         knownWords: knownWords,
@@ -67,6 +69,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         hotkeyManager.stop()
         keepAwake.deactivate()
         clipboardHistory.disable()
+        calendarReminderStartup?.cancel()
+        calendarReminders?.shutDown()
+        SystemNotifier.shared.onCalendarReminder = nil
         meetingNotes.shutDown()
     }
 
@@ -81,6 +86,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if !isTesting {
             UNUserNotificationCenter.current().delegate = SystemNotifier.shared
             SystemNotifier.shared.onCheckWords = { [weak self] in self?.wordReviewWindow.show($0) }
+            setupCalendarReminders()
             setupHotkey()
             setupPermissions()
             // Polling the real pasteboard during unit/UI test runs would
@@ -90,6 +96,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 clipboardHistory.enable()
             }
             meetingNotes.resumeUnfinished()
+        }
+    }
+
+    private func setupCalendarReminders() {
+        let notifications = CalendarReminderNotifications()
+        let controller = CalendarReminderController(source: EventKitCalendarSource(), notifications: notifications,
+            recorder: meetingRecorder, driver: CalendarReminderDriver(), settings: settings,
+            store: CalendarReminderStore(defaults: .standard))
+        SystemNotifier.shared.onCalendarReminder = { [weak controller] action, token in
+            await controller?.handle(action, token: token)
+        }
+        calendarReminderStartup = Task { [weak self] in
+            guard !Task.isCancelled, let self else { return }
+            self.calendarReminders = controller
+            await controller.resume()
+            await notifications.prepare()
         }
     }
 
@@ -234,7 +256,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// Not behind the `isTesting` gate: binding the panel and the review window touches no
     /// hardware and no disk and writes no setting, and both stay hidden until they are needed.
     private func setupMeetingNotes() {
-        meetingNotes.onStateChange = { [weak self] in self?.updateStatus() }
+        meetingNotes.onStateChange = { [weak self] in
+            self?.updateStatus()
+            self?.calendarReminders?.recorderDidChange()
+        }
         meetingRecorder.onShowPermissions = { [weak self] in self?.showOnboarding() }
         meetingNotes.onCheckWords = { [weak self] in self?.wordReviewWindow.show($0) }
         meetingControlsPanel.bindRecorder()

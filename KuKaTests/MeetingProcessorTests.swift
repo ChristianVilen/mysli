@@ -3,6 +3,20 @@ import XCTest
 
 @MainActor
 final class MeetingProcessorTests: MeetingProcessorTestCase {
+    func testRecoveredDisplayTitleReachesHeadingsButNeverTheSpokenSummaryInput() async throws {
+        let original = try makeMeeting()
+        try original.saveDisplayTitle("Planning\n# Forged")
+        let meeting = MeetingFolder(url: original.url)
+        let outcome = await process(meeting)
+        XCTAssertEqual(outcome, .done(summary: meeting.url(for: .summary)))
+        XCTAssertTrue(try meeting.read(.transcript).hasPrefix("# Planning \\# Forged\n"))
+        XCTAssertTrue(try meeting.read(.summary).hasPrefix("# Planning \\# Forged\n"))
+        let prompt = try XCTUnwrap(runner.calls.first?.arguments.last)
+        XCTAssertFalse(prompt.contains("Planning"))
+        XCTAssertEqual(prompt.components(separatedBy: "Transcript:\n\n").last,
+                       "**[00:00:01] Them:** Let's ship on Friday\n\n**[00:00:04] Me:** Sounds good\n")
+    }
+
     func testFirstRunWritesTranscriptAndSummaryAndTrashesTheAudio() async throws {
         let meeting = try makeMeeting()
 

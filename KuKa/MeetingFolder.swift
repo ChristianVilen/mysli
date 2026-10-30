@@ -145,6 +145,26 @@ struct MeetingFolder: Hashable {
 
     var name: String { url.lastPathComponent }
 
+    private struct Metadata: Codable {
+        let version: Int
+        let title: String
+    }
+
+    func saveDisplayTitle(_ title: String) throws {
+        guard let title = MeetingTitle.normalized(title) else { return }
+        try JSONEncoder().encode(Metadata(version: 1, title: title))
+            .write(to: url.appendingPathComponent("meeting.json"), options: .atomic)
+    }
+
+    private var displayTitle: String? {
+        guard let handle = try? FileHandle(forReadingFrom: url.appendingPathComponent("meeting.json")) else { return nil }
+        defer { try? handle.close() }
+        guard let data = try? handle.read(upToCount: 16_385), data.count <= 16_384,
+              let metadata = try? JSONDecoder().decode(Metadata.self, from: data), metadata.version == 1,
+              let title = MeetingTitle.normalized(metadata.title), title == metadata.title else { return nil }
+        return title
+    }
+
     static func folderName(startingAt date: Date) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
@@ -153,6 +173,7 @@ struct MeetingFolder: Hashable {
     }
 
     var title: String {
+        if let displayTitle { return displayTitle }
         guard let match = name.wholeMatch(of: #/(\d{4}-\d{2}-\d{2})_(\d{2})-(\d{2})(?:-(\d+))?/#) else {
             return name
         }

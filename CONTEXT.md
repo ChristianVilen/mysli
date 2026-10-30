@@ -1,5 +1,8 @@
 # KuKa domain glossary
 
+- **Calendar occurrence.** One calendar event instance, identified by its calendar, item, and original recurrence date. `EventKitCalendarSource` reads immutable snapshots and keeps safe provider aliases within its lifetime. `CalendarReminderController` owns eligibility, reminder tokens, receipts, and one recording association. `CalendarReminderDriver` owns refresh signals. `CalendarReminderNotifications` builds native requests while `SystemNotifier` remains the only delegate. The integration is off by default and its Settings UI belongs to #43. The exact interface and limits are in `docs/calendar-recording-reminders.md`.
+- **Meeting display title.** Optional bounded `meeting.json` metadata saved before capture. It preserves the dated folder name, equality, and stage rules. `MeetingTitle` normalizes the text and escapes document headings. The recorder's session fixes the title at Start. The existing menu status shows it with a bounded suffix and a full tooltip and accessibility label.
+
 - **Capture** — producing a screenshot image from a screen region, window, or full screen. Owned by `CaptureManager`; the produced image goes straight to the image store.
 - **Image store** — everything that happens to a produced image: disk writes under the Screenshots directory, clipboard, file naming, combining two captures into one, annotation overwrites, deletion, and returning freed memory to the OS. Owned by `ImageStore`.
 - **Selection session** — one round of "user picks what to capture": overlays appear on every screen, the user drags a rect, picks a window (Space toggles window mode), or cancels (Esc). Ends with a single `SelectionResult` carrying the screen the capture belongs on. Owned by `SelectionSession`.

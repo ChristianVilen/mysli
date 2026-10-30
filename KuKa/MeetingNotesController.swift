@@ -314,7 +314,18 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
         let phase = recorder.phase
         let statusLine = statusLine
         statusLineItem.isHidden = statusLine == nil
-        if let statusLine { statusLineItem.title = statusLine }
+        if let statusLine {
+            if let title = recorder.displayTitle {
+                let shortTitle = title.count > 48 ? String(title.prefix(47)) + "…" : title
+                statusLineItem.title = "\(statusLine) · \(shortTitle)"
+                statusLineItem.toolTip = title
+                statusLineItem.setAccessibilityLabel("\(statusLine) · \(title)")
+            } else {
+                statusLineItem.title = statusLine
+                statusLineItem.toolTip = nil
+                statusLineItem.setAccessibilityLabel(nil)
+            }
+        }
         recordItem.title = phase.isCapturing ? "Stop Recording Meeting" : "Start Recording Meeting"
         pauseItem.title = phase == .paused ? "Resume Recording" : "Pause Recording"
         for item in [pauseItem, showControlsItem, restorePositionItem, meterItem] { item.isHidden = !phase.isCapturing }

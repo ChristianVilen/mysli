@@ -42,6 +42,15 @@ final class SystemNotifier: NSObject, Notifying, UNUserNotificationCenterDelegat
     private let open: (URL) -> Void
 
     var onCheckWords: (@MainActor (MeetingFolder) -> Void)?
+    var onCalendarReminder: (@MainActor (CalendarReminderAction, UUID) async -> Void)?
+
+    @MainActor
+    func routeCalendarReminder(category: String, action: String, userInfo: [AnyHashable: Any]) async -> Bool {
+        guard let response = CalendarReminderNotifications.decode(category: category, action: action, userInfo: userInfo)
+        else { return false }
+        await onCalendarReminder?(response.action, response.token)
+        return true
+    }
 
     init(open: @escaping (URL) -> Void = { NSWorkspace.shared.open($0) }) {
         self.open = open
@@ -74,10 +83,18 @@ final class SystemNotifier: NSObject, Notifying, UNUserNotificationCenterDelegat
     func userNotificationCenter(_ center: UNUserNotificationCenter,
                                 didReceive response: UNNotificationResponse,
                                 withCompletionHandler completionHandler: @escaping () -> Void) {
-        if let click = NotificationClick(userInfo: response.notification.request.content.userInfo) {
-            Task { @MainActor in self.perform(click) }
+        Task { @MainActor in
+            let content = response.notification.request.content
+            await self.handleResponse(category: content.categoryIdentifier, action: response.actionIdentifier,
+                                      userInfo: content.userInfo, completion: completionHandler)
         }
-        completionHandler()
+    }
+
+    @MainActor
+    func handleResponse(category: String, action: String, userInfo: [AnyHashable: Any], completion: () -> Void) async {
+        defer { completion() }
+        if await routeCalendarReminder(category: category, action: action, userInfo: userInfo) { return }
+        if let click = NotificationClick(userInfo: userInfo) { perform(click) }
     }
 
     /// Without this, macOS hides a notification while Ku-Ka is the active app,

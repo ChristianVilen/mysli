@@ -33,6 +33,11 @@ final class Settings {
         set { defaults.set(newValue, forKey: "thumbnailDuration") }
     }
 
+    var calendarRecordingRemindersEnabled: Bool {
+        get { defaults.bool(forKey: "calendarRecordingRemindersEnabled") }
+        set { defaults.set(newValue, forKey: "calendarRecordingRemindersEnabled") }
+    }
+
     var windowTilingEnabled: Bool {
         get { defaults.object(forKey: "windowTilingEnabled") as? Bool ?? true }
         set { defaults.set(newValue, forKey: "windowTilingEnabled") }

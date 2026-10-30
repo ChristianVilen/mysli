@@ -251,7 +251,7 @@ enum Transcript {
         }
         header.append((hasRooms ? Legend.rooms : .microphone).rawValue)
         var text = """
-        # \(title)
+        # \(MeetingTitle.heading(title))
 
         Duration: \(clock(duration))
 

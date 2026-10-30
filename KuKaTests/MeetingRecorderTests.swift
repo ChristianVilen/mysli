@@ -4,6 +4,70 @@ import XCTest
 
 @MainActor
 final class MeetingRecorderTests: XCTestCase {
+    func testShutdownDuringCaptureStopsLateHandleAndPreservesANewerSession() async throws {
+        let delayed = DelayedCapture()
+        let recorder = MeetingRecorder(
+            permissions: PermissionsManager(isAccessibilityTrusted: { true }, hasScreenCaptureAccess: { true },
+                                            microphoneAccess: { .granted }),
+            root: { self.root }, capture: delayed, liveTranscriber: FakeLiveTranscriber(), notifier: FakeNotifier())
+        let first = Task { await recorder.startRecording(title: "First") }
+        await waitUntil { delayed.release != nil }
+        let firstID = recorder.activeSessionID
+        XCTAssertNotNil(firstID)
+        XCTAssertEqual(recorder.displayTitle, "First")
+        XCTAssertEqual(delayed.titles, ["First"])
+        recorder.shutDown()
+        let secondID = await recorder.startRecording(title: "Second")
+        XCTAssertNotNil(secondID)
+        XCTAssertNotEqual(firstID, secondID)
+        delayed.release?.resume()
+        let staleResult = await first.value
+        XCTAssertNil(staleResult)
+        XCTAssertEqual(recorder.phase, .recording)
+        XCTAssertEqual(recorder.activeSessionID, secondID)
+        XCTAssertEqual(delayed.recordings[0].stopCount, 1)
+        XCTAssertEqual(delayed.recordings[1].stopCount, 0)
+        XCTAssertEqual(MeetingFolder.all(in: root).count, 2)
+        recorder.shutDown()
+    }
+
+    func testShutdownDuringPermissionPromptCannotStartCaptureAfterTheAnswer() async {
+        microphone = .notDetermined
+        var prompt: CheckedContinuation<Bool, Never>?
+        answerMicrophonePrompt = { await withCheckedContinuation { prompt = $0 } }
+        let start = Task { await sut.toggleRecording() }
+        await waitUntil { prompt != nil }
+        sut.shutDown()
+        microphone = .granted
+        prompt?.resume(returning: true)
+        await start.value
+        XCTAssertEqual(sut.phase, .idle)
+        XCTAssertTrue(capture.recordings.isEmpty)
+    }
+
+    func testExplicitStartDoesNotStopABusyOrPausedSessionAndStaleStopDoesNothing() async throws {
+        let result = await sut.startRecording(title: "Planning")
+        let first = try XCTUnwrap(result)
+        XCTAssertEqual(sut.activeSessionID, first)
+        XCTAssertEqual(sut.displayTitle, "Planning")
+        let busy = await sut.startRecording(title: "Other")
+        XCTAssertNil(busy)
+        hostTime = hostTime + 10
+        sut.pause()
+        XCTAssertEqual(sut.activeSessionID, first)
+        let paused = await sut.startRecording()
+        XCTAssertNil(paused)
+        sut.stopRecording(ifSession: UUID())
+        XCTAssertEqual(sut.phase, .paused)
+        sut.stopRecording(ifSession: first)
+        XCTAssertEqual(sut.phase, .idle)
+        let next = await sut.startRecording()
+        XCTAssertNotNil(next)
+        XCTAssertNotEqual(next, first)
+        sut.stopRecording(ifSession: first)
+        XCTAssertEqual(sut.phase, .recording)
+    }
+
     private var root: URL!
     private var microphone = MicrophoneAccess.granted
     private var answerMicrophonePrompt: () async -> Bool = { false }
@@ -473,5 +537,19 @@ final class MeetingRecorderTests: XCTestCase {
         XCTAssertEqual(sut.phase, .idle)
         XCTAssertEqual(capture.recordings.count, 0)
         XCTAssertEqual(alerts, ["Ku-Ka needs Microphone permission to record your side of the call."])
+    }
+}
+
+private final class DelayedCapture: FakeMeetingAudioCapture {
+    var release: CheckedContinuation<Void, Never>?
+    var titles: [String] = []
+
+    @MainActor
+    override func start(into meeting: MeetingFolder, clock: RecordingClock,
+                        onInterrupted: @escaping @MainActor (String) -> Void) async throws -> ActiveRecording {
+        titles.append(MeetingFolder(url: meeting.url).title)
+        let handle = try await super.start(into: meeting, clock: clock, onInterrupted: onInterrupted)
+        if recordings.count == 1 { await withCheckedContinuation { release = $0 } }
+        return handle
     }
 }

@@ -302,10 +302,10 @@ struct SummaryReply: Equatable {
 
 enum SummaryDocument {
     static func markdown(title: String, body: String) -> String {
-        "# \(title)\n\n\(body.trimmingCharacters(in: .whitespacesAndNewlines))\n"
+        "# \(MeetingTitle.heading(title))\n\n\(body.trimmingCharacters(in: .whitespacesAndNewlines))\n"
     }
 
     static func noSpeech(title: String) -> String {
-        "# \(title)\n\nNo speech was detected, so there is no summary. The audio is in the meeting folder.\n"
+        "# \(MeetingTitle.heading(title))\n\nNo speech was detected, so there is no summary. The audio is in the meeting folder.\n"
     }
 }

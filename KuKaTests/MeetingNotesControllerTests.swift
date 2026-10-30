@@ -3,6 +3,26 @@ import XCTest
 
 @MainActor
 final class MeetingNotesControllerTests: MeetingNotesTestCase {
+    func testCalendarTitleAppearsInRecordingStatusAndFullTitleRemainsAccessible() async throws {
+        _ = await recorder.startRecording(title: "Planning")
+        sut.menuWillOpen()
+        XCTAssertTrue(visibleTitles.contains("● Recording · 0:00 · Planning"), "\(visibleTitles)")
+        let status = try XCTUnwrap(item(titled: "● Recording · 0:00 · Planning"))
+        XCTAssertEqual(status.toolTip, "Planning")
+        hostTime = HostTime(seconds: 1_010)
+        recorder.pause()
+        sut.menuWillOpen()
+        XCTAssertTrue(visibleTitles.contains("Paused · 0:10 · Planning"), "\(visibleTitles)")
+    }
+
+    func testLongCalendarTitleDoesNotStretchMenu() async throws {
+        let title = String(repeating: "A", count: 120)
+        _ = await recorder.startRecording(title: title)
+        sut.menuWillOpen()
+        let status = try XCTUnwrap(item(titled: "● Recording · 0:00 · \(String(repeating: "A", count: 47))…"))
+        XCTAssertEqual(status.toolTip, title)
+        XCTAssertEqual(status.accessibilityLabel(), "● Recording · 0:00 · \(title)")
+    }
     func testTheMenuOffersToChooseTheMeetingsFolder() {
         XCTAssertNotNil(item(titled: "Choose Meetings Folder…"))
     }

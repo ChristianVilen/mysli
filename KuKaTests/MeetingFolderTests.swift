@@ -2,6 +2,55 @@ import XCTest
 @testable import KuKa
 
 final class MeetingFolderTests: XCTestCase {
+    func testUntrustedTitleIsOnePlainHeadingInBothDocuments() {
+        let title = "Review\n# Forged **Me:** [link](../secret) <tag>"
+        let expected = "# Review \\# Forged \\*\\*Me:\\*\\* \\[link\\]\\(../secret\\) \\<tag\\>\n"
+        XCTAssertTrue(Transcript.markdown([], title: title, duration: 0, by: "Fake", after: [], rooms: .notDiarized).hasPrefix(expected))
+        XCTAssertEqual(SummaryDocument.markdown(title: title, body: "Notes"), expected + "\nNotes\n")
+        XCTAssertTrue(SummaryDocument.noSpeech(title: title).hasPrefix(expected))
+    }
+
+    func testSavedTitleHasABoundedLengthAndBlankTitleKeepsDate() throws {
+        let meeting = try MeetingFolder.create(in: try makeTemporaryDirectory(), startingAt: localDate(2026, 10, 23, 14, 2))
+        try meeting.saveDisplayTitle(" \n\t ")
+        XCTAssertEqual(meeting.title, "Meeting on 2026-10-23 at 14:02")
+        try meeting.saveDisplayTitle(String(repeating: "a", count: 301))
+        XCTAssertEqual(meeting.title, String(repeating: "a", count: 300))
+    }
+
+    func testTitleTruncationDoesNotLeaveAnInvalidTrailingSpace() throws {
+        let meeting = try MeetingFolder.create(in: try makeTemporaryDirectory(), startingAt: localDate(2026, 10, 23, 14, 2))
+        try meeting.saveDisplayTitle(String(repeating: "a", count: 299) + " b")
+        XCTAssertEqual(meeting.title, String(repeating: "a", count: 299))
+    }
+
+    func testDisplayTitleSurvivesReconstructionWithoutChangingIdentityOrStage() throws {
+        let root = try makeTemporaryDirectory()
+        let meeting = try MeetingFolder.create(in: root, startingAt: localDate(2026, 10, 23, 14, 2))
+        try meeting.saveDisplayTitle("  ../Planning\n# Next **topic**  ")
+        let restored = MeetingFolder(url: meeting.url)
+        XCTAssertEqual(restored.title, "../Planning # Next **topic**")
+        XCTAssertEqual(restored, meeting)
+        XCTAssertEqual(restored.name, "2026-10-23_14-02")
+        XCTAssertNil(restored.stage())
+        XCTAssertTrue(MeetingFolder.all(in: root).isEmpty)
+        try restored.write("speech", to: .transcript)
+        XCTAssertEqual(MeetingFolder.all(in: root).first?.0.title, "../Planning # Next **topic**")
+    }
+
+    func testInvalidAndOversizedTitleMetadataFallsBackToDatedTitle() throws {
+        let meeting = try MeetingFolder.create(in: try makeTemporaryDirectory(), startingAt: localDate(2026, 10, 23, 14, 2))
+        let metadata = meeting.url.appendingPathComponent("meeting.json")
+        let invalid = ["{}", #"{"version":2,"title":"Wrong"}"#, #"{"version":1,"title":" "}"#,
+                       #"{"version":1,"title":"First\nSecond"}"#,
+                       "{\"version\":1,\"title\":\"" + String(repeating: "x", count: 301) + "\"}",
+                       "{\"version\":1,\"title\":\"Wrong\",\"padding\":\"" + String(repeating: "x", count: 16_384) + "\"}"]
+        for text in invalid {
+            try Data(text.utf8).write(to: metadata)
+            XCTAssertEqual(meeting.title, "Meeting on 2026-10-23 at 14:02")
+        }
+    }
+
     func testStageFollowsTheMostAdvancedFile() {
         let cases: [(MeetingFolderContents, MeetingStage?)] = [
             (MeetingFolderContents(hasSummary: true), .done),
