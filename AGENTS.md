@@ -324,6 +324,13 @@ Update Notes (finished page) → requestUpdate → MeetingNotesController.update
 
 Create git worktrees with `workmux add <branch>`, and remove them with `workmux remove` or `workmux merge`. Do not create worktrees in `.claude/worktrees/`, and do not use an agent tool's own worktree option. The project's workmux settings are in `.workmux.yaml`.
 
+## Context maintenance
+
+- Check code and tests for actual behavior. `README.md` describes use, `CONTEXT.md` defines terms, and this file records implementation rules. GitHub issues track remaining work.
+- Treat `.claude/meeting-notes/`, `.claude/meeting-notes.todo.md`, and dated research as history unless a document explicitly identifies current work. A proposal is not a shipped requirement.
+- When a feature changes behavior, update the affected current docs. After merge, reconcile its issues and mark its plan as shipped, with the PR link. Keep unverified manual checks separate from completed implementation.
+- Keep Brain entries short and link to the repository docs. Do not duplicate the architecture or backlog there.
+
 ---
 
 ## Testing

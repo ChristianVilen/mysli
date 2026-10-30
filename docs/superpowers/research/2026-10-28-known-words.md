@@ -1,5 +1,7 @@
 # Known words for meeting notes
 
+Status update, 2026-10-29: known words and Check Words shipped in [PR #45](https://github.com/ChristianVilen/ku-ka/pull/45). Current behavior is in [AGENTS.md](../../../AGENTS.md#known-words-implementation) and [README.md](../../../README.md#meeting-notes). The proposals below are historical. The shipped version corrects final text, not the live draft; sends only relevant word forms, not the whole list or its notes; inserts new list lines rather than editing existing entries; and stores skipped questions per meeting. Update Notes starts from the saved heard transcript and can overwrite manual transcript edits. See `KnownWordsFile` for the current lock location. No merge or status update establishes that the measurement plan below ran.
+
 Research and design, 2026-10-28. No production code is part of this note. Nothing ran on audio, and no model was loaded. The user has not reviewed this note yet.
 
 The request: a list of known names and terms that Ku-Ka keeps learning from. Ku-Ka asks the user when a sentence looks wrong, so that the next meeting notes spell those words right.

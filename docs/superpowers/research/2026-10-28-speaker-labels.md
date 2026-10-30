@@ -1,5 +1,7 @@
 # Speaker labels in the final meeting transcript
 
+Status update, 2026-10-29: microphone room labels shipped in [PR #45](https://github.com/ChristianVilen/ku-ka/pull/45), after the real-room check recorded in [AGENTS.md](../../../AGENTS.md#meeting-notes-implementation). The shipped settings use threshold 0.6 and no fixed speaker count. Remote speakers still share Them. This note preserves the earlier measurements and proposals; statements about pending review describe the research date.
+
 Research and design, 2026-10-28. No production code is part of this note. The user has not reviewed it yet.
 
 ## How to read this note

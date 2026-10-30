@@ -1,5 +1,7 @@
 # Floating meeting recorder panel
 
+Status update, 2026-10-29: the floating panel, Pause/Resume, and live transcript shipped in [PR #45](https://github.com/ChristianVilen/ku-ka/pull/45). The live engine uses `timeIndexedProgressiveTranscription`. This note preserves the research and earlier proposals. Current behavior is in [README.md](../../../README.md#meeting-notes) and [AGENTS.md](../../../AGENTS.md#meeting-notes-implementation).
+
 Research and design, 2026-10-27. No production code is part of this note. The user reviewed the mockup and answered the design questions on 2026-10-27.
 
 ## How to read this note
