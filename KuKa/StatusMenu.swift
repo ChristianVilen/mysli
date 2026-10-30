@@ -29,6 +29,7 @@ extension MenuSection {
 final class StatusMenu: NSObject, NSMenuDelegate {
     let menu = NSMenu()
     var onShowSettings: (() -> Void)?
+    var onShowKuKa: (() -> Void)?
     var onShowPermissions: (() -> Void)?
     var onOpenKeyboardSettings: (() -> Void)?
     /// Fired every time the menu opens, before it is shown.
@@ -182,46 +183,18 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     }
 
     private func build() {
-        menu.addItem(settingsItem())
+        let kuKa = NSMenuItem(title: "Ku-Ka…", action: #selector(showKuKa), keyEquivalent: "")
+        kuKa.target = self
+        menu.addItem(kuKa)
         menu.addItem(.separator())
 
         for section in sections {
             section.buildMenuSection(into: menu)
         }
 
-        let featuresLabel = NSMenuItem(title: "Features", action: nil, keyEquivalent: "")
-        featuresLabel.isEnabled = false
-        menu.addItem(featuresLabel)
-
-        for feature in [
-            "⌘⇧3 to capture full screen",
-            "⌘⇧4 to capture selected area",
-            "⌘⇧C to open clipboard history",
-            "Multi-monitor support",
-            "Auto-save to ~/Screenshots/",
-            "Copy to clipboard",
-            "Thumbnail preview & annotation",
-            "Meeting transcripts and summaries"
-        ] {
-            let item = NSMenuItem(title: feature, action: nil, keyEquivalent: "")
-            item.isEnabled = false
-            item.indentationLevel = 1
-            menu.addItem(item)
-        }
-
-        menu.addItem(.separator())
-
         let permissionsItem = NSMenuItem(title: "Permissions…", action: #selector(showPermissions), keyEquivalent: "")
         permissionsItem.target = self
         menu.addItem(permissionsItem)
-
-        let reportBug = NSMenuItem(title: "Report a Bug…", action: #selector(openReportBug), keyEquivalent: "")
-        reportBug.target = self
-        menu.addItem(reportBug)
-
-        let suggestFeature = NSMenuItem(title: "Suggest a Feature…", action: #selector(openSuggestFeature), keyEquivalent: "")
-        suggestFeature.target = self
-        menu.addItem(suggestFeature)
 
         menu.addItem(.separator())
 
@@ -232,17 +205,10 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     }
 
     @objc private func showSettings() { onShowSettings?() }
+    @objc private func showKuKa() { onShowKuKa?() }
 
     @objc private func showPermissions() {
         onShowPermissions?()
-    }
-
-    @objc private func openReportBug() {
-        NSWorkspace.shared.open(URL(string: "https://github.com/ChristianVilen/ku-ka/issues/new?labels=bug")!)
-    }
-
-    @objc private func openSuggestFeature() {
-        NSWorkspace.shared.open(URL(string: "https://github.com/ChristianVilen/ku-ka/issues/new?labels=enhancement")!)
     }
 
     func menuWillOpen(_ menu: NSMenu) {

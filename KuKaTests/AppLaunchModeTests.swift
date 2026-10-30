@@ -25,7 +25,7 @@ final class AppLaunchModeTests: XCTestCase {
         let host = SettingsPreviewAppDelegate(defaults: defaults, present: { presented.append($0) },
             activation: .fake())
         defer { host.settingsWindow.close() }
-        let menuItem = try XCTUnwrap(host.statusMenu.menu.item(withTitle: "Settings…"))
+        let menuItem = try XCTUnwrap(host.statusMenu.menu.item(withTitle: "Ku-Ka…"))
         XCTAssertTrue(NSApp.sendAction(try XCTUnwrap(menuItem.action), to: menuItem.target, from: menuItem))
         XCTAssertEqual(presented.count, 1)
         XCTAssertTrue(presented.first === host.settingsWindow.window)

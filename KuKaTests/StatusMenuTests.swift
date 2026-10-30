@@ -36,6 +36,15 @@ final class StatusMenuTests: XCTestCase {
         _ = (item.target as? NSObject)?.perform(item.action, with: item)
     }
 
+    func testDropdownOpensKuKaAndKeepsHelpInsideTheWindow() {
+        XCTAssertEqual(menuItems.filter { $0.title == "Ku-Ka…" }.count, 1)
+        for title in ["Features", "Report a Bug…", "Suggest a Feature…", "Settings…"] {
+            XCTAssertNil(item(titled: title), title)
+        }
+        XCTAssertNotNil(item(titled: "Permissions…"))
+        XCTAssertNotNil(item(titled: "Keep screen on"))
+    }
+
     func testRepeatedHealthDoesNotReplaceMenuItems() {
         let health = HotkeyHealth(issues: [.init(shortcut: .tileLeft, failure: .releaseFailed(-50))])
         sut.updateHotkeyHealth(health)
@@ -78,25 +87,23 @@ final class StatusMenuTests: XCTestCase {
         XCTAssertNil(item(titled: "Open Keyboard Settings…"))
     }
 
-    func testMenuContainsSettingsAndOperationalItemsOnly() throws {
+    func testMenuContainsKuKaAndOperationalItemsOnly() throws {
         let preferenceTitles = ["Settings…", "Settings", "Launch at Login", "Window Tiling", "Clipboard History",
                                 "Thumbnail Duration", "3 Seconds", "5 Seconds", "15 Seconds", "Forever",
                                 "Choose Meetings Folder…"]
-        XCTAssertEqual(menuItems.filter { preferenceTitles.contains($0.title) }.map(\.title), ["Settings…"])
+        XCTAssertEqual(menuItems.filter { preferenceTitles.contains($0.title) }.map(\.title), [])
         for title in ["Start Recording Meeting", "Open Meetings Folder", "Permissions…", "Quit Ku-Ka"] {
             XCTAssertNotNil(item(titled: title))
         }
-        let settingsItem = try XCTUnwrap(item(titled: "Settings…"))
-        XCTAssertEqual(settingsItem.keyEquivalent, ",")
-        XCTAssertEqual(settingsItem.keyEquivalentModifierMask, .command)
+        let settingsItem = try XCTUnwrap(item(titled: "Ku-Ka…"))
         var shown = 0
-        sut.onShowSettings = { shown += 1 }
+        sut.onShowKuKa = { shown += 1 }
         click(settingsItem)
         XCTAssertEqual(shown, 1)
     }
 
-    func testFeaturesSectionListsClipboardHistoryShortcut() {
-        XCTAssertNotNil(item(titled: "⌘⇧C to open clipboard history"), "missing clipboard history feature line")
+    func testFeaturesStayOutOfTheOperationalMenu() {
+        XCTAssertNil(item(titled: "⌘⇧C to open clipboard history"))
     }
 
     func testApplicationMenuGivesOrdinaryWindowsTheStandardCommands() throws {
@@ -135,7 +142,7 @@ final class StatusMenuTests: XCTestCase {
         let lidHint = try XCTUnwrap(titles.firstIndex(of: "Closing the lid still sleeps your Mac"))
 
         XCTAssertEqual(Array(titles[(lidHint + 1)...(lidHint + 6)]),
-                       ["", "Meeting Notes", "Start Recording Meeting", "Open Meetings Folder", "", "Features"])
+                       ["", "Meeting Notes", "Start Recording Meeting", "Open Meetings Folder", "", "Permissions…"])
     }
 
     func testOpeningTheMenuShowsFailedMeetingsFromDisk() throws {

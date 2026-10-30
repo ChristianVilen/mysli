@@ -17,10 +17,12 @@ final class KeepAwakeController: NSObject {
 
     let panelView: KeepAwakePanelView
     private let turnOffItem: NSMenuItem
+    private let displayAwakeItem: NSMenuItem
 
     /// Fired whenever the active/inactive state changes, so the owner can
     /// refresh anything outside this section (e.g. the status-bar icon).
     var onStateChange: (() -> Void)?
+    var onDisplayAwakeChanged: ((Bool) -> Void)?
 
     var isActive: Bool { wakeManager.isActive }
 
@@ -33,8 +35,10 @@ final class KeepAwakeController: NSObject {
         self.notifier = notifier
         panelView = KeepAwakePanelView(presets: Self.presets)
         turnOffItem = NSMenuItem(title: "Turn Off", action: #selector(turnOff(_:)), keyEquivalent: "")
+        displayAwakeItem = NSMenuItem(title: "Keep screen on", action: #selector(toggleDisplayAwake), keyEquivalent: "")
         super.init()
         turnOffItem.target = self
+        displayAwakeItem.target = self
         turnOffItem.isHidden = true
         panelView.onSelectDuration = { [weak self] duration in self?.select(duration) }
         wakeManager.keepDisplayAwake = keepDisplayAwake
@@ -56,6 +60,7 @@ final class KeepAwakeController: NSObject {
         let panelItem = NSMenuItem()
         panelItem.view = panelView
         menu.addItem(panelItem)
+        menu.addItem(displayAwakeItem)
         menu.addItem(turnOffItem)
 
         let hint = NSMenuItem(title: "Closing the lid still sleeps your Mac", action: nil, keyEquivalent: "")
@@ -87,6 +92,13 @@ final class KeepAwakeController: NSObject {
 
     func setDisplayAwake(_ isOn: Bool) {
         wakeManager.keepDisplayAwake = isOn
+        updateMenu()
+    }
+
+    @objc private func toggleDisplayAwake() {
+        let enabled = !wakeManager.keepDisplayAwake
+        setDisplayAwake(enabled)
+        onDisplayAwakeChanged?(enabled)
     }
 
     @objc private func turnOff(_ sender: NSMenuItem) {
@@ -99,6 +111,7 @@ final class KeepAwakeController: NSObject {
     }
 
     private func updateMenu() {
+        displayAwakeItem.state = wakeManager.keepDisplayAwake ? .on : .off
         let session = wakeManager.session
         turnOffItem.isHidden = session == nil
 

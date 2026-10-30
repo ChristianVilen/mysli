@@ -1,10 +1,25 @@
 import Cocoa
 
 enum SettingsPage: Int, CaseIterable {
-    case settings, instructions
+    case settings, instructions, permissions, help
 
-    var title: String { self == .settings ? "Settings" : "Instructions" }
-    var symbol: String { self == .settings ? "gearshape" : "book.closed" }
+    var title: String {
+        switch self {
+        case .settings: "Settings"
+        case .instructions: "Features & instructions"
+        case .permissions: "Permissions"
+        case .help: "Help & feedback"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .settings: "gearshape"
+        case .instructions: "book.closed"
+        case .permissions: "checkmark.shield"
+        case .help: "questionmark.bubble"
+        }
+    }
 }
 
 struct SettingsDisplayOptions {

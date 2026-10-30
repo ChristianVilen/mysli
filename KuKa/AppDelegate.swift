@@ -49,9 +49,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     )
     private lazy var wordReviewWindow = WordReviewWindowController(controller: wordReview)
     private lazy var statusMenu = StatusMenu(sections: [keepAwake, meetingNotes])
-    private lazy var settingsWindow = SettingsWindowController(settings: settings)
+    private lazy var settingsWindow = SettingsWindowController(settings: settings, permissionActions: .init(
+        accessibility: { [weak self] in self?.permissions.requestAccessibility() },
+        screenRecording: { [weak self] in self?.permissions.requestScreenRecording() },
+        microphone: { [weak self] in Task { _ = await self?.permissions.requestMicrophone() } },
+        keyboardSettings: { [weak self] in self?.permissions.openSettings(.keyboardShortcuts) }))
     private let permissions = PermissionsManager()
-    private var onboardingController: OnboardingWindowController?
     // False until setupPermissions() reads the grants. Hotkey setup calls updateStatus() before that,
     // and grants that were not read yet must not show warnings or open screenshot setup.
     private var permissionHandlingEnabled = false
@@ -120,7 +123,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         permissions.startMonitoring()
         // An accessory app rarely becomes active, so also re-check every time
         // the status menu opens — otherwise a revocation made in System
-        // Settings would leave the warning badge stale until onboarding opens.
+        // Settings would leave the warning badge stale until Permissions opens.
         statusMenu.onMenuWillOpen = { [weak self] in
             self?.permissions.refresh()
             self?.hotkeyManager.refresh()
@@ -129,34 +132,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         permissions.refresh()
         permissionsChanged()
         if !permissions.allGranted {
-            showOnboarding(.welcome)
+            settingsWindow.show(.permissions)
         }
     }
 
     private func permissionsChanged() {
         updateStatus()
-        onboardingController?.refreshRows()
-    }
-
-    private func showOnboarding(_ page: OnboardingWindowController.Page = .checklist) {
-        onboarding().show(page)
-    }
-
-    private func onboarding() -> OnboardingWindowController {
-        if onboardingController == nil {
-            let controller = OnboardingWindowController(permissions: permissions, settings: settings)
-            controller.onClose = { [weak self] in
-                self?.scheduleScreenshotSetup()
-            }
-            onboardingController = controller
-        }
-        return onboardingController!
+        settingsWindow.renderPermissions(.init(accessibility: permissions.accessibility,
+                                               screenRecording: permissions.screenRecording,
+                                               microphone: permissions.microphone))
     }
 
     private func showScreenshotSetupIfNeeded() {
         guard permissionHandlingEnabled, !settings.didShowScreenshotShortcutSetup,
               hotkeyManager.issues.contains(where: { $0.shortcut.isScreenshot && $0.failure == .systemConflict }) else { return }
-        onboarding().showScreenshotSetupIfNeeded(issues: hotkeyManager.issues)
+        settingsWindow.showScreenshotSetupIfNeeded(issues: hotkeyManager.issues)
     }
 
     private func scheduleScreenshotSetup() {
@@ -174,6 +164,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self?.settingsWindow.show()
             Task { await self?.calendarReminders?.refresh() }
         }
+        statusMenu.onShowKuKa = statusMenu.onShowSettings
         statusItem.menu = statusMenu.menu
         NSApp.mainMenu = statusMenu.applicationMenu()
         settingsWindow.onTilingChanged = { [weak self] enabled in
@@ -182,9 +173,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         settingsWindow.onCalendarRemindersChanged = { [weak self] enabled in
             Task { await self?.calendarReminders?.setEnabled(enabled) }
         }
-        settingsWindow.onDisplayAwakeChanged = { [weak self] in self?.keepAwake.setDisplayAwake($0) }
+        settingsWindow.onPermissionsVisibilityChanged = { [weak self] visible in
+            guard let self else { return }
+            if visible {
+                permissions.refresh()
+                permissionsChanged()
+                permissions.startPolling()
+            } else {
+                permissions.stopPolling()
+            }
+        }
         settingsWindow.onMeetingsFolderChanged = { [weak self] _ in self?.meetingNotes.meetingsFolderChanged() }
-        statusMenu.onShowPermissions = { [weak self] in self?.showOnboarding() }
+        statusMenu.onShowPermissions = { [weak self] in self?.settingsWindow.show(.permissions) }
         statusMenu.onOpenKeyboardSettings = { [weak self] in self?.permissions.openSettings(.keyboardShortcuts) }
     }
 
@@ -235,11 +235,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func startCapture(_ mode: CaptureFlow.Mode) {
         // Screen Recording can be revoked at any time, so re-check at press
-        // time. A missing grant routes to the onboarding window (explanation
-        // + Grant button) instead of capturing a black frame.
+        // time so a missing grant opens Permissions instead of capturing a black frame.
         permissions.refresh()
         guard permissions.screenRecording else {
-            showOnboarding()
+            settingsWindow.show(.permissions)
             return
         }
         // Read the ambient state at press time, before the Task hop
@@ -258,6 +257,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func setupKeepAwake() {
         keepAwake.onStateChange = { [weak self] in self?.updateStatus() }
+        keepAwake.onDisplayAwakeChanged = { [weak self] in self?.settings.keepDisplayAwake = $0 }
     }
 
     private func setupMeetingNotes() {
@@ -265,7 +265,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self?.updateStatus()
             self?.calendarReminders?.recorderDidChange()
         }
-        meetingRecorder.onShowPermissions = { [weak self] in self?.showOnboarding() }
+        meetingRecorder.onShowPermissions = { [weak self] in self?.settingsWindow.show(.permissions) }
         meetingNotes.onCheckWords = { [weak self] in self?.wordReviewWindow.show($0) }
         meetingControlsPanel.bindRecorder()
         wordReviewWindow.bindController()
@@ -294,6 +294,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             ? HotkeyHealth(accessibilityMissing: !permissions.accessibility, issues: hotkeyManager.issues)
             : .healthy
         statusMenu.updateHotkeyHealth(health)
+        settingsWindow.permissionsPage.showShortcutConflicts(
+            hotkeyManager.issues.filter { $0.shortcut.isScreenshot && $0.failure == .systemConflict }.map(\.shortcut))
         let warning: StatusWarning?
         if health != .healthy {
             warning = .shortcutsUnavailable

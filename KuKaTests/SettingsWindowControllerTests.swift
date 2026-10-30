@@ -27,24 +27,38 @@ final class SettingsWindowControllerTests: XCTestCase {
         defaults.removePersistentDomain(forName: "SettingsWindowControllerTests")
     }
 
+    func testFourPagesUseOneKuKaWindowWithoutChangingPreferences() {
+        let before = defaults.persistentDomain(forName: "SettingsWindowControllerTests")! as NSDictionary
+        let window = sut.window
+        sut.show()
+        XCTAssertEqual(window?.title, "Ku-Ka")
+        XCTAssertEqual(sut.pageButtons.map { $0.accessibilityLabel() },
+                       ["Settings", "Features & instructions", "Permissions", "Help & feedback"])
+        for button in sut.pageButtons {
+            button.performClick(nil)
+            XCTAssertTrue(sut.window === window)
+            XCTAssertEqual(sut.selectedPage.rawValue, button.tag)
+        }
+        XCTAssertEqual(defaults.persistentDomain(forName: "SettingsWindowControllerTests")! as NSDictionary, before)
+    }
+
     func testSwitchesSavePreferencesAndApplyTypedEffects() {
         var effects: [Bool] = []
         var calendar: [Bool] = []
         sut.onTilingChanged = { effects.append($0) }
         sut.onClipboardChanged = { effects.append($0) }
-        sut.onDisplayAwakeChanged = { effects.append($0) }
         sut.onCalendarRemindersChanged = { calendar.append($0) }
         sut.show()
-        for control in [sut.launchAtLogin, sut.windowTiling, sut.clipboardHistory, sut.displayAwake,
+        for control in [sut.launchAtLogin, sut.windowTiling, sut.clipboardHistory,
                         sut.calendarReminders, sut.teamsSpeakerNames] {
             control.performClick(nil)
         }
         XCTAssertTrue(settings.launchAtLogin)
         XCTAssertFalse(settings.windowTilingEnabled)
         XCTAssertFalse(settings.clipboardHistoryEnabled)
-        XCTAssertFalse(settings.keepDisplayAwake)
+        XCTAssertTrue(settings.keepDisplayAwake)
         XCTAssertTrue(settings.teamsSpeakerNamesEnabled)
-        XCTAssertEqual(effects, [false, false, false])
+        XCTAssertEqual(effects, [false, false])
         XCTAssertEqual(calendar, [true])
         XCTAssertNil(defaults.object(forKey: "calendarRecordingRemindersEnabled"),
                      "only CalendarReminderController.setEnabled saves the calendar choice")
@@ -199,17 +213,17 @@ final class SettingsWindowControllerTests: XCTestCase {
         sut.pageButtons[SettingsPage.instructions.rawValue].performClick(nil)
         XCTAssertEqual(sut.selectedPage, .instructions)
         XCTAssertEqual(sut.instructions.enclosingScrollView?.isHidden, false)
-        XCTAssertEqual(sut.pageButtons.map(\.state), [.off, .on])
+        XCTAssertEqual(sut.pageButtons.map(\.state), [.off, .on, .off, .off])
         sut.close()
         sut.show()
         XCTAssertEqual(sut.selectedPage, .settings)
         XCTAssertEqual(sut.instructions.enclosingScrollView?.isHidden, true)
-        XCTAssertEqual(sut.pageButtons.map(\.state), [.on, .off])
+        XCTAssertEqual(sut.pageButtons.map(\.state), [.on, .off, .off, .off])
     }
 
     func testEachPageCyclesTheKeyboardThroughNavigationAndItsLabelledControls() {
         sut.show()
-        let settingsControls: [NSView] = [sut.launchAtLogin, sut.windowTiling, sut.clipboardHistory, sut.displayAwake,
+        let settingsControls: [NSView] = [sut.launchAtLogin, sut.windowTiling, sut.clipboardHistory,
             sut.thumbnailDuration, sut.chooseMeetingsFolder, sut.summaryTool, sut.chooseBackground, sut.clearBackground,
             sut.calendarReminders, sut.teamsSpeakerNames]
         assertKeyViewCycle(sut.pageButtons + settingsControls)
@@ -218,6 +232,27 @@ final class SettingsWindowControllerTests: XCTestCase {
         }
         sut.pageButtons[SettingsPage.instructions.rawValue].performClick(nil)
         assertKeyViewCycle(sut.pageButtons + sut.instructions.guideButtons)
+        sut.show(.permissions)
+        assertKeyViewCycle(sut.pageButtons + sut.permissionsPage.controls)
+        sut.show(.help)
+        assertKeyViewCycle(sut.pageButtons + sut.helpPage.controls)
+    }
+
+    func testEveryPageKeepsItsControlsInsideTheCompactViewport() throws {
+        let window = try XCTUnwrap(sut.window)
+        window.setContentSize(NSSize(width: 640, height: 420))
+        for page in SettingsPage.allCases {
+            sut.show(page)
+            let root = try XCTUnwrap(window.contentView)
+            root.layoutSubtreeIfNeeded()
+            let scroll = try XCTUnwrap(descendants(root).compactMap { $0 as? NSScrollView }.first { !$0.isHidden })
+            let document = try XCTUnwrap(scroll.documentView)
+            for control in descendants(document).compactMap({ $0 as? NSControl }) {
+                let rect = control.convert(control.bounds, to: document)
+                XCTAssertGreaterThanOrEqual(rect.minX, -1, "\(page): \(control)")
+                XCTAssertLessThanOrEqual(rect.maxX, document.bounds.width + 1, "\(page): \(control)")
+            }
+        }
     }
 
     func testGuidesExpandAndCollapseWithTheirVoiceOverState() {
@@ -253,7 +288,7 @@ final class SettingsWindowControllerTests: XCTestCase {
             XCTAssertEqual(group.layer?.borderWidth, 1.5)
             XCTAssertTrue(group.content.superview === group, "the content leaves the hidden glass")
         }
-        XCTAssertEqual(sut.pageButtons.map(\.bezelStyle), [.push, .push])
+        XCTAssertEqual(sut.pageButtons.map(\.bezelStyle), [.push, .push, .push, .push])
         sut.applyDisplayOptions(SettingsDisplayOptions(reduceTransparency: false, increaseContrast: false))
         XCTAssertNil(root.layer?.backgroundColor)
         for group in groups {
@@ -261,7 +296,7 @@ final class SettingsWindowControllerTests: XCTestCase {
             XCTAssertEqual(group.layer?.borderWidth, 0.5)
             XCTAssertFalse(group.content.superview === group)
         }
-        XCTAssertEqual(sut.pageButtons.map(\.bezelStyle), [.glass, .glass])
+        XCTAssertEqual(sut.pageButtons.map(\.bezelStyle), [.glass, .glass, .glass, .glass])
     }
 
     private func assertKeyViewCycle(_ views: [NSView], file: StaticString = #filePath, line: UInt = #line) {

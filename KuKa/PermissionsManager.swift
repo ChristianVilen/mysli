@@ -54,7 +54,7 @@ enum MicrophoneAccess: Equatable {
 ///
 /// macOS offers no callback when the user grants a permission in System
 /// Settings, so status is re-read either on demand (`refresh()`) or on a
-/// short timer while the onboarding window is open (`startPolling()`).
+/// short timer while the Permissions page is visible (`startPolling()`).
 @MainActor
 final class PermissionsManager {
     /// Marks that the system Accessibility prompt has been shown once. See
@@ -120,8 +120,7 @@ final class PermissionsManager {
     ///
     /// That prompt is what puts Ku-Ka in the Accessibility list — opening the
     /// pane alone does not — so it must run at least once, or the user finds
-    /// no row to switch on. After that it only repeats what the onboarding
-    /// window already says, as a modal on top of it, so we stay quiet.
+    /// no row to switch on.
     func requestAccessibility() {
         if !defaults.bool(forKey: Self.didPromptForAccessibilityKey) {
             defaults.set(true, forKey: Self.didPromptForAccessibilityKey)
@@ -159,7 +158,7 @@ final class PermissionsManager {
         NSLog("Ku-Ka: could not open the System Settings pane for \(pane)")
     }
 
-    /// Keep status fresh outside the onboarding poll: re-read whenever the
+    /// Keep status fresh outside the Permissions page: re-read whenever the
     /// app becomes active — catches grants (or revocations) made in System
     /// Settings while we weren't polling. Runs for the app's lifetime.
     func startMonitoring() {
@@ -174,7 +173,7 @@ final class PermissionsManager {
     }
 
     /// Poll every 0.5s so a grant made in System Settings shows up live.
-    /// Only meant to run while the onboarding window is open.
+    /// Only meant to run while the Permissions page is visible.
     func startPolling() {
         guard timer == nil else { return }
         timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in

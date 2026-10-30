@@ -9,7 +9,6 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     let launchAtLogin = NSSwitch()
     let windowTiling = NSSwitch()
     let clipboardHistory = NSSwitch()
-    let displayAwake = NSSwitch()
     let calendarReminders = NSSwitch()
     let teamsSpeakerNames = NSSwitch()
     let thumbnailDuration = NSPopUpButton()
@@ -26,6 +25,9 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private let chooseContext: Picker
     private let present: (NSWindow) -> Void
     private let activation: OrdinaryWindowActivation
+    private let isWindowVisible: (NSWindow) -> Bool
+    private var permissionsVisible = false
+    private var visibilityObservers: [NSObjectProtocol] = []
     private(set) var selectedPage: SettingsPage = .settings
     let pageButtons = SettingsPage.allCases.map { page in
         let button = NSButton(title: page.title, image: NSImage(systemSymbolName: page.symbol, accessibilityDescription: nil)!, target: nil, action: nil)
@@ -39,26 +41,34 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     }
     private var pages: [SettingsPage: NSScrollView] = [:]
     let instructions = SettingsInstructionsView()
+    let permissionsPage: SettingsPermissionsView
+    let helpPage: SettingsHelpView
     private var displayObserver: NSObjectProtocol?
     var onTilingChanged: ((Bool) -> Void)?
     var onClipboardChanged: ((Bool) -> Void)?
-    var onDisplayAwakeChanged: ((Bool) -> Void)?
+    var onPermissionsVisibilityChanged: ((Bool) -> Void)?
     var onMeetingsFolderChanged: ((URL) -> Void)?
     var onCalendarRemindersChanged: ((Bool) -> Void)?
 
     init(settings: Settings,
+         permissionActions: PermissionActions = .inert,
+         openURL: @escaping (URL) -> Void = { NSWorkspace.shared.open($0) },
          chooseFolder: @escaping Picker = SettingsWindowController.folderPicker,
          chooseContext: @escaping Picker = SettingsWindowController.contextPicker,
          present: @escaping (NSWindow) -> Void = SettingsWindowController.presentWindow,
-         activation: OrdinaryWindowActivation = .shared) {
+         activation: OrdinaryWindowActivation = .shared,
+         isWindowVisible: @escaping (NSWindow) -> Bool = { $0.isVisible && !$0.isMiniaturized && !NSApp.isHidden }) {
         self.settings = settings
+        permissionsPage = SettingsPermissionsView(actions: permissionActions)
+        helpPage = SettingsHelpView(openURL: openURL)
         self.chooseFolder = chooseFolder
         self.chooseContext = chooseContext
         self.present = present
         self.activation = activation
+        self.isWindowVisible = isWindowVisible
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 760, height: 700),
-                                    styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: true)
-        window.title = "Ku-Ka Settings"
+                                    styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: true)
+        window.title = "Ku-Ka"
         window.isReleasedWhenClosed = false
         window.contentMinSize = NSSize(width: 640, height: 420)
         super.init(window: window)
@@ -69,38 +79,73 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.applyDisplayOptions(.current) }
         }
+        for name in [NSApplication.didHideNotification, NSApplication.didUnhideNotification] {
+            visibilityObservers.append(NotificationCenter.default.addObserver(forName: name, object: NSApp, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.refreshPermissionsVisibility() }
+            })
+        }
     }
 
     isolated deinit {
         if let displayObserver { NSWorkspace.shared.notificationCenter.removeObserver(displayObserver) }
+        for observer in visibilityObservers { NotificationCenter.default.removeObserver(observer) }
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
     static func presentWindow(_ window: NSWindow) {
+        if window.isMiniaturized { window.deminiaturize(nil) }
         if !window.isVisible { window.center() }
         window.makeKeyAndOrderFront(nil)
     }
 
-    func show() {
+    func show(_ page: SettingsPage = .settings) {
         loginError.stringValue = ""
         loginError.isHidden = true
         refresh()
-        selectPage(.settings)
+        selectPage(page)
         guard let window else { return }
         activation.open(window)
         present(window)
+        refreshPermissionsVisibility()
     }
 
     func windowWillClose(_ notification: Notification) {
+        setPermissionsVisible(false)
         if let window { activation.close(window) }
+    }
+
+    func windowDidMiniaturize(_ notification: Notification) { refreshPermissionsVisibility() }
+    func windowDidDeminiaturize(_ notification: Notification) { refreshPermissionsVisibility() }
+
+    private func refreshPermissionsVisibility() {
+        setPermissionsVisible(selectedPage == .permissions && window.map(isWindowVisible) == true)
+    }
+
+    private func setPermissionsVisible(_ visible: Bool) {
+        guard visible != permissionsVisible else { return }
+        permissionsVisible = visible
+        onPermissionsVisibilityChanged?(visible)
+    }
+
+    func renderPermissions(_ snapshot: PermissionSnapshot) { permissionsPage.render(snapshot) }
+
+    @discardableResult
+    func showScreenshotSetupIfNeeded(issues: [HotkeyRegistrationIssue]) -> Bool {
+        let conflicts = issues.filter { $0.shortcut.isScreenshot && $0.failure == .systemConflict }.map(\.shortcut)
+        guard !conflicts.isEmpty, !settings.didShowScreenshotShortcutSetup else { return false }
+        permissionsPage.showShortcutConflicts(conflicts)
+        show(.permissions)
+        guard permissionsVisible else { return false }
+        permissionsPage.revealShortcutSetup()
+        settings.didShowScreenshotShortcutSetup = true
+        return true
     }
 
     private func refresh() {
         launchAtLogin.state = settings.launchAtLogin ? .on : .off
         windowTiling.state = settings.windowTilingEnabled ? .on : .off
         clipboardHistory.state = settings.clipboardHistoryEnabled ? .on : .off
-        displayAwake.state = settings.keepDisplayAwake ? .on : .off
         calendarReminders.state = settings.calendarRecordingRemindersEnabled ? .on : .off
         teamsSpeakerNames.state = settings.teamsSpeakerNamesEnabled ? .on : .off
         let duration = settings.thumbnailDuration
@@ -129,7 +174,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private func buildForm() {
         for (control, action) in [
             (launchAtLogin, #selector(loginChanged)), (windowTiling, #selector(tilingChanged)),
-            (clipboardHistory, #selector(clipboardChanged)), (displayAwake, #selector(displayChanged)),
+            (clipboardHistory, #selector(clipboardChanged)),
             (calendarReminders, #selector(calendarChanged)), (teamsSpeakerNames, #selector(teamsChanged)),
             (chooseMeetingsFolder, #selector(folderClicked)), (chooseBackground, #selector(contextClicked)),
             (clearBackground, #selector(clearClicked)), (thumbnailDuration, #selector(durationChanged)),
@@ -142,7 +187,6 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         launchAtLogin.setAccessibilityLabel("Launch at login")
         windowTiling.setAccessibilityLabel("Enable window tiling")
         clipboardHistory.setAccessibilityLabel("Record clipboard history")
-        displayAwake.setAccessibilityLabel("Keep display awake during Keep Awake")
         calendarReminders.setAccessibilityLabel("Calendar recording reminders")
         teamsSpeakerNames.setAccessibilityLabel("Teams speaker names")
         summaryTool.setAccessibilityLabel("Summary tool")
@@ -169,8 +213,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         add(SettingsLayout.group([
             column([SettingsLayout.row("Launch at login", control: launchAtLogin), loginError]),
             SettingsLayout.row("Window tiling", detail: "Move windows with Control + Option.", control: windowTiling),
-            SettingsLayout.row("Clipboard history", detail: "Keep recent copies until you quit Ku-Ka.", control: clipboardHistory),
-            SettingsLayout.row("Keep display awake", detail: "While a Keep Awake session is active.", control: displayAwake)
+            SettingsLayout.row("Clipboard history", detail: "Keep recent copies until you quit Ku-Ka.", control: clipboardHistory)
         ]))
         loginError.textColor = .systemRed
         loginError.isHidden = true
@@ -218,12 +261,13 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             sidebar.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 10),
             sidebar.topAnchor.constraint(equalTo: root.topAnchor, constant: 10),
             sidebar.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -10),
-            sidebar.widthAnchor.constraint(equalToConstant: 170),
+            sidebar.widthAnchor.constraint(equalToConstant: 210),
             navigation.leadingAnchor.constraint(equalTo: sidebar.content.leadingAnchor, constant: 12),
             navigation.trailingAnchor.constraint(equalTo: sidebar.content.trailingAnchor, constant: -12),
             navigation.topAnchor.constraint(equalTo: sidebar.content.topAnchor, constant: 24)
         ])
-        pages = [.settings: SettingsLayout.scroll(content), .instructions: SettingsLayout.scroll(instructions)]
+        pages = [.settings: SettingsLayout.scroll(content), .instructions: SettingsLayout.scroll(instructions),
+                 .permissions: SettingsLayout.scroll(permissionsPage), .help: SettingsLayout.scroll(helpPage)]
         for scroll in pages.values {
             scroll.translatesAutoresizingMaskIntoConstraints = false
             root.addSubview(scroll)
@@ -256,15 +300,20 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         let controls: [NSView]
         switch page {
         case .settings:
-            controls = [launchAtLogin, windowTiling, clipboardHistory, displayAwake, thumbnailDuration,
+            controls = [launchAtLogin, windowTiling, clipboardHistory, thumbnailDuration,
                         chooseMeetingsFolder, summaryTool, chooseBackground, clearBackground, calendarReminders,
                         teamsSpeakerNames]
         case .instructions:
             controls = instructions.guideButtons
+        case .permissions:
+            controls = permissionsPage.controls
+        case .help:
+            controls = helpPage.controls
         }
         let keyViews: [NSView] = pageButtons + controls
         for (control, next) in zip(keyViews, keyViews.dropFirst() + [pageButtons[0]]) { control.nextKeyView = next }
         window?.makeFirstResponder(pageButtons[page.rawValue])
+        refreshPermissionsVisibility()
     }
 
     func applyDisplayOptions(_ options: SettingsDisplayOptions) {
@@ -292,11 +341,6 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     @objc private func clipboardChanged() {
         settings.clipboardHistoryEnabled = clipboardHistory.state == .on
         onClipboardChanged?(settings.clipboardHistoryEnabled)
-    }
-
-    @objc private func displayChanged() {
-        settings.keepDisplayAwake = displayAwake.state == .on
-        onDisplayAwakeChanged?(settings.keepDisplayAwake)
     }
 
     @objc private func calendarChanged() {

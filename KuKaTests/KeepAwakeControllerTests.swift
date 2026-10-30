@@ -122,6 +122,37 @@ final class KeepAwakeControllerTests: XCTestCase {
         XCTAssertTrue(controller.isActive)
     }
 
+    func testMenuDisplayToggleKeepsTheCurrentSessionAndExpiry() throws {
+        let toggle = try XCTUnwrap(menu.items.first { $0.title == "Keep screen on" })
+        XCTAssertEqual(toggle.state, .on)
+        clickChip("1h")
+        let expiry = manager.session?.expiresAt
+        clock = clock.addingTimeInterval(60)
+        click(toggle)
+        XCTAssertEqual(toggle.state, .off)
+        XCTAssertEqual(preventer.lastKeepDisplayAwake, false)
+        XCTAssertEqual(manager.session?.expiresAt, expiry)
+        XCTAssertTrue(controller.isActive)
+        click(toggle)
+        XCTAssertEqual(toggle.state, .on)
+        XCTAssertEqual(preventer.lastKeepDisplayAwake, true)
+        XCTAssertEqual(manager.session?.expiresAt, expiry)
+    }
+
+    func testMenuDisplayTogglePersistsTheChoiceWithoutStartingASession() throws {
+        let suite = "KeepAwakeControllerTests.DisplayPreference"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defaults.removePersistentDomain(forName: suite)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let settings = Settings(defaults: defaults, loginItem: FakeLoginItem())
+        controller.onDisplayAwakeChanged = { settings.keepDisplayAwake = $0 }
+        let toggle = try XCTUnwrap(menu.items.first { $0.title == "Keep screen on" })
+        click(toggle)
+        XCTAssertEqual(defaults.object(forKey: "keepDisplayAwake") as? Bool, false)
+        XCTAssertFalse(controller.isActive)
+        XCTAssertEqual(preventer.beginCount, 0)
+    }
+
     // MARK: - State-change hook (drives the status-bar icon)
 
     func testOnStateChangeFiresOnActivateAndDeactivate() {
