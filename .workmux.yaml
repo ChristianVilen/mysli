@@ -1,7 +1,7 @@
 main_branch: main
 
 panes:
-  - command: codex
+  - command: codex --no-daemon
     focus: true
   - split: horizontal
 
