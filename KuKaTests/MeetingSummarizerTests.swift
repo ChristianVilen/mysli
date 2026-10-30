@@ -200,8 +200,10 @@ final class MeetingSummarizerTests: XCTestCase {
     microphone, so "Me" can be several people. "Room 1", "Room 2", and so on are different voices on that \
     microphone. Software told the voices apart by their sound, so two people can share one Room label, and \
     one person can have two Room labels. No label tells which person recorded the meeting. A transcript has \
-    "Me" or Room labels, not both. "Them" is everyone else on the call, and the transcript does not tell \
-    those people apart. A "Me" or "Room" line can sometimes repeat a "Them" line because of echo.
+    "Me" or Room labels, not both. "Them" is system audio without a supported name. \
+    Labels ending in "(Teams)" come from best-effort Teams meeting UI observations. \
+    They can be wrong and do not prove action ownership. A "Me" or "Room" line can sometimes repeat \
+    a system-audio line because of echo.
 
     Write Markdown with exactly these sections:
     ## Summary
@@ -211,7 +213,9 @@ final class MeetingSummarizerTests: XCTestCase {
     ## Action items
     A checklist in the form "- [ ] Owner: task". The owner is a person's name only when the \
     transcript says who will do the task. Otherwise the owner is "Unclear". Never use a speaker \
-    label, such as "Me", "Them", or "Room 1", as an owner.
+    label, such as "Me", "Them", "Room 1", or "Name (Teams)", as an owner. A speaker name alone \
+    does not say who will do a task. Do not infer an owner from a roster, calendar, meeting \
+    background, or a voice guess.
     ## Key points
     A bullet list.
 

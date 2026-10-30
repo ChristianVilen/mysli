@@ -37,10 +37,10 @@ enum Transcript {
     /// segment is a line of its own. With `.voices`, the microphone lines get room labels: see
     /// `microphoneLines`.
     static func merge(_ tracks: [MeetingTrack: [TranscriptSegment]], rooms: RoomLabels,
-                      joinGap: TimeInterval? = 2) -> [TranscriptLine] {
+                      joinGap: TimeInterval? = 2, speakers: TeamsSpeakerEvidence = .empty) -> [TranscriptLine] {
         let them = withText(tracks[.system] ?? [])
         // sorted(by:) is stable, so Them, listed first, stays first on an equal start.
-        let spoken = (them.map { (speaker: Speaker.them, segment: $0) }
+        let spoken = (systemLines(them, speakers: speakers)
             + microphoneLines(microphoneSpeech(tracks), them: them, rooms: rooms))
             .sorted { $0.segment.start < $1.segment.start }
 
@@ -56,6 +56,19 @@ enum Transcript {
             lastEnd = segment.end
         }
         return lines
+    }
+
+    private static func systemLines(_ segments: [TranscriptSegment], speakers: TeamsSpeakerEvidence)
+        -> [(speaker: Speaker, segment: TranscriptSegment)] {
+        let sorted = segments.sorted { $0.start < $1.start }
+        var furthestEnd = -TimeInterval.infinity
+        return sorted.enumerated().map { index, segment in
+            let overlapsPrevious = segment.start < furthestEnd
+            let overlapsNext = index + 1 < sorted.count && sorted[index + 1].start < segment.end
+            furthestEnd = max(furthestEnd, segment.end)
+            let name = overlapsPrevious || overlapsNext ? nil : speakers.name(for: segment)
+            return (name.map(Speaker.teams) ?? .them, segment)
+        }
     }
 
     /// Microphone segments with text that pass the segment-echo filter, in time order.
@@ -239,17 +252,24 @@ enum Transcript {
     }
 
     static func markdown(_ lines: [TranscriptLine], title: String, duration: TimeInterval,
-                         by transcriber: String, after failures: [TranscriberFailure], rooms: RoomLabels) -> String {
+                         by transcriber: String, after failures: [TranscriberFailure], rooms: RoomLabels,
+                         teams: TeamsScanSummary) -> String {
         let byline = failures.isEmpty
             ? "Transcript by \(transcriber)."
             : "Transcript by \(transcriber). Tried first:\n\n" + failures.map { "- \($0)" }.joined(separator: "\n")
         var header = [byline]
         if case .failed(let failure) = rooms { header.append("There are no room labels. \(failure)") }
+        if let note = teams.transcriptNote(for: lines) { header.append(note) }
         let hasRooms = lines.contains { line in
             if case .room = line.speaker { return true }
             return false
         }
-        header.append((hasRooms ? Legend.rooms : .microphone).rawValue)
+        let hasNames = lines.contains { line in
+            if case .teams = line.speaker { return true }
+            return false
+        }
+        let legend: Legend = hasNames ? (hasRooms ? .teamsRooms : .teamsMicrophone) : (hasRooms ? .rooms : .microphone)
+        header.append(legend.rawValue)
         var text = """
         # \(MeetingTitle.heading(title))
 
@@ -272,6 +292,8 @@ enum Transcript {
     /// `contentForSummary` must still find a legend in a transcript that waits for its summary
     /// across an app update, so add a case for a new legend, and never edit or delete one.
     private enum Legend: String, CaseIterable {
+        case teamsRooms = "\"Room 1\", \"Room 2\", and so on are voices on the microphone of the Mac that recorded the meeting. The microphone hears the person who recorded the meeting and anyone in the same room. Ku-Ka told the voices apart on this Mac and numbered them in the order they first spoke. Two people with similar voices can share one label, and one person can get two labels. No label tells which voice is the person who recorded the meeting. Labels ending in \"(Teams)\" come from best-effort Teams meeting UI observations. They can be wrong and do not prove action ownership. \"Them\" is system audio without a supported name."
+        case teamsMicrophone = "\"Me\" is the microphone of the Mac that recorded the meeting. It hears the person who recorded the meeting and anyone in the same room. Labels ending in \"(Teams)\" come from best-effort Teams meeting UI observations. They can be wrong and do not prove action ownership. \"Them\" is system audio without a supported name."
         case rooms = "\"Room 1\", \"Room 2\", and so on are voices on the microphone of the Mac that recorded the meeting. The microphone hears the person who recorded the meeting and anyone in the same room. Ku-Ka told the voices apart on this Mac and numbered them in the order they first spoke. Two people with similar voices can share one label, and one person can get two labels. No label tells which voice is the person who recorded the meeting. \"Them\" is everyone else on the call."
         case microphone = "\"Me\" is the microphone of the Mac that recorded the meeting. It hears the person who recorded the meeting and anyone in the same room. \"Them\" is everyone else on the call."
         case person = "\"Me\" is the person who recorded the meeting. \"Them\" is everyone else on the call."

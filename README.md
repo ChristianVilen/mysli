@@ -73,7 +73,7 @@ While recording, open the menu to check the **Microphone** and **Mac audio** met
 
 Ku-Ka then transcribes the call on your Mac with Whisper (the `large-v3-v20240930_turbo` model, through WhisperKit) and asks an AI command-line tool for a summary. It tries Antigravity (`agy`) first and Claude Code (`claude`) if that fails. Install at least one of them in `/opt/homebrew/bin`, `/usr/local/bin`, or `~/.local/bin`, and log in to it once in Terminal. A notification tells you when the notes are ready; click it to open the summary, or the review window when there are words to check (see below). Ku-Ka asks for notification permission the first time you start a recording. Each meeting gets its own folder, for example `~/Meetings/2026-10-23_14-02/`, with `transcript.md` and `summary.md`.
 
-In the transcript, "Them" is everyone else on the call (the sound your Mac plays). Your Mac's microphone hears you and anyone in the same room. Ku-Ka tells those voices apart on your Mac and labels them "Room 1", "Room 2", and so on, in the order they first speak. Ku-Ka never guesses which voice is you. Two people with similar voices can share a label, and one person can get two. A voice with fewer than 5 words gets no label of its own: its lines take the label of the voice that spoke nearest in time. When Ku-Ka finds only one voice, the microphone lines say "Me". If Ku-Ka cannot tell the voices apart, the microphone lines also say "Me", and the top of the transcript says why. Ku-Ka does not try on a microphone track longer than 3 hours. In the summary, an action item has a person's name only when the transcript says who will do it. Otherwise its owner is "Unclear". Headphones give the cleanest transcript. On speakers, your microphone also hears the other people. Ku-Ka removes those repeated lines from the microphone lines when it finds them. It also removes the lines of a microphone voice that speaks almost only while the other people speak and mostly repeats their words, because that voice is their echo.
+By default, "Them" is everyone else on the call, from the sound your Mac plays. The optional Teams speaker-name feature below can name supported remote lines after Stop. Your Mac's microphone hears you and anyone in the same room. Ku-Ka tells those voices apart on your Mac and labels them "Room 1", "Room 2", and so on, in the order they first speak. Ku-Ka never guesses which voice is you. Two people with similar voices can share a label, and one person can get two. A voice with fewer than 5 words gets no label of its own: its lines take the label of the voice that spoke nearest in time. When Ku-Ka finds only one voice, the microphone lines say "Me". If Ku-Ka cannot tell the voices apart, the microphone lines also say "Me", and the top of the transcript says why. Ku-Ka does not try on a microphone track longer than 3 hours. In the summary, an action item has a person's name only when the transcript says who will do it. Otherwise its owner is "Unclear". Headphones give the cleanest transcript. On speakers, your microphone also hears the other people. Ku-Ka removes those repeated lines from the microphone lines when it finds them. It also removes the lines of a microphone voice that speaks almost only while the other people speak and mostly repeats their words, because that voice is their echo.
 
 The first meeting downloads the Whisper model, about 1.5 GB, to `~/Library/Application Support/Ku-Ka/whisper-models`. Ku-Ka excludes this model cache from Time Machine backups. The menu shows **Downloading speech model** meanwhile. After that, transcription needs no network while the model and tokenizer files remain intact. If Ku-Ka cannot download or load the model, or Whisper does not know the language, Ku-Ka transcribes with Apple's speech recognition instead. The top of the transcript names the transcriber and, after a fallback, says why Whisper was not used. These diagnostics stay in the transcript file and are left out of the summary input.
 
@@ -114,6 +114,54 @@ The AI tool also tells Ku-Ka which words it thinks speech recognition got wrong.
 Update Notes makes `transcript.md` again from the text that speech recognition wrote and from the list. So a change that you made to `transcript.md` by hand is lost. To fix a word, add it to the list instead.
 
 Recording needs the Screen Recording permission (for the sound your Mac plays) and the Microphone permission. Ku-Ka asks for Microphone the first time you start a recording.
+
+### Experimental Teams speaker names
+
+This feature is off by default. Its rules come from public source code and tests with fake Accessibility trees. **It has not been verified during a real Teams call.** Teams can change its UI, hide its speaking indicator, or keep the last speaker highlighted. Names can be missing or wrong.
+
+To opt in, run this command and restart Ku-Ka before your next recording:
+
+```bash
+defaults write com.kuka.screenshot teamsSpeakerNamesEnabled -bool true
+```
+
+Ku-Ka reads this preference once when each recording starts.
+
+While you record, Ku-Ka reads candidate speaker indicators and participant labels from the Teams desktop app through Accessibility. It supports a narrow profile of English meeting controls and video-tile structure. It does not enable Accessibility flags, click controls, open chats, or request a new permission. If Accessibility is unavailable or the structure is unsupported, recording continues and the remote lines stay "Them".
+
+After Stop, a remote segment can say `Aino (Teams)` when repeated observations support that name for at least 90% of the segment. Conflicts, uncertain observations, overlapping remote segments, and insufficient coverage keep "Them". Ku-Ka does not guess from a roster, a muted microphone, a calendar, or a saved voice profile. The live draft and microphone Room labels stay unchanged. A Teams label alone does not establish who owns an action item.
+
+Pause stops observation. Resume starts a new observation run, and final timestamps use the same three-second silence gaps as the audio. Ku-Ka keeps at most 36,000 observations per recording. It stops collection at that limit and retains earlier evidence.
+
+Observations stay in memory through the processing queue and disappear when that job finishes. Quit, a crash, or a retry before the transcript exists can lose them, so those lines fall back to "Them". Once names are in the heard transcript, Update Notes preserves them. Named labels in the final transcript go to the summary CLI with the rest of the transcript. No separate participant list, raw AX tree, or voice profile is saved.
+
+If the feature was on and every remote line stayed "Them", a line near the top of `transcript.md` says why. It gives the most common reason, for example:
+
+> Teams speaker names were on, but no remote line got a name. In 380 of 412 scans, no Teams window showed meeting controls with Hang up or Leave.
+
+If Teams showed a name in some scans, the line says in how many scans instead.
+
+Ku-Ka also writes the scan results and their counts to the macOS log. To watch the lines while you record, run this command:
+
+```bash
+/usr/bin/log stream --predicate 'subsystem == "com.kuka.screenshot" AND category == "teams"'
+```
+
+To see the lines of the last two hours, run this command:
+
+```bash
+/usr/bin/log show --last 2h --predicate 'subsystem == "com.kuka.screenshot" AND category == "teams"'
+```
+
+Use the full path `/usr/bin/log`, because zsh has its own `log` command. These log lines hold only reason codes, counts, and scan times. They never hold a name or other text from Teams.
+
+To turn the feature off for future recordings, run this command and restart Ku-Ka:
+
+```bash
+defaults write com.kuka.screenshot teamsSpeakerNamesEnabled -bool false
+```
+
+The [source research](docs/superpowers/research/2026-10-29-teams-open-source.md) and [read-only probe instructions](docs/superpowers/research/2026-10-29-teams-ax-feasibility.md) describe the remaining real-call check.
 
 ### Optional meeting context
 
@@ -194,7 +242,7 @@ Alternatively, you can use the GUI method:
 Screen Recording lets Ku-Ka take screenshots and record the sound of a call for Meeting Notes. Accessibility lets it move windows and paste from clipboard history. On first launch, a setup window explains these permissions. Grant the permissions for the features you use; each row updates after you allow it in System Settings. Open the window again from **Permissions…** in the menu. A red dot in the bottom-left corner of the menu bar icon means an Accessibility or shortcut problem. An orange dot in that corner means Screen Recording is missing, when no red warning is present.
 
 ### Accessibility (window tiling and automatic paste)
-Accessibility lets Ku-Ka move and resize windows and paste items from clipboard history. Registering the shortcuts does not need this permission.
+Accessibility lets Ku-Ka move and resize windows and paste items from clipboard history. The optional Teams speaker-name feature also uses it to read meeting UI. Registering the shortcuts does not need this permission.
 
 **System Settings → Privacy & Security → Accessibility** → Enable Ku-Ka
 
@@ -319,7 +367,7 @@ KuKa/
 - No preferences UI for changing the shortcut keys, including the window tiling hotkeys
 - Some windows can't be tiled — apps that don't let their windows be moved or resized through the Accessibility API, and Ku-Ka's own windows. The hotkey then does nothing; there is no error message.
 - Meeting Notes transcribes one language per meeting, set with `meetingLocale` (US English by default).
-- Meeting Notes does not tell apart the people on the call. They all share the label "Them". Room labels do not say which voice is you.
+- Remote lines use "Them" unless experimental Teams observations support a name. Teams compatibility remains unverified, and unsupported layouts keep "Them". Room labels do not say which voice is you.
 - On speakers, a repeated line of fewer than 3 words can stay in the transcript as yours.
 - The live transcript works only for a language whose Apple speech model is already on your Mac. There is none for Finnish.
 - The macOS microphone indicator stays on while a meeting recording is paused.

@@ -19,6 +19,15 @@ final class SettingsTests: XCTestCase {
         super.tearDown()
     }
 
+    func testTeamsSpeakerNamesAreOptInAndPersistWithTheDocumentedKey() {
+        XCTAssertFalse(sut.teamsSpeakerNamesEnabled)
+        sut.teamsSpeakerNamesEnabled = true
+        XCTAssertEqual(defaults.object(forKey: "teamsSpeakerNamesEnabled") as? Bool, true)
+        XCTAssertTrue(Settings(defaults: defaults, loginItem: loginItem).teamsSpeakerNamesEnabled)
+        sut.teamsSpeakerNamesEnabled = false
+        XCTAssertFalse(Settings(defaults: defaults, loginItem: loginItem).teamsSpeakerNamesEnabled)
+    }
+
     func testThumbnailDurationDefaultsToFiveAndRoundTrips() {
         XCTAssertEqual(sut.thumbnailDuration, 5.0)
         sut.thumbnailDuration = 15

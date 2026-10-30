@@ -53,7 +53,7 @@ final class RealMeetingAudioTests: XCTestCase {
         let lines = Transcript.merge(tracks.mapValues(\.segments), rooms: rooms)
         let markdown = Transcript.markdown(lines, title: "Meeting audio in \(audio.lastPathComponent)",
                                            duration: tracks.values.map(\.duration).max() ?? 0,
-                                           by: transcriber.name, after: [], rooms: rooms)
+                                           by: transcriber.name, after: [], rooms: rooms, teams: .empty)
         try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
         try markdown.write(to: output.appendingPathComponent("transcript.md"), atomically: true, encoding: .utf8)
         try (timings.joined(separator: "\n") + "\n").write(to: output.appendingPathComponent("timings.txt"),

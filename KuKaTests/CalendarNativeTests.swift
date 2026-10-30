@@ -38,7 +38,8 @@ final class CalendarNativeTests: XCTestCase {
         let before = SummaryDocument.markdown(title: folder.title, body: "Ship on Friday.")
         try folder.saveDisplayTitle("Planning")
         let after = SummaryDocument.markdown(title: folder.title, body: "Ship on Friday.")
-        let transcript = Transcript.markdown([], title: folder.title, duration: 60, by: "Synthetic", after: [], rooms: .notDiarized)
+        let transcript = Transcript.markdown([], title: folder.title, duration: 60, by: "Synthetic", after: [], rooms: .notDiarized,
+                                             teams: .empty)
         try folder.write(after, to: .summary)
         try folder.write(transcript, to: .transcript)
         XCTAssertEqual(before, "# Meeting on 2026-10-23 at 14:02\n\nShip on Friday.\n")

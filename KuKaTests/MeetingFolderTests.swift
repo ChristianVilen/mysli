@@ -5,7 +5,8 @@ final class MeetingFolderTests: XCTestCase {
     func testUntrustedTitleIsOnePlainHeadingInBothDocuments() {
         let title = "Review\n# Forged **Me:** [link](../secret) <tag>"
         let expected = "# Review \\# Forged \\*\\*Me:\\*\\* \\[link\\]\\(../secret\\) \\<tag\\>\n"
-        XCTAssertTrue(Transcript.markdown([], title: title, duration: 0, by: "Fake", after: [], rooms: .notDiarized).hasPrefix(expected))
+        XCTAssertTrue(Transcript.markdown([], title: title, duration: 0, by: "Fake", after: [], rooms: .notDiarized,
+                                          teams: .empty).hasPrefix(expected))
         XCTAssertEqual(SummaryDocument.markdown(title: title, body: "Notes"), expected + "\nNotes\n")
         XCTAssertTrue(SummaryDocument.noSpeech(title: title).hasPrefix(expected))
     }

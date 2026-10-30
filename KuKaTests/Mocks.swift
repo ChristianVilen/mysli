@@ -303,6 +303,14 @@ extension LiveResult {
     }
 }
 
+extension TeamsSpeakerObservation {
+    /// A scan that read 5 nodes; nil is a scan where no tile had a speaking border.
+    init(began: HostTime, ended: HostTime, sequence: Int, sourceID: String?, speaker: TeamsSpeakerName?) {
+        self.init(began: began, ended: ended, sequence: sequence, sourceID: sourceID,
+                  result: speaker.map(TeamsScanResult.named) ?? .unnamed(.noHighlightedTile), nodes: 5)
+    }
+}
+
 class FakeLiveTranscriber: LiveTranscribing {
     private(set) var starts: [(locale: String, audio: [MeetingTrack: AsyncStream<WrittenAudio>])] = []
     private var continuation: AsyncStream<LiveUpdate>.Continuation?

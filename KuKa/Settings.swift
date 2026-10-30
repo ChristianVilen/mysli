@@ -75,6 +75,11 @@ final class Settings {
         return URL(fileURLWithPath: (path as NSString).expandingTildeInPath)
     }
 
+    var teamsSpeakerNamesEnabled: Bool {
+        get { defaults.bool(forKey: "teamsSpeakerNamesEnabled") }
+        set { defaults.set(newValue, forKey: "teamsSpeakerNamesEnabled") }
+    }
+
     /// A BCP 47 tag such as "de-DE", set with `defaults write`.
     var meetingLocale: Locale {
         guard let tag = defaults.string(forKey: "meetingLocale"), !tag.isEmpty else {

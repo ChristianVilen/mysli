@@ -23,7 +23,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private lazy var meetingRecorder = MeetingRecorder(
         permissions: permissions,
         root: { [settings] in settings.meetingsFolder },
-        locale: { [settings] in settings.meetingLocale }
+        locale: { [settings] in settings.meetingLocale },
+        teamsSpeakerNamesEnabled: { [settings] in settings.teamsSpeakerNamesEnabled }
     )
     private lazy var meetingNotes = MeetingNotesController(
         recorder: meetingRecorder,

@@ -81,7 +81,8 @@ struct MeetingProcessor {
         return .updated(summary: meeting.url(for: .summary))
     }
 
-    func process(_ meeting: MeetingFolder, progress: (MeetingProgress) -> Void) async -> MeetingOutcome {
+    func process(_ meeting: MeetingFolder, speakers: TeamsSpeakerEvidence = .empty,
+                 progress: (MeetingProgress) -> Void) async -> MeetingOutcome {
         let lock: FileLock
         do {
             lock = try meeting.lock()
@@ -110,7 +111,7 @@ struct MeetingProcessor {
                 do {
                     switch step {
                     case .transcribe:
-                        guard try await transcribe(meeting, progress: progress) else { return .noSpeech }
+                        guard try await transcribe(meeting, speakers: speakers, progress: progress) else { return .noSpeech }
                     case .summarize:
                         try await summarize(meeting)
                     }
@@ -132,11 +133,13 @@ struct MeetingProcessor {
 
     /// False when nobody spoke. The meeting is then done, and its audio stays
     /// in the folder.
-    private func transcribe(_ meeting: MeetingFolder, progress: (MeetingProgress) -> Void) async throws -> Bool {
+    private func transcribe(_ meeting: MeetingFolder, speakers: TeamsSpeakerEvidence,
+                            progress: (MeetingProgress) -> Void) async throws -> Bool {
         let (tracks, transcriber, failures) = try await transcribeTracks(meeting, progress: progress)
         let rooms = try await labelRooms(meeting, tracks: tracks, progress: progress)
         try Task.checkCancellation()
-        let lines = Transcript.merge(tracks.mapValues(\.segments), rooms: rooms)
+        let lines = Transcript.merge(tracks.mapValues(\.segments), rooms: rooms, speakers: speakers)
+        if let line = speakers.scans.mergeLine(for: lines) { Log.teams.notice(line) }
         let duration = tracks.values.map(\.duration).max() ?? 0
         if lines.isEmpty {
             // Summary first: it marks the meeting done, so a crash before the
@@ -145,7 +148,7 @@ struct MeetingProcessor {
             try meeting.write(SummaryDocument.noSpeech(title: meeting.title), to: .summary)
         }
         let heard = Transcript.markdown(lines, title: meeting.title, duration: duration,
-                                        by: transcriber, after: failures, rooms: rooms)
+                                        by: transcriber, after: failures, rooms: rooms, teams: speakers.scans)
         try meeting.write(heard, to: .heardTranscript)
         try meeting.write(heard, to: .transcript)
         return !lines.isEmpty

@@ -25,19 +25,21 @@ enum Speaker: Hashable, Sendable {
     case me
     case them
     case room(Int)
+    case teams(TeamsSpeakerName)
 
     var label: String {
         switch self {
         case .me: return "Me"
         case .them: return "Them"
         case .room(let number): return "Room \(number)"
+        case .teams(let name): return "\(name.value) (Teams)"
         }
     }
 
     var track: MeetingTrack {
         switch self {
         case .me, .room: return .microphone
-        case .them: return .system
+        case .them, .teams: return .system
         }
     }
 }

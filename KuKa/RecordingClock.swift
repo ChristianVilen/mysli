@@ -35,7 +35,7 @@ struct RecordingClock: Equatable, Sendable {
     /// Recorded time 0 and file position 0.
     let origin: HostTime
     /// Pause and resume times in order: [pause, resume, pause, ...]. Each is after the one before.
-    private(set) var boundaries: [HostTime] = []
+    private var boundaries: [HostTime] = []
 
     init(origin: HostTime) { self.origin = origin }
 
@@ -64,6 +64,29 @@ struct RecordingClock: Equatable, Sendable {
     /// Where audio captured at `time` lands in the files. Nil before `origin` or inside a pause.
     func filePosition(at time: HostTime) -> TimeInterval? {
         runs.firstIndex { $0.contains(time) }.map { filePosition(at: time, inRun: $0) }
+    }
+
+    struct FileInterval: Equatable, Sendable {
+        let start: TimeInterval
+        let end: TimeInterval
+    }
+
+    func fileIntervalInOneRun(from start: HostTime, to end: HostTime) -> FileInterval? {
+        guard origin.seconds.isFinite, start.seconds.isFinite, end.seconds.isFinite, start <= end,
+              let index = runs.firstIndex(where: { $0.contains(start) && $0.contains(end) }) else { return nil }
+        return FileInterval(start: filePosition(at: start, inRun: index),
+                            end: filePosition(at: end, inRun: index))
+    }
+
+    func keptFileIntervals(from start: HostTime, to end: HostTime) -> [FileInterval] {
+        guard origin.seconds.isFinite, start.seconds.isFinite, end.seconds.isFinite, start <= end else { return [] }
+        return runs.enumerated().compactMap { index, run in
+            let first = max(start, run.start)
+            let last = min(end, run.end ?? end)
+            guard first <= last, run.contains(first) else { return nil }
+            let position = filePosition(at: first, inRun: index)
+            return FileInterval(start: position, end: position + (last - first))
+        }
     }
 
     /// The recorded time of a file position. A position inside a resume gap maps to the pause

@@ -239,7 +239,7 @@ final class TranscriptTests: XCTestCase {
             TranscriptLine(speaker: .them, start: 1.7, text: "Let's ship on Friday"),
             TranscriptLine(speaker: .me, start: 3604, text: "Sounds good"),
         ], title: "Meeting on 2026-10-23 at 14:02", duration: 3729, by: "Whisper large-v3-v20240930_turbo", after: [],
-           rooms: .notDiarized)
+           rooms: .notDiarized, teams: .empty)
 
         XCTAssertEqual(markdown, """
         # Meeting on 2026-10-23 at 14:02
@@ -288,7 +288,7 @@ final class TranscriptTests: XCTestCase {
             title: "Meeting on 2026-10-23 at 14:02", duration: 60, by: "Apple speech recognition",
             after: [TranscriberFailure(transcriber: "Whisper large-v3-v20240930_turbo", stage: .download,
                                        message: "The Internet connection appears to be offline.")],
-            rooms: .notDiarized)
+            rooms: .notDiarized, teams: .empty)
 
         XCTAssertEqual(markdown, """
         # Meeting on 2026-10-23 at 14:02
@@ -317,7 +317,7 @@ final class TranscriptTests: XCTestCase {
             TranscriptLine(speaker: .room(1), start: 4, text: "Sounds good"),
             TranscriptLine(speaker: .room(2), start: 6, text: "Friday works for me"),
         ], title: "Meeting on 2026-10-23 at 14:02", duration: 60, by: whisper, after: [],
-           rooms: voices((7, 3.5, 5.5), (3, 5.5, 8)))
+           rooms: voices((7, 3.5, 5.5), (3, 5.5, 8)), teams: .empty)
 
         XCTAssertEqual(markdown, """
         # Meeting on 2026-10-23 at 14:02
@@ -342,7 +342,7 @@ final class TranscriptTests: XCTestCase {
                           rooms: voices((7, 3.5, 5.5)))
         func markdown(_ rooms: RoomLabels) -> String {
             Transcript.markdown(lines, title: "Meeting on 2026-10-23 at 14:02", duration: 60, by: whisper, after: [],
-                                rooms: rooms)
+                                rooms: rooms, teams: .empty)
         }
 
         XCTAssertEqual(markdown(voices((7, 3.5, 5.5))), markdown(.notDiarized))
@@ -351,7 +351,8 @@ final class TranscriptTests: XCTestCase {
     func testMarkdownWithoutRoomLabelsSaysWhyUnderTheByline() {
         let markdown = Transcript.markdown([shipOnFriday, TranscriptLine(speaker: .me, start: 4, text: "Sounds good")],
                                            title: "Meeting on 2026-10-23 at 14:02", duration: 60, by: whisper, after: [],
-                                           rooms: .failed(.download("The Internet connection appears to be offline.")))
+                                           rooms: .failed(.download("The Internet connection appears to be offline.")),
+                                           teams: .empty)
 
         XCTAssertEqual(markdown, """
         # Meeting on 2026-10-23 at 14:02
@@ -373,7 +374,8 @@ final class TranscriptTests: XCTestCase {
 
     func testTheFailureLineComesAfterTheTranscribersTriedFirst() {
         let markdown = Transcript.markdown([shipOnFriday], title: "Meeting on 2026-10-23 at 14:02", duration: 60,
-                                           by: "Apple speech recognition", after: [offline], rooms: .failed(.noVoices))
+                                           by: "Apple speech recognition", after: [offline], rooms: .failed(.noVoices),
+                                           teams: .empty)
 
         XCTAssertEqual(markdown, """
         # Meeting on 2026-10-23 at 14:02
@@ -420,7 +422,7 @@ final class TranscriptTests: XCTestCase {
         for (rooms, content) in cases {
             for failures in [[], [offline]] {
                 let markdown = Transcript.markdown(merge(me: me, them: them, rooms: rooms), title: "Meeting on 2026-10-23 at 14:02",
-                                                   duration: 60, by: whisper, after: failures, rooms: rooms)
+                                                   duration: 60, by: whisper, after: failures, rooms: rooms, teams: .empty)
 
                 XCTAssertEqual(Transcript.contentForSummary(markdown), content, "\(rooms), \(failures.count) failures")
             }
@@ -433,7 +435,7 @@ final class TranscriptTests: XCTestCase {
 
     private func heardTranscript(_ lines: [TranscriptLine]) -> String {
         Transcript.markdown(lines, title: "Meeting on 2026-10-23 at 14:02", duration: 60, by: whisper, after: [],
-                            rooms: .notDiarized)
+                            rooms: .notDiarized, teams: .empty)
     }
 
     /// The forms on the list's last line occur only in the title, the byline, the legend, and the labels.

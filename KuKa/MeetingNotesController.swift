@@ -18,12 +18,21 @@ enum MeetingsFolderPicker {
 @MainActor
 final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection {
     private enum Job: Equatable {
-        case process(MeetingFolder)
+        case process(RecordedMeeting)
         case updateNotes(MeetingFolder)
 
         var meeting: MeetingFolder {
             switch self {
-            case .process(let meeting), .updateNotes(let meeting): return meeting
+            case .process(let recording): return recording.folder
+            case .updateNotes(let meeting): return meeting
+            }
+        }
+
+        static func == (lhs: Job, rhs: Job) -> Bool {
+            switch (lhs, rhs) {
+            case (.process(let lhs), .process(let rhs)): return lhs.folder == rhs.folder
+            case (.updateNotes(let lhs), .updateNotes(let rhs)): return lhs == rhs
+            default: return false
             }
         }
     }
@@ -148,13 +157,15 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
 
     func resumeUnfinished() {
         for (meeting, stage) in MeetingFolder.all(in: root()) {
-            if case .pending = stage { enqueue(.process(meeting)) }
+            if case .pending = stage { enqueue(.process(RecordedMeeting(folder: meeting, speakers: .empty))) }
         }
     }
 
     /// Quit: stops the recording and the processing. Each meeting waits for the next launch.
     func shutDown() {
         recorder.shutDown()
+        queue.removeAll()
+        current = nil
         processingTask?.cancel()
     }
 
@@ -187,7 +198,7 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
             guard case .failed = stage else { continue }
             do {
                 try meeting.clearFailure()
-                enqueue(.process(meeting))
+                enqueue(.process(RecordedMeeting(folder: meeting, speakers: .empty)))
             } catch {
                 NSLog("Ku-Ka: could not clear the failure of \(meeting.name): \(error)")
             }
@@ -227,8 +238,9 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
         while !queue.isEmpty, !Task.isCancelled {
             let job = queue.removeFirst()
             switch job {
-            case .process(let meeting):
-                let outcome = await processor.process(meeting) { [weak self] progress in
+            case .process(let recording):
+                let meeting = recording.folder
+                let outcome = await processor.process(meeting, speakers: recording.speakers) { [weak self] progress in
                     self?.current = (job, progress.title)
                     self?.updateMenu()
                 }
