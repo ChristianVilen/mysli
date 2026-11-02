@@ -155,7 +155,7 @@ final class PermissionsManager {
 
     func openSettings(_ pane: SettingsPane) {
         for url in pane.urls where openURL(url) { return }
-        NSLog("Ku-Ka: could not open the System Settings pane for \(pane)")
+        Log.permissions.error("Could not open the System Settings pane for \(String(describing: pane), privacy: .public)")
     }
 
     /// Keep status fresh outside the Permissions page: re-read whenever the

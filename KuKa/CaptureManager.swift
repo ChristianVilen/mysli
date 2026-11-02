@@ -16,7 +16,7 @@ class SystemScreenCapture: ScreenCapturing {
         guard let content = await shareableContent() else { return nil }
         guard let display = content.displays.first(where: { $0.frame.contains(CGPoint(x: rect.midX, y: rect.midY)) })
                 ?? content.displays.first else {
-            NSLog("Ku-Ka: No display found for capture rect")
+            Log.capture.error("No display found for capture rect")
             return nil
         }
 
@@ -35,7 +35,7 @@ class SystemScreenCapture: ScreenCapturing {
     func captureWindow(windowID: CGWindowID) async -> CGImage? {
         guard let content = await shareableContent() else { return nil }
         guard let window = content.windows.first(where: { $0.windowID == windowID }) else {
-            NSLog("Ku-Ka: Window \(windowID) not found for capture")
+            Log.capture.error("Window \(windowID) not found for capture")
             return nil
         }
 
@@ -50,7 +50,7 @@ class SystemScreenCapture: ScreenCapturing {
         do {
             return try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
         } catch {
-            NSLog("Ku-Ka: Shareable content lookup failed: \(error)")
+            Log.capture.error("Shareable content lookup failed (code \((error as NSError).code)): \(error.localizedDescription)")
             return nil
         }
     }
@@ -71,7 +71,7 @@ class SystemScreenCapture: ScreenCapturing {
         do {
             return try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
         } catch {
-            NSLog("Ku-Ka: \(label) failed: \(error)")
+            Log.capture.error("\(label, privacy: .public) failed (code \((error as NSError).code)): \(error.localizedDescription)")
             return nil
         }
     }
@@ -100,7 +100,7 @@ class CaptureManager {
         let cgRect = ScreenCoordinates.flipVertical(screenFrame, primaryScreenHeight: primaryHeight)
 
         guard let cgImage = await screenCapture.captureScreen(rect: cgRect) else {
-            NSLog("Ku-Ka: Full screen capture returned nil")
+            Log.capture.error("Full screen capture returned nil")
             return nil
         }
 
@@ -109,7 +109,7 @@ class CaptureManager {
 
     func captureWindow(windowID: CGWindowID) async -> CaptureResult? {
         guard let cgImage = await screenCapture.captureWindow(windowID: windowID) else {
-            NSLog("Ku-Ka: Window capture returned nil")
+            Log.capture.error("Window capture returned nil")
             return nil
         }
         return store.store(cgImage: cgImage)
@@ -119,7 +119,7 @@ class CaptureManager {
         let cgRect = ScreenCoordinates.cgRect(forSelection: rect, inScreenFrame: screenFrame, primaryHeight: primaryHeight)
 
         guard let cgImage = await screenCapture.captureScreen(rect: cgRect) else {
-            NSLog("Ku-Ka: Screen capture returned nil")
+            Log.capture.error("Screen capture returned nil")
             return nil
         }
 

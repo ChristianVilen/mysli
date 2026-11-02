@@ -44,12 +44,12 @@ struct KnownWordsFile {
         let url = url()
         do {
             guard let markdown = try Self.text(at: url) else {
-                NSLog("Ku-Ka: the known-words list \(url.path) is not UTF-8 text, so Ku-Ka does not use it.")
+                Log.meeting.error("The known-words list \(url.path, privacy: .public) is not UTF-8 text, so Ku-Ka does not use it.")
                 return .empty
             }
             return KnownWordsList(markdown: markdown)
         } catch {
-            NSLog("Ku-Ka: could not read the known-words list \(url.path): \(error.localizedDescription)")
+            Log.meeting.error("Could not read the known-words list \(url.path, privacy: .public) (code \((error as NSError).code)): \(error.localizedDescription)")
             return .empty
         }
     }

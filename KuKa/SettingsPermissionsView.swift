@@ -33,12 +33,15 @@ final class PermissionRowView: NSView {
         SettingsLayout.add(heading, to: copy)
         SettingsLayout.add(SettingsLayout.label(explanation, size: 12, secondary: true), to: copy)
         copy.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        copy.setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)
         statusLabel.setContentHuggingPriority(.required, for: .horizontal)
         grantButton.target = self
         grantButton.action = #selector(grantClicked)
         grantButton.bezelStyle = .rounded
+        grantButton.setContentHuggingPriority(.required, for: .horizontal)
         grantButton.setContentCompressionResistancePriority(.required, for: .horizontal)
         let row = NSStackView(views: [statusLabel, copy, grantButton])
+        row.distribution = .fill
         row.alignment = .top
         row.spacing = 10
         SettingsLayout.fill(row, in: self)

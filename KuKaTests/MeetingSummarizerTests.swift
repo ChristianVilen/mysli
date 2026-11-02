@@ -106,6 +106,28 @@ final class MeetingSummarizerTests: XCTestCase {
         ])
     }
 
+    func testFailureLogsKeepToolAndReasonButHideLaunchDetailsAndToolOutput() {
+        let failures = [
+            SummaryFailure(cli: .antigravity, reason: .notInstalled(searched: ["/opt/homebrew/bin/agy", "/usr/local/bin/agy"])),
+            SummaryFailure(cli: .claude, reason: .couldNotLaunch("private meeting content")),
+            SummaryFailure(cli: .antigravity, reason: .exited(status: 7, stderrTail: "private transcript\nsecond line")),
+            SummaryFailure(cli: .claude, reason: .exited(status: 2, stderrTail: "")),
+            SummaryFailure(cli: .antigravity, reason: .timedOut),
+            SummaryFailure(cli: .claude, reason: .emptyOutput),
+        ]
+        XCTAssertEqual(failures.map { $0.logMessage.text }, [
+            "agy was not found at /opt/homebrew/bin/agy, /usr/local/bin/agy",
+            "claude could not start: <private>",
+            "agy exited with status 7: <private>",
+            "claude exited with status 2",
+            "agy took too long and was stopped",
+            "claude exited without writing a summary",
+        ])
+        let composed: LogMessage = "Earlier failure: \(failures[2].logMessage)"
+        XCTAssertEqual(composed.text, "Earlier failure: agy exited with status 7: <private>")
+        XCTAssertEqual(failures[2].description, "agy exited with status 7: private transcript second line")
+    }
+
     func testSummaryDocumentIsTheTitleAndTheTrimmedNotesWithoutAFooter() {
         let markdown = SummaryDocument.markdown(title: "Meeting on 2026-10-23 at 14:02", body: "\n## Summary\nShip Friday.\n\n")
 

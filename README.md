@@ -19,6 +19,7 @@ A lightweight macOS menu bar app that replaces the default `Shift+Command+4` scr
 - Window tiling — hotkeys to snap the active window to the left half, right half, or full screen of its display
 - Clipboard history — `Shift+Command+C` opens a searchable list of what you've copied, text and images, and pastes the item you choose back into the app you were using
 - Meeting notes. Record a call from the menu bar, and Ku-Ka writes a transcript and a summary as Markdown files. Transcription runs on your Mac, and so does the step that tells apart the voices in your room. A floating panel lets you pause and stop the recording and shows a live draft of the transcript.
+- App logs. **Show Log…** opens a live, searchable log window with filters, copy, save, and deletion.
 - Runs as a menu bar agent (no Dock icon)
 
 ## Keep Awake
@@ -205,6 +206,36 @@ defaults delete com.kuka.screenshot meetingContextFile
 ```
 
 This leaves your file in place. It does not remove context already sent to a provider or saved in `agy` history.
+
+## Logs
+
+Choose **Show Log…** in the menu, immediately after **Permissions…**. The window
+starts with logs from this launch. You can select Today, Last 7 days, or Everything
+kept, then filter by app area or show errors only. It shows the newest 5,000 matching
+lines and refreshes every two seconds while open. Scroll up to read older text
+without following new lines. Press **Command-F** to open the find bar.
+
+**Copy All** copies the displayed lines. **Save…** exports those same lines to a
+text file. **Delete All Logs** asks for confirmation, then removes Ku-Ka's daily
+log files. New log messages create a file again. This does not remove macOS unified
+logs.
+
+Daily files are in `~/Library/Logs/Ku-Ka/`, with access limited to your account.
+At launch and at the first message of each new day, Ku-Ka removes files older
+than 14 days. It also removes the oldest files above a 20 MB total, while keeping
+today's file even if it exceeds that limit.
+
+Participant names, transcript text, known words, meeting context, error descriptions,
+and summary-tool output stay private. Logs replace private values with `<private>`
+before sending a message to either output. Fixed reasons, error codes, and approved
+file paths remain visible. Full summary-tool failures remain in the meeting's
+`error.md`.
+
+To view live messages through macOS logging, run:
+
+```sh
+/usr/bin/log stream --predicate 'subsystem == "com.kuka.screenshot"' --info
+```
 
 ## Requirements
 
@@ -439,7 +470,20 @@ Unit tests never download or load the Whisper or SpeakerKit model. `RealMeetingA
 
 ### Test-Mode Guard
 
-When running under XCTest, the app skips real shortcut registration, permission setup, clipboard polling, and meeting recovery. Meeting tests use a temporary folder, never `~/Meetings`. Tests use the real registrar with fake Carbon calls. Detection uses `XCTestConfigurationFilePath` (unit tests) and the `--uitesting` launch argument (no UI-test target currently exists).
+XCTest uses no app delegate and does not construct production services. The
+`--uitesting` Settings preview uses isolated defaults and inert services. Both
+leave production file logging off. Meeting tests use a temporary folder, never
+`~/Meetings`, and registrar tests use fake Carbon calls. Detection uses
+`XCTestConfigurationFilePath`, which takes priority over the preview argument.
+
+### Log tests
+
+Log tests use temporary folders and injected outputs. They cover privacy,
+permissions, retention, concurrent writes, bounded shutdown, cached reading,
+filters, selection and scroll preservation, stale refreshes, deletion, find,
+and shared window activation. XCTest and the Settings preview do not start
+production file logging. Set `TEST_RUNNER_KUKA_LOG_SNAPSHOTS` to a folder when
+running `LogWindowControllerTests` to export light and dark AppKit view captures.
 
 ## Acknowledgements
 

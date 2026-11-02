@@ -56,7 +56,7 @@ struct ModelInstall {
         do {
             try folder.setResourceValues(values)
         } catch {
-            NSLog("Ku-Ka: could not exclude the \(label) model cache from backups: \(error)")
+            Log.meeting.error("Could not exclude the \(label, privacy: .public) model cache from backups (code \((error as NSError).code)): \(error.localizedDescription)")
         }
     }
 }

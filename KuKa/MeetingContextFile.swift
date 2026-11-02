@@ -56,6 +56,6 @@ struct MeetingContextFile {
     }
 
     private func omit(_ url: URL, reason: String) {
-        NSLog("Ku-Ka: meeting context omitted at %@: %@.", url.path, reason)
+        Log.meeting.error("Meeting context omitted at \(url.path, privacy: .public): \(reason, privacy: .public).")
     }
 }

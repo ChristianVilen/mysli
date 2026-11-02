@@ -35,7 +35,7 @@ final class IOKitSleepPreventer: SleepPreventing {
             &id
         )
         guard result == kIOReturnSuccess else {
-            NSLog("Ku-Ka: failed to create power assertion (code \(result))")
+            Log.keepAwake.error("Failed to create power assertion (code \(result))")
             return false
         }
         assertionID = id
@@ -47,7 +47,7 @@ final class IOKitSleepPreventer: SleepPreventing {
         guard isPreventing else { return }
         let result = IOPMAssertionRelease(assertionID)
         if result != kIOReturnSuccess {
-            NSLog("Ku-Ka: failed to release power assertion (code \(result))")
+            Log.keepAwake.error("Failed to release power assertion (code \(result))")
         }
         assertionID = 0
         isPreventing = false

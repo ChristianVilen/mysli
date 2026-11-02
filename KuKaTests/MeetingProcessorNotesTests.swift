@@ -258,7 +258,10 @@ final class MeetingProcessorNotesTests: MeetingProcessorTestCase {
 
         let outcome = await makeProcessor().updateNotes(meeting, tool: .automatic)
 
-        XCTAssertEqual(outcome, .summaryToolFailed(message: "agy exited with status 1: authentication failed\nclaude took too long and was stopped"))
+        XCTAssertEqual(outcome, .summaryToolFailed(failures: [
+            SummaryFailure(cli: .antigravity, reason: .exited(status: 1, stderrTail: "authentication failed")),
+            SummaryFailure(cli: .claude, reason: .timedOut),
+        ]))
         XCTAssertEqual(try meeting.read(.summary), summary)
         XCTAssertFalse(exists(.failure, in: meeting))
         XCTAssertEqual(meeting.stage(), .done)

@@ -50,7 +50,7 @@ struct AccessibilityWindowControl: WindowControlling {
 
     func focusedWindow() -> FocusedWindow? {
         guard let primaryScreenHeight = Self.primaryScreenHeight() else {
-            NSLog("Ku-Ka: No screens available; cannot resolve focused window")
+            Log.tiling.error("No screens available; cannot resolve focused window")
             return nil
         }
 
@@ -61,7 +61,7 @@ struct AccessibilityWindowControl: WindowControlling {
         // until first contact, so the read fails with kAXErrorCannotComplete
         // and tiling silently does nothing. NSWorkspace answers locally.
         guard let frontmost = NSWorkspace.shared.frontmostApplication else {
-            NSLog("Ku-Ka: No frontmost application; cannot resolve focused window")
+            Log.tiling.error("No frontmost application; cannot resolve focused window")
             return nil
         }
         guard frontmost.processIdentifier != ProcessInfo.processInfo.processIdentifier else {
@@ -91,7 +91,7 @@ struct AccessibilityWindowControl: WindowControlling {
     @discardableResult
     func setFrame(_ frame: CGRect, of handle: WindowHandle) -> CGRect? {
         guard let primaryScreenHeight = Self.primaryScreenHeight() else {
-            NSLog("Ku-Ka: No screens available; cannot set window frame")
+            Log.tiling.error("No screens available; cannot set window frame")
             return nil
         }
 
@@ -104,7 +104,7 @@ struct AccessibilityWindowControl: WindowControlling {
         let sizeSettableError = AXUIElementIsAttributeSettable(element, kAXSizeAttribute as CFString, &sizeSettable)
         guard positionSettableError == .success, positionSettable.boolValue,
               sizeSettableError == .success, sizeSettable.boolValue else {
-            NSLog("Ku-Ka: Window position/size not settable; leaving window untouched")
+            Log.tiling.error("Window position/size not settable; leaving window untouched")
             return nil
         }
 
@@ -115,7 +115,7 @@ struct AccessibilityWindowControl: WindowControlling {
         var size = axFrame.size
         guard let positionValue = AXValueCreate(.cgPoint, &position),
               let sizeValue = AXValueCreate(.cgSize, &size) else {
-            NSLog("Ku-Ka: Failed to create AXValue for target position/size")
+            Log.tiling.error("Failed to create AXValue for target position/size")
             return nil
         }
 
@@ -124,15 +124,15 @@ struct AccessibilityWindowControl: WindowControlling {
         // position afterward is a common window-manager reliability trick.
         let setPosition1Error = AXUIElementSetAttributeValue(element, kAXPositionAttribute as CFString, positionValue)
         if setPosition1Error != .success {
-            NSLog("Ku-Ka: Failed to set window position (AXError \(setPosition1Error.rawValue))")
+            Log.tiling.error("Failed to set window position (AXError \(setPosition1Error.rawValue))")
         }
         let setSizeError = AXUIElementSetAttributeValue(element, kAXSizeAttribute as CFString, sizeValue)
         if setSizeError != .success {
-            NSLog("Ku-Ka: Failed to set window size (AXError \(setSizeError.rawValue))")
+            Log.tiling.error("Failed to set window size (AXError \(setSizeError.rawValue))")
         }
         let setPosition2Error = AXUIElementSetAttributeValue(element, kAXPositionAttribute as CFString, positionValue)
         if setPosition2Error != .success {
-            NSLog("Ku-Ka: Failed to re-set window position (AXError \(setPosition2Error.rawValue))")
+            Log.tiling.error("Failed to re-set window position (AXError \(setPosition2Error.rawValue))")
         }
 
         guard let achievedPosition = Self.axPoint(kAXPositionAttribute as CFString, from: element, label: "window position after set") else {
@@ -155,11 +155,11 @@ struct AccessibilityWindowControl: WindowControlling {
         var ref: CFTypeRef?
         let error = AXUIElementCopyAttributeValue(element, attribute, &ref)
         guard error == .success else {
-            NSLog("Ku-Ka: Failed to read \(label) (AXError \(error.rawValue))")
+            Log.tiling.error("Failed to read \(label, privacy: .public) (AXError \(error.rawValue))")
             return nil
         }
         guard let value = ref, CFGetTypeID(value) == AXUIElementGetTypeID() else {
-            NSLog("Ku-Ka: \(label) attribute was not an AXUIElement")
+            Log.tiling.error("\(label, privacy: .public) attribute was not an AXUIElement")
             return nil
         }
         return (value as! AXUIElement)
@@ -172,11 +172,11 @@ struct AccessibilityWindowControl: WindowControlling {
         var ref: CFTypeRef?
         let error = AXUIElementCopyAttributeValue(element, attribute, &ref)
         guard error == .success else {
-            NSLog("Ku-Ka: Failed to read \(label) (AXError \(error.rawValue))")
+            Log.tiling.error("Failed to read \(label, privacy: .public) (AXError \(error.rawValue))")
             return nil
         }
         guard let value = ref, CFGetTypeID(value) == AXValueGetTypeID() else {
-            NSLog("Ku-Ka: \(label) attribute was not an AXValue")
+            Log.tiling.error("\(label, privacy: .public) attribute was not an AXValue")
             return nil
         }
         return (value as! AXValue)
@@ -188,7 +188,7 @@ struct AccessibilityWindowControl: WindowControlling {
         guard let value = axValue(attribute, from: element, label: label) else { return nil }
         var point = CGPoint.zero
         guard AXValueGetValue(value, .cgPoint, &point) else {
-            NSLog("Ku-Ka: Failed to unpack \(label) as CGPoint")
+            Log.tiling.error("Failed to unpack \(label, privacy: .public) as CGPoint")
             return nil
         }
         return point
@@ -200,7 +200,7 @@ struct AccessibilityWindowControl: WindowControlling {
         guard let value = axValue(attribute, from: element, label: label) else { return nil }
         var size = CGSize.zero
         guard AXValueGetValue(value, .cgSize, &size) else {
-            NSLog("Ku-Ka: Failed to unpack \(label) as CGSize")
+            Log.tiling.error("Failed to unpack \(label, privacy: .public) as CGSize")
             return nil
         }
         return size

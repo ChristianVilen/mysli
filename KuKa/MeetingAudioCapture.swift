@@ -151,7 +151,7 @@ final class ScreenCaptureRecording:NSObject, ActiveRecording, SCStreamOutput, SC
         let isRecordingStart = startedTracks.isEmpty
         if startedTracks.insert(track).inserted {
             let offset = HostTime(sampleBuffer.presentationTimeStamp) - clock.origin
-            NSLog("Ku-Ka: first %@ buffer starts %.3f s after the clock origin", "\(track)", offset)
+            Log.meeting.notice("First \(String(describing: track), privacy: .public) buffer starts \(String(format: "%.3f", offset), privacy: .public) s after the clock origin")
             guard !isRecordingStart || Self.firstBufferOffsets.contains(offset) else {
                 interrupt(reason: "Ku-Ka could not match the audio clock (offset \(Int(offset.rounded())) s).")
                 return

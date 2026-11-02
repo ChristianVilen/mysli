@@ -80,7 +80,7 @@ final class HotkeyManager {
     private func setIssues(_ newIssues: [HotkeyRegistrationIssue]) {
         guard issues != newIssues else { return }
         for issue in newIssues where !issues.contains(issue) {
-            NSLog("Ku-Ka: Shortcut unavailable: \(issue.shortcut.label), \(issue.failure)")
+            Log.hotkeys.error("Shortcut unavailable: \(issue.shortcut.label, privacy: .public), \(String(describing: issue.failure), privacy: .public)")
         }
         issues = newIssues
         onChange?()

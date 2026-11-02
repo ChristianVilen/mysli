@@ -193,7 +193,7 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
                 try meeting.clearFailure()
                 enqueue(.process(RecordedMeeting(folder: meeting, speakers: .empty)))
             } catch {
-                NSLog("Ku-Ka: could not clear the failure of \(meeting.name): \(error)")
+                Log.meeting.error("Could not clear the failure of \(meeting.name, privacy: .public) (code \((error as NSError).code)): \(error.localizedDescription)")
             }
         }
         reloadFromDisk()
@@ -433,13 +433,15 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
         switch outcome {
         case .updated(let summary):
             notifier.post(title: "Notes Updated", body: "\(meeting.title). Click to open the summary.", onClick: .open(summary))
-        case .summaryToolFailed(let message):
-            NSLog("Ku-Ka: could not update the notes of %@: %@", meeting.name, message)
+        case .summaryToolFailed(let failures):
+            for failure in failures {
+                Log.meeting.error("Could not update the notes of \(meeting.name, privacy: .public): \(failure.logMessage)")
+            }
             notifier.post(title: "Notes Not Updated",
                           body: "\(meeting.title). The summary tool did not answer, so the summary did not change. The transcript has your answers.",
                           onClick: .open(meeting.url(for: .summary)))
         case .failed(let message):
-            NSLog("Ku-Ka: could not update the notes of %@: %@", meeting.name, message)
+            Log.meeting.error("Could not update the notes of \(meeting.name, privacy: .public): \(message)")
             notifier.post(title: "Notes Not Updated",
                           body: "\(meeting.title). Ku-Ka could not update the notes, so the summary did not change.",
                           onClick: .open(meeting.url(for: .summary)))

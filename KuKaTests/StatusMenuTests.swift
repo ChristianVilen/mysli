@@ -45,6 +45,15 @@ final class StatusMenuTests: XCTestCase {
         XCTAssertNotNil(item(titled: "Keep screen on"))
     }
 
+    func testShowLogFollowsPermissionsAndCallsItsAction() throws {
+        let permissions = try XCTUnwrap(menuItems.firstIndex { $0.title == "Permissions…" })
+        XCTAssertEqual(menuItems[permissions + 1].title, "Show Log…")
+        var shown = 0
+        sut.onShowLog = { shown += 1 }
+        click(try XCTUnwrap(item(titled: "Show Log…")))
+        XCTAssertEqual(shown, 1)
+    }
+
     func testRepeatedHealthDoesNotReplaceMenuItems() {
         let health = HotkeyHealth(issues: [.init(shortcut: .tileLeft, failure: .releaseFailed(-50))])
         sut.updateHotkeyHealth(health)

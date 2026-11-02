@@ -26,8 +26,8 @@ struct AppleLiveTranscriber: LiveTranscribing {
     private static func run(locale: Locale, audio: [MeetingTrack: AsyncStream<WrittenAudio>],
                             into updates: AsyncStream<LiveUpdate>.Continuation) async {
         defer { updates.finish() }
-        func unavailable(_ detail: String) {
-            NSLog("Ku-Ka: no live transcript: \(detail)")
+        func unavailable(_ detail: LogMessage) {
+            Log.meeting.notice("No live transcript: \(detail)")
             let language = Locale(identifier: "en").localizedString(forIdentifier: locale.identifier)
                 ?? locale.identifier(.bcp47)
             updates.yield(.unavailable("Live transcript is not available for \(language) on this Mac."))
@@ -35,10 +35,10 @@ struct AppleLiveTranscriber: LiveTranscribing {
 
         do {
             if try await SpeechTranscriberAdapter().needsDownload(for: locale) {
-                return unavailable("the \(locale.identifier(.bcp47)) speech model is not installed.")
+                return unavailable("the \(locale.identifier(.bcp47), privacy: .public) speech model is not installed.")
             }
         } catch {
-            return unavailable(error.localizedDescription)
+            return unavailable("speech model lookup failed (code \((error as NSError).code)): \(error.localizedDescription)")
         }
         let analyses = MeetingTrack.allCases.compactMap { track in
             audio[track].map { TrackAnalysis(track: track, audio: $0, locale: locale) }
@@ -48,7 +48,7 @@ struct AppleLiveTranscriber: LiveTranscribing {
         let best = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: analyses.map(\.transcriber),
                                                                  considering: format)
         guard best == format else {
-            return unavailable("the speech model wants \(best.map { "\($0)" } ?? "no format"), not \(format).")
+            return unavailable("the speech model wants \(best.map { "\($0)" } ?? "no format", privacy: .public), not \(format, privacy: .public).")
         }
 
         do {

@@ -64,6 +64,20 @@ struct SummaryFailure: Equatable, CustomStringConvertible {
     let cli: SummaryCLI
     let reason: Reason
 
+    var logMessage: LogMessage {
+        switch reason {
+        case .notInstalled, .timedOut, .emptyOutput:
+            return "\(description, privacy: .public)"
+        case .couldNotLaunch(let message):
+            return "\(cli.rawValue, privacy: .public) could not start: \(message)"
+        case .exited(let status, let stderrTail):
+            if stderrTail.isEmpty {
+                return "\(cli.rawValue, privacy: .public) exited with status \(status)"
+            }
+            return "\(cli.rawValue, privacy: .public) exited with status \(status): \(stderrTail)"
+        }
+    }
+
     var description: String {
         let name = cli.rawValue
         switch reason {

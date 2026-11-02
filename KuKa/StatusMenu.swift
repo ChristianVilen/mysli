@@ -31,6 +31,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     var onShowSettings: (() -> Void)?
     var onShowKuKa: (() -> Void)?
     var onShowPermissions: (() -> Void)?
+    var onShowLog: (() -> Void)?
     var onOpenKeyboardSettings: (() -> Void)?
     /// Fired every time the menu opens, before it is shown.
     var onMenuWillOpen: (() -> Void)?
@@ -196,6 +197,10 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         permissionsItem.target = self
         menu.addItem(permissionsItem)
 
+        let logItem = NSMenuItem(title: "Show Log…", action: #selector(showLog), keyEquivalent: "")
+        logItem.target = self
+        menu.addItem(logItem)
+
         menu.addItem(.separator())
 
         let quitItem = NSMenuItem(title: "Quit Ku-Ka", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
@@ -206,6 +211,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
 
     @objc private func showSettings() { onShowSettings?() }
     @objc private func showKuKa() { onShowKuKa?() }
+    @objc private func showLog() { onShowLog?() }
 
     @objc private func showPermissions() {
         onShowPermissions?()

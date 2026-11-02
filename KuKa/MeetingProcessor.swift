@@ -15,7 +15,7 @@ enum MeetingOutcome: Equatable {
 /// when every CLI fails.
 enum NotesUpdateOutcome: Equatable {
     case updated(summary: URL)
-    case summaryToolFailed(message: String)
+    case summaryToolFailed(failures: [SummaryFailure])
     case failed(message: String)
     case cancelled
     /// Another recorder or processor holds the folder's lock.
@@ -94,7 +94,7 @@ struct MeetingProcessor {
                 try meeting.write(SummaryDocument.markdown(title: meeting.title, body: notes), to: .summary)
             case .failed(let failures):
                 if Task.isCancelled { return .cancelled }
-                return .summaryToolFailed(message: failures.map(\.description).joined(separator: "\n"))
+                return .summaryToolFailed(failures: failures)
             }
         } catch {
             if Task.isCancelled { return .cancelled }
@@ -270,7 +270,7 @@ struct MeetingProcessor {
         do {
             try meeting.discardAudio(trash: trash)
         } catch {
-            NSLog("Ku-Ka: could not move meeting audio to the Trash: \(error)")
+            Log.meeting.error("Could not move meeting audio to the Trash (code \((error as NSError).code)): \(error.localizedDescription)")
         }
         let result = try await summarizeContent(content, in: meeting, list: list, typedNotes: typedNotes,
                                                 tool: tool, summaryInput: summaryInput)
@@ -304,8 +304,9 @@ struct MeetingProcessor {
                                                 typedNotes: typedNotes)
         try Task.checkCancellation()
         if case .written(_, _, let cli, let earlier) = result, !earlier.isEmpty {
-            NSLog("Ku-Ka: %@ wrote the notes of %@. Tried first: %@", cli.rawValue, meeting.name,
-                  earlier.map(\.description).joined(separator: "; "))
+            for failure in earlier {
+                Log.meeting.notice("\(cli.rawValue, privacy: .public) wrote the notes of \(meeting.name, privacy: .public). Earlier failure: \(failure.logMessage)")
+            }
         }
         return result
     }

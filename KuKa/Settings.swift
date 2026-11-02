@@ -143,6 +143,7 @@ final class Settings {
             }
             return nil
         } catch {
+            Log.app.error("Launch at login toggle failed (code \((error as NSError).code)): \(error.localizedDescription)")
             return error.localizedDescription
         }
     }

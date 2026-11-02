@@ -3,6 +3,14 @@ import UserNotifications
 
 @MainActor
 class AppDelegate: NSObject, NSApplicationDelegate {
+    private let launchDate = Date()
+    private let logFolder = FileManager.default.homeDirectoryForCurrentUser
+        .appendingPathComponent("Library/Logs/Ku-Ka", isDirectory: true)
+    private lazy var logFiles = LogFiles(folder: logFolder, onFailure: { LogOutput.shared.reportFileFailure($0) })
+    private lazy var logWindow = LogWindowController(
+        reader: LogFileReader(folder: logFolder), launchDate: launchDate,
+        deleteLogs: { [logFiles] in try await logFiles.deleteAll() }
+    )
     private var statusItem: NSStatusItem!
     private let hotkeyManager = HotkeyManager()
     private let settings = Settings()
@@ -93,9 +101,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         calendarReminders?.shutDown()
         SystemNotifier.shared.onCalendarReminder = nil
         meetingNotes.shutDown()
+        if !logFiles.flush(timeout: 2) {
+            LogOutput.shared.reportFileFailure(POSIXError(.ETIMEDOUT))
+        }
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        LogOutput.shared.enableFiles(logFiles)
+        Log.app.notice("Ku-Ka launched")
         setupMenuBar()
         setupThumbnailStack()
         setupKeepAwake()
@@ -200,6 +213,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         settingsWindow.onMeetingsFolderChanged = { [weak self] _ in self?.meetingNotes.meetingsFolderChanged() }
         statusMenu.onShowPermissions = { [weak self] in self?.settingsWindow.show(.permissions) }
+        statusMenu.onShowLog = { [weak self] in self?.logWindow.show() }
         statusMenu.onOpenKeyboardSettings = { [weak self] in self?.permissions.openSettings(.keyboardShortcuts) }
     }
 
