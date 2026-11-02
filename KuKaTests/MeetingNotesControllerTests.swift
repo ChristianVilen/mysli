@@ -124,7 +124,7 @@ final class MeetingNotesControllerTests: MeetingNotesTestCase {
         sut.menuTick()
 
         XCTAssertEqual(visibleTitles, ["Meeting Notes", "● Recording · 4:05", "Stop Recording Meeting", "Pause Recording",
-                                       "Show Meeting Controls", "Restore Default Position", "Open Meetings Folder", ""])
+                                       "Write Meeting Notes…", "Show Meeting Controls", "Restore Default Position", "Recent Meeting Notes", "Open Meetings Folder", ""])
     }
 
     func testTheRecordedTimeStopsWhilePausedAndLeavesOutThePause() async {
@@ -159,7 +159,7 @@ final class MeetingNotesControllerTests: MeetingNotesTestCase {
     func testTheMenuOffersPauseWhileRecordingAndResumeWhilePaused() async throws {
         await recorder.toggleRecording()
         XCTAssertEqual(visibleTitles, ["Meeting Notes", "● Recording · 0:00", "Stop Recording Meeting", "Pause Recording",
-                                       "Show Meeting Controls", "Restore Default Position", "Open Meetings Folder", ""])
+                                       "Write Meeting Notes…", "Show Meeting Controls", "Restore Default Position", "Recent Meeting Notes", "Open Meetings Folder", ""])
 
         hostTime = HostTime(seconds: 1_010)
         let pause = try XCTUnwrap(item(titled: "Pause Recording"))
@@ -167,7 +167,7 @@ final class MeetingNotesControllerTests: MeetingNotesTestCase {
 
         XCTAssertEqual(recorder.phase, .paused)
         XCTAssertEqual(visibleTitles, ["Meeting Notes", "Paused · 0:10", "Stop Recording Meeting", "Resume Recording",
-                                       "Show Meeting Controls", "Restore Default Position", "Open Meetings Folder", ""])
+                                       "Write Meeting Notes…", "Show Meeting Controls", "Restore Default Position", "Recent Meeting Notes", "Open Meetings Folder", ""])
 
         hostTime = HostTime(seconds: 1_040)
         let resume = try XCTUnwrap(item(titled: "Resume Recording"))
@@ -188,7 +188,7 @@ final class MeetingNotesControllerTests: MeetingNotesTestCase {
         XCTAssertEqual(recorder.phase, .idle)
         XCTAssertEqual(capture.recordings.first?.stopCount, 1)
         XCTAssertEqual(notifications, ["Meeting Notes Ready: Meeting on 2026-10-23 at 14:02. Click to open the summary."])
-        XCTAssertEqual(visibleTitles, ["Meeting Notes", "Start Recording Meeting", "Open Meetings Folder", ""])
+        XCTAssertEqual(visibleTitles, ["Meeting Notes", "Start Recording Meeting", "Recent Meeting Notes", "Open Meetings Folder", ""])
     }
 
     func testAnInterruptionWhilePausedEndsTheMeeting() async {
@@ -311,7 +311,7 @@ final class MeetingNotesControllerTests: MeetingNotesTestCase {
         XCTAssertEqual(notifier.posted.last?.url?.resolvingSymlinksInPath(), meeting.url(for: .summary).resolvingSymlinksInPath(),
                        "a click opens the summary")
         XCTAssertEqual(notifier.permissionRequests, 1, "asked at Start, not at the first notice")
-        XCTAssertEqual(visibleTitles, ["Meeting Notes", "Start Recording Meeting", "Open Meetings Folder", ""])
+        XCTAssertEqual(visibleTitles, ["Meeting Notes", "Start Recording Meeting", "Recent Meeting Notes", "Open Meetings Folder", ""])
     }
 
     func testCaptureEndingOnItsOwnSaysSoAtOnceAndProcessesWhatWasRecorded() async throws {
@@ -395,7 +395,7 @@ final class MeetingNotesControllerTests: MeetingNotesTestCase {
     func testRetryRunsFailedMeetingsFromTheStepThatFailed() async throws {
         let failed = try leftoverMeeting(at: localDate(2026, 10, 22, 10, 0), failure: "agy exited with status 1", transcript: true)
         sut.menuWillOpen()
-        XCTAssertEqual(visibleTitles, ["Meeting Notes", "Start Recording Meeting", "Retry Failed Meeting", "Open Meetings Folder", ""])
+        XCTAssertEqual(visibleTitles, ["Meeting Notes", "Start Recording Meeting", "Retry Failed Meeting", "Recent Meeting Notes", "Open Meetings Folder", ""])
 
         let retry = try XCTUnwrap(item(titled: "Retry Failed Meeting"))
         _ = (retry.target as? NSObject)?.perform(retry.action, with: retry)
@@ -404,7 +404,7 @@ final class MeetingNotesControllerTests: MeetingNotesTestCase {
         XCTAssertEqual(failed.stage(), .done)
         XCTAssertEqual(try failed.read(.summary).components(separatedBy: "\n").first, "# Meeting on 2026-10-22 at 10:00")
         XCTAssertEqual(notifications, ["Meeting Notes Ready: Meeting on 2026-10-22 at 10:00. Click to open the summary."])
-        XCTAssertEqual(visibleTitles, ["Meeting Notes", "Start Recording Meeting", "Open Meetings Folder", ""])
+        XCTAssertEqual(visibleTitles, ["Meeting Notes", "Start Recording Meeting", "Recent Meeting Notes", "Open Meetings Folder", ""])
     }
 
     func testTheRetryItemCountsTheFailedMeetings() throws {

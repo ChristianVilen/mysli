@@ -224,6 +224,17 @@ final class MeetingControlsPanelTests: XCTestCase {
         XCTAssertEqual(recorder.controls?.status, .saved)
     }
 
+    func testWriteNotesHasItsOwnActionAndLeavesTheTranscriptAvailable() async throws {
+        var requests = 0
+        sut.onWriteNotes = { requests += 1 }
+        await startMeeting()
+        try XCTUnwrap(button("Write meeting notes")).performClick(nil)
+        XCTAssertEqual(requests, 1)
+        XCTAssertEqual(recorder.phase, .recording)
+        try XCTUnwrap(button("Show live transcript")).performClick(nil)
+        XCTAssertTrue(recorder.controls?.isTranscriptOpen == true)
+    }
+
     func testPauseAndStopAreOffWhileStarting() async throws {
         microphone = .notDetermined
         var prompt: CheckedContinuation<Bool, Never>?

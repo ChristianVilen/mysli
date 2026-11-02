@@ -136,6 +136,10 @@ final class MeetingRecorder {
     var onControlsRequest: (@MainActor (MeetingControlsRequest) -> Void)?
 
     var phase: RecorderPhase { state.phase }
+    var activeMeeting: MeetingFolder? {
+        guard case .active(let meeting) = state else { return nil }
+        return meeting.folder
+    }
     var activeSessionID: UUID? {
         switch state {
         case .idle: return nil

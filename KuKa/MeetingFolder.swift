@@ -48,6 +48,7 @@ enum Speaker: Hashable, Sendable {
 enum MeetingDocument: String, CaseIterable {
     case transcript = "transcript.md"
     case summary = "summary.md"
+    case notes = "notes.md"
     case failure = "error.md"
     /// The transcript as the transcriber wrote it, before known words.
     case heardTranscript = ".transcript-as-heard.md"

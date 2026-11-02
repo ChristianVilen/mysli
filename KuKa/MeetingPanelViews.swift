@@ -4,9 +4,9 @@ extension MeetingControlsPanel {
     enum Layout {
         static let cornerRadius: CGFloat = 18
         static let pillHeight: CGFloat = 42
-        static let recordingWidth: CGFloat = 224
-        static let startingWidth: CGFloat = 236
-        static let pausedWidth: CGFloat = 292
+        static let recordingWidth: CGFloat = 258
+        static let startingWidth: CGFloat = 270
+        static let pausedWidth: CGFloat = 326
         static let noticeWidth: CGFloat = 300
         /// The pill and the drawer while the drawer is open.
         static let openWidth: CGFloat = 380

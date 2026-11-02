@@ -186,6 +186,12 @@ enum Transcript {
     private static let minimumMicrophoneWords = 3
     private static let sharedWordFraction = 0.6
 
+    private static let noSpeechMessage = "No speech was detected."
+
+    static func isSilent(_ markdown: String) -> Bool {
+        contentForSummary(markdown).trimmingCharacters(in: .whitespacesAndNewlines) == noSpeechMessage
+    }
+
     /// Everything after the speaker legend, so the summary CLI gets no header and no failure lines.
     /// `markdown` has no known-words note: it is a `CorrectedTranscript.body`.
     static func contentForSummary(_ markdown: String) -> String {
@@ -283,7 +289,7 @@ enum Transcript {
             text += "**[\(clock(line.start))] \(line.speaker.label):** \(line.text)\n\n"
         }
         if lines.isEmpty {
-            text += "No speech was detected.\n\n"
+            text += noSpeechMessage + "\n\n"
         }
         return String(text.dropLast())
     }

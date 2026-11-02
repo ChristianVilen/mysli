@@ -170,8 +170,8 @@ final class StatusMenuTests: XCTestCase {
 
         let titles = menuItems.filter { !$0.isHidden }.map(\.title)
         let header = try XCTUnwrap(titles.firstIndex(of: "Meeting Notes"))
-        XCTAssertEqual(Array(titles[header...(header + 4)]),
-                       ["Meeting Notes", "Start Recording Meeting", "Check Words (1)…", "Retry Failed Meeting", "Open Meetings Folder"])
+        XCTAssertEqual(Array(titles[header...(header + 5)]),
+                       ["Meeting Notes", "Start Recording Meeting", "Check Words (1)…", "Retry Failed Meeting", "Recent Meeting Notes", "Open Meetings Folder"])
     }
 
     func testIconDiffersWhenKeepAwakeIsActive() {

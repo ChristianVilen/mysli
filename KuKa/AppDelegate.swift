@@ -39,6 +39,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         summaryTool: { [settings] in settings.summaryTool }
     )
     private lazy var meetingControlsPanel = MeetingControlsPanel(recorder: meetingRecorder, settings: settings)
+    private var typedNotesWindows: [MeetingFolder: MeetingTypedNotesWindowController] = [:]
     private(set) var calendarReminders: CalendarReminderController?
     private var calendarReminderStartup: Task<Void, Never>?
     private lazy var wordReview = WordReviewController(
@@ -60,6 +61,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var permissionHandlingEnabled = false
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        if meetingNotes.hasUnsavedTypedNotes {
+            let alert = NSAlert()
+            alert.messageText = "Some meeting notes are not saved"
+            alert.informativeText = "Keep editing to retry the save or copy your draft. Quit without saving discards the unsaved text."
+            if meetingRecorder.phase.isCapturing {
+                alert.informativeText += " The recording also stops, and processing resumes when Ku-Ka opens again."
+            }
+            alert.addButton(withTitle: "Keep editing")
+            alert.addButton(withTitle: "Quit without saving")
+            NSApp.activate()
+            if alert.runModal() == .alertSecondButtonReturn { return .terminateNow }
+            for meeting in meetingNotes.unsavedNotesMeetings { openTypedNotes(meeting) }
+            return .terminateCancel
+        }
         guard meetingRecorder.phase.isCapturing else { return .terminateNow }
         let alert = NSAlert()
         alert.messageText = "Stop Recording and Quit?"
@@ -267,8 +282,36 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         meetingRecorder.onShowPermissions = { [weak self] in self?.settingsWindow.show(.permissions) }
         meetingNotes.onCheckWords = { [weak self] in self?.wordReviewWindow.show($0) }
+        meetingNotes.onOpenTypedNotes = { [weak self] in self?.openTypedNotes($0) }
+        meetingControlsPanel.onWriteNotes = { [weak self] in self?.meetingNotes.openCurrentTypedNotes() }
         meetingControlsPanel.bindRecorder()
         wordReviewWindow.bindController()
+    }
+
+    private func openTypedNotes(_ meeting: MeetingFolder) {
+        if let window = typedNotesWindows[meeting] {
+            window.show()
+            return
+        }
+        do {
+            let session = try meetingNotes.typedNotes(for: meeting)
+            let window = MeetingTypedNotesWindowController(session: session, requestUpdate: { [weak self] in
+                self?.meetingNotes.updateSummary(meeting)
+            })
+            window.onClose = { [weak self] in
+                guard let self, self.meetingNotes.closeTypedNotes(for: meeting) else { return }
+                self.typedNotesWindows.removeValue(forKey: meeting)
+            }
+            typedNotesWindows[meeting] = window
+            window.show()
+        } catch {
+            let alert = NSAlert()
+            alert.messageText = "Could not open meeting notes"
+            alert.informativeText = error.localizedDescription
+            alert.addButton(withTitle: "OK")
+            NSApp.activate()
+            alert.runModal()
+        }
     }
 
     private func openEditor(result: CaptureResult) {

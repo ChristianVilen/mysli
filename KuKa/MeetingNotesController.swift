@@ -6,11 +6,12 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
     private enum Job: Equatable {
         case process(RecordedMeeting)
         case updateNotes(MeetingFolder)
+        case updateSummary(MeetingFolder)
 
         var meeting: MeetingFolder {
             switch self {
             case .process(let recording): return recording.folder
-            case .updateNotes(let meeting): return meeting
+            case .updateNotes(let meeting), .updateSummary(let meeting): return meeting
             }
         }
 
@@ -18,6 +19,7 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
             switch (lhs, rhs) {
             case (.process(let lhs), .process(let rhs)): return lhs.folder == rhs.folder
             case (.updateNotes(let lhs), .updateNotes(let rhs)): return lhs == rhs
+            case (.updateSummary(let lhs), .updateSummary(let rhs)): return lhs == rhs
             default: return false
             }
         }
@@ -33,10 +35,14 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
     private let openURL: (URL) -> Void
 
     private var queue: [Job] = []
-    private var current: (job: Job, activity: String)?
+    private var current: (job: Job, activity: String, snapshot: String?)?
     private var processingTask: Task<Void, Never>?
     private var menuIsOpen = false
     private var meterTimer: Timer?
+    private var notesSessions: [MeetingFolder: MeetingTypedNotesSession] = [:]
+    private var summaryResults: [MeetingFolder: TypedNotesSummaryResult] = [:]
+    private var awaitingNotes: [RecordedMeeting] = []
+    private(set) var recentNotesMeetings: [MeetingFolder] = []
 
     private let statusLineItem: NSMenuItem
     private let meterItem: NSMenuItem
@@ -50,11 +56,14 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
     private let checkWordsItem: NSMenuItem
     private let retryItem: NSMenuItem
     private let openFolderItem: NSMenuItem
+    private let writeNotesItem: NSMenuItem
+    private let recentNotesItem = NSMenuItem(title: "Recent Meeting Notes", action: nil, keyEquivalent: "")
 
     /// Fires on every change of the recorder's `phase`, Starting and quit included.
     var onStateChange: (() -> Void)?
     /// Nil selects the oldest unfinished review.
     var onCheckWords: (@MainActor (MeetingFolder?) -> Void)?
+    var onOpenTypedNotes: ((MeetingFolder) -> Void)?
 
     /// Claims the recorder's `onChange` and `onEnded`.
     init(recorder: MeetingRecorder,
@@ -83,9 +92,10 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
         checkWordsItem = NSMenuItem(title: "", action: #selector(checkWordsClicked), keyEquivalent: "")
         retryItem = NSMenuItem(title: "", action: #selector(retryClicked), keyEquivalent: "")
         openFolderItem = NSMenuItem(title: "Open Meetings Folder", action: #selector(openFolderClicked), keyEquivalent: "")
+        writeNotesItem = NSMenuItem(title: "Write Meeting Notes…", action: #selector(writeNotesClicked), keyEquivalent: "")
         super.init()
         meterItem.view = meterView
-        for item in [recordItem, pauseItem, showControlsItem, restorePositionItem, checkWordsItem, retryItem, openFolderItem] {
+        for item in [recordItem, pauseItem, showControlsItem, restorePositionItem, checkWordsItem, retryItem, openFolderItem, writeNotesItem] {
             item.target = self
         }
         for item in [statusLineItem, meterItem, pauseItem, showControlsItem, restorePositionItem, progressItem, waitingItem,
@@ -93,10 +103,12 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
             item.isHidden = true
         }
         recorder.onChange = { [weak self] in
+            if let meeting = self?.recorder.activeMeeting { self?.remember(meeting) }
+            self?.refreshNotesSessions()
             self?.updateMenu()
             self?.onStateChange?()
         }
-        recorder.onEnded = { [weak self] in self?.enqueue(.process($0)) }
+        recorder.onEnded = { [weak self] in self?.recordingEnded($0) }
     }
 
     isolated deinit {
@@ -107,12 +119,13 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
         let header = NSMenuItem(title: "Meeting Notes", action: nil, keyEquivalent: "")
         header.isEnabled = false
         menu.addItem(header)
-        for item in [statusLineItem, meterItem, recordItem, pauseItem, showControlsItem, restorePositionItem, progressItem,
-                     waitingItem, checkWordsItem, retryItem, openFolderItem] {
+        for item in [statusLineItem, meterItem, recordItem, pauseItem, writeNotesItem, showControlsItem, restorePositionItem, progressItem,
+                     waitingItem, checkWordsItem, retryItem, recentNotesItem, openFolderItem] {
             menu.addItem(item)
         }
         menu.addItem(.separator())
         updateMenu()
+        reloadRecentNotes()
     }
 
     func menuWillOpen() {
@@ -190,6 +203,117 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
         enqueue(.updateNotes(meeting))
     }
 
+    @discardableResult
+    func updateSummary(_ meeting: MeetingFolder) -> Bool {
+        let context = notesContext(for: meeting)
+        guard MeetingTypedNotesSession.canUpdateSummary(meeting, recordingPhase: context.recordingPhase,
+            summaryState: context.summaryState, hasUnsavedChanges: notesSessions[meeting]?.hasUnsavedChanges == true)
+        else { return false }
+        enqueue(.updateSummary(meeting))
+        return true
+    }
+
+    func typedNotes(for meeting: MeetingFolder) throws -> MeetingTypedNotesSession {
+        if let session = notesSessions[meeting] { return session }
+        let session = try MeetingTypedNotesSession(meeting: meeting)
+        notesSessions[meeting] = session
+        session.context = { [weak self] in self?.notesContext(for: meeting) ?? (.idle, .idle) }
+        session.onSaved = { [weak self] in self?.notesSaved(for: meeting) }
+        remember(meeting)
+        refreshNotesSessions()
+        return session
+    }
+
+    var hasUnsavedTypedNotes: Bool { notesSessions.values.contains { $0.hasUnsavedChanges } }
+    var unsavedNotesMeetings: [MeetingFolder] { notesSessions.values.filter(\.hasUnsavedChanges).map(\.meeting) }
+
+    @discardableResult
+    func closeTypedNotes(for meeting: MeetingFolder) -> Bool {
+        guard let session = notesSessions[meeting], session.close() else { return false }
+        notesSessions.removeValue(forKey: meeting)
+        pruneSummaryResults()
+        return true
+    }
+
+    func openCurrentTypedNotes() {
+        if let meeting = recorder.activeMeeting { onOpenTypedNotes?(meeting) }
+    }
+
+    @objc private func writeNotesClicked() { openCurrentTypedNotes() }
+
+    @objc private func recentNotesClicked(_ sender: NSMenuItem) {
+        guard let meeting = sender.representedObject as? MeetingFolder else { return }
+        onOpenTypedNotes?(meeting)
+    }
+
+    private func recordingEnded(_ recording: RecordedMeeting) {
+        if notesSessions[recording.folder]?.hasUnsavedChanges == true {
+            awaitingNotes.append(recording)
+            refreshNotesSessions()
+        } else {
+            enqueue(.process(recording))
+        }
+    }
+
+    private func notesSaved(for meeting: MeetingFolder) {
+        let ready = awaitingNotes.filter { $0.folder == meeting }
+        awaitingNotes.removeAll { $0.folder == meeting }
+        for recording in ready { enqueue(.process(recording)) }
+    }
+
+    private func setSummaryResult(_ result: TypedNotesSummaryResult?, for meeting: MeetingFolder) {
+        summaryResults[meeting] = result
+        refreshNotesSessions()
+    }
+
+    private func notesContext(for meeting: MeetingFolder) -> (recordingPhase: RecorderPhase, summaryState: TypedNotesSummaryState) {
+        let phase = recorder.activeMeeting == meeting ? recorder.phase : .idle
+        if let current, current.job.meeting == meeting {
+            return (phase, current.snapshot.map { .summarizing(snapshot: $0) } ?? .processing)
+        }
+        if queue.contains(where: { $0.meeting == meeting }) { return (phase, .queued) }
+        if awaitingNotes.contains(where: { $0.folder == meeting }) { return (phase, .waitingForSave) }
+        return (phase, summaryResults[meeting]?.state ?? .idle)
+    }
+
+    private func refreshNotesSessions() {
+        for session in notesSessions.values { session.onChange?() }
+    }
+
+    private func remember(_ meeting: MeetingFolder) {
+        recentNotesMeetings.removeAll { $0 == meeting }
+        recentNotesMeetings.insert(meeting, at: 0)
+        recentNotesMeetings = Array(recentNotesMeetings.prefix(5))
+        pruneSummaryResults()
+        rebuildRecentNotesMenu()
+    }
+
+    private func reloadRecentNotes() {
+        let disk = MeetingFolder.all(in: root()).reversed().map(\.0)
+        var seen = Set<MeetingFolder>()
+        recentNotesMeetings = Array((recentNotesMeetings + disk).filter { seen.insert($0).inserted }.prefix(5))
+        rebuildRecentNotesMenu()
+    }
+
+    private func rebuildRecentNotesMenu() {
+        let submenu = NSMenu()
+        let unsaved = unsavedNotesMeetings.filter { !recentNotesMeetings.contains($0) }.sorted { $0.name > $1.name }
+        for meeting in recentNotesMeetings + unsaved {
+            let item = NSMenuItem(title: meeting.title, action: #selector(recentNotesClicked(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = meeting
+            submenu.addItem(item)
+        }
+        recentNotesItem.submenu = submenu
+        recentNotesItem.isHidden = submenu.items.isEmpty
+    }
+
+    private func pruneSummaryResults() {
+        let retained = Set(recentNotesMeetings + Array(notesSessions.keys) + queue.map(\.meeting)
+            + awaitingNotes.map(\.folder) + [current?.job.meeting].compactMap { $0 })
+        summaryResults = summaryResults.filter { retained.contains($0.key) }
+    }
+
     @objc private func checkWordsClicked() {
         onCheckWords?(nil)
     }
@@ -207,6 +331,7 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
     private func enqueue(_ job: Job) {
         guard !queue.contains(job), current?.job != job else { return }
         queue.append(job)
+        refreshNotesSessions()
         updateMenu()
         guard processingTask == nil else { return }
         processingTask = Task { [weak self] in await self?.processQueue() }
@@ -216,26 +341,62 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
         while !queue.isEmpty, !Task.isCancelled {
             let job = queue.removeFirst()
             let tool = summaryTool()
+            current = (job, "Processing", nil)
+            refreshNotesSessions()
+            let summaryInput: (String) -> Void = { [weak self] notes in
+                self?.current?.snapshot = notes
+                self?.refreshNotesSessions()
+            }
             switch job {
             case .process(let recording):
                 let meeting = recording.folder
-                let outcome = await processor.process(meeting, speakers: recording.speakers, tool: tool) { [weak self] progress in
-                    self?.current = (job, progress.title)
+                let outcome = await processor.process(meeting, speakers: recording.speakers, tool: tool,
+                                                       summaryInput: summaryInput) { [weak self] progress in
+                    self?.current?.activity = progress.title
                     self?.updateMenu()
                 }
+                let snapshot = current?.snapshot
                 current = nil
+                switch outcome {
+                case .done: setSummaryResult(snapshot.map { .updated(snapshot: $0) }, for: meeting)
+                case .noSpeech: setSummaryResult(.updated(snapshot: ""), for: meeting)
+                case .failed: setSummaryResult(.failed("Processing failed. Use Retry Failed Meeting in the Ku-Ka menu."), for: meeting)
+                case .busy, .gone: setSummaryResult(.failed("The meeting folder is unavailable or in use."), for: meeting)
+                case .cancelled: setSummaryResult(nil, for: meeting)
+                }
                 report(outcome, for: meeting)
             case .updateNotes(let meeting):
-                current = (job, "Updating notes")
+                current?.activity = "Updating notes"
                 updateMenu()
-                let outcome = await processor.updateNotes(meeting, tool: tool)
+                let outcome = await processor.updateNotes(meeting, tool: tool, summaryInput: summaryInput)
+                let snapshot = current?.snapshot
                 current = nil
+                finishSummaryUpdate(outcome, for: meeting, snapshot: snapshot)
                 report(outcome, for: meeting)
+            case .updateSummary(let meeting):
+                current?.activity = "Updating summary"
+                updateMenu()
+                let outcome = await processor.updateSummary(meeting, tool: tool, summaryInput: summaryInput)
+                let snapshot = current?.snapshot
+                current = nil
+                finishSummaryUpdate(outcome, for: meeting, snapshot: snapshot)
             }
         }
         processingTask = nil
+        pruneSummaryResults()
         updateMenu()
         reloadFromDisk()
+    }
+
+    private func finishSummaryUpdate(_ outcome: NotesUpdateOutcome, for meeting: MeetingFolder, snapshot: String?) {
+        switch outcome {
+        case .updated: setSummaryResult(snapshot.map { .updated(snapshot: $0) }, for: meeting)
+        case .cancelled: setSummaryResult(nil, for: meeting)
+        case .busy: setSummaryResult(.failed("The meeting folder is in use. Try Update summary again."), for: meeting)
+        case .notReady: setSummaryResult(.failed("The meeting is not ready, or its folder was moved or deleted."), for: meeting)
+        case .failed, .summaryToolFailed:
+            setSummaryResult(.failed("The summary could not be updated. The previous summary is unchanged. Try again."), for: meeting)
+        }
     }
 
     private func report(_ outcome: MeetingOutcome, for meeting: MeetingFolder) {
@@ -318,6 +479,7 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
             }
         }
         recordItem.title = phase.isCapturing ? "Stop Recording Meeting" : "Start Recording Meeting"
+        writeNotesItem.isHidden = !phase.isCapturing
         pauseItem.title = phase == .paused ? "Resume Recording" : "Pause Recording"
         for item in [pauseItem, showControlsItem, restorePositionItem, meterItem] { item.isHidden = !phase.isCapturing }
         reconcileMeterTimer()
@@ -353,6 +515,7 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
 
     /// Other processes can change failures and word reviews on disk.
     private func reloadFromDisk() {
+        reloadRecentNotes()
         let failed = MeetingFolder.all(in: root()).filter {
             if case .failed = $0.1 { return true }
             return false

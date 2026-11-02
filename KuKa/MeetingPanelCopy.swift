@@ -49,6 +49,7 @@ enum MeetingPanelCopy {
 
     static let stopButton = Button(title: nil, label: "Stop recording", tooltip: "Stop recording and make notes")
     static let closeButton = Button(title: nil, label: "Close", tooltip: "Close")
+    static let notesButton = Button(title: nil, label: "Write meeting notes", tooltip: "Write meeting notes in a separate window")
 
     static func transcriptButton(isOpen: Bool) -> Button {
         let label = isOpen ? "Hide live transcript" : "Show live transcript"

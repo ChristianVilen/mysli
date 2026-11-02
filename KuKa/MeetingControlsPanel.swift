@@ -23,6 +23,7 @@ final class MeetingControlsPanel: FloatingPanel {
     }
 
     private let recorder: MeetingRecorder
+    var onWriteNotes: (() -> Void)?
     private let settings: Settings
     private let screens: Screens
     private let announce: (String, NSAccessibilityPriorityLevel) -> Void
@@ -50,6 +51,7 @@ final class MeetingControlsPanel: FloatingPanel {
     private lazy var stopButton = MeetingPanelButton(target: self, action: #selector(stopClicked))
     private lazy var closeButton = MeetingPanelButton(target: self, action: #selector(closeClicked))
     private lazy var transcriptButton = MeetingPanelButton(target: self, action: #selector(transcriptClicked))
+    private lazy var notesButton = MeetingPanelButton(target: self, action: #selector(notesClicked))
     private let buttonSeparator = MeetingPanelFill(color: .separatorColor, rounded: .none)
     private let noteLabel = NSTextField.makeWrappingLabel(size: 12, color: .secondaryLabelColor)
     private let drawer: MeetingTranscriptDrawer
@@ -174,11 +176,12 @@ final class MeetingControlsPanel: FloatingPanel {
         timeLabel.textColor = isPaused ? .secondaryLabelColor : .labelColor
         wordLabel.show(MeetingPanelCopy.word(for: status))
 
-        for view in [pauseButton, stopButton, transcriptButton, buttonSeparator] { view.isHidden = !isRecorder }
+        for view in [pauseButton, stopButton, notesButton, transcriptButton, buttonSeparator] { view.isHidden = !isRecorder }
         closeButton.isHidden = isRecorder
         pauseButton.isEnabled = !isStarting
         stopButton.isEnabled = !isStarting
         transcriptButton.isEnabled = !isStarting
+        notesButton.isEnabled = !isStarting
         pauseButton.configure(symbol: isPaused ? Self.symbol("circle.fill", size: 9, color: .systemRed)
                                                : Self.symbol("pause.fill", size: 12, color: .labelColor),
                               copy: MeetingPanelCopy.pauseButton(isPaused: isPaused))
@@ -284,6 +287,10 @@ final class MeetingControlsPanel: FloatingPanel {
     @objc private func closeClicked() { recorder.dismissControls() }
 
     @objc private func transcriptClicked() { recorder.toggleTranscript() }
+    @objc private func notesClicked() {
+        guard recorder.activeMeeting != nil else { return }
+        onWriteNotes?()
+    }
 
     private func dragBegan() {
         dragStart = placement?.pillTopRight
@@ -388,8 +395,10 @@ final class MeetingControlsPanel: FloatingPanel {
 
         stopButton.configure(symbol: Self.symbol("stop.fill", size: 11, color: .systemRed), copy: MeetingPanelCopy.stopButton)
         closeButton.configure(symbol: Self.symbol("xmark", size: 11, color: .labelColor), copy: MeetingPanelCopy.closeButton)
+        notesButton.configure(symbol: Self.symbol("square.and.pencil", size: 13, color: .labelColor),
+                              copy: MeetingPanelCopy.notesButton)
         buttonSeparator.translatesAutoresizingMaskIntoConstraints = false
-        let buttons = NSStackView(views: [pauseButton, stopButton, closeButton, buttonSeparator, transcriptButton])
+        let buttons = NSStackView(views: [pauseButton, stopButton, closeButton, buttonSeparator, notesButton, transcriptButton])
         buttons.orientation = .horizontal
         buttons.spacing = Layout.buttonSpacing
         buttons.detachesHiddenViews = true
