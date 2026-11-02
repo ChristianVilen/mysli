@@ -48,7 +48,7 @@ enum SummaryCLI: String {
     func invocation(prompt: String) -> (arguments: [String], input: String?) {
         switch self {
         case .antigravity: return (["--sandbox", "--disable-slash-commands", "-p", prompt], nil)
-        case .claude: return (["-p", "--tools", "", "--no-session-persistence", "--strict-mcp-config"], prompt)
+        case .claude: return (["-p", "--model", "sonnet", "--effort", "medium", "--tools", "", "--no-session-persistence", "--strict-mcp-config"], prompt)
         }
     }
 }

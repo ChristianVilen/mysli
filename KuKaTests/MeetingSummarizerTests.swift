@@ -57,7 +57,7 @@ final class MeetingSummarizerTests: XCTestCase {
         let expected = SummaryPrompt.make(transcript: transcript, knownWords: knownWords, context: "Konvio background")
         XCTAssertEqual(runner.calls.map(\.arguments), [
             ["--sandbox", "--disable-slash-commands", "-p", expected],
-            ["-p", "--tools", "", "--no-session-persistence", "--strict-mcp-config"],
+            ["-p", "--model", "sonnet", "--effort", "medium", "--tools", "", "--no-session-persistence", "--strict-mcp-config"],
         ])
         XCTAssertEqual(runner.calls.map(\.input), [nil, expected])
         XCTAssertEqual(runner.calls.map(\.timeout), [.seconds(600), .seconds(600)])
@@ -161,7 +161,7 @@ final class MeetingSummarizerTests: XCTestCase {
 
         XCTAssertEqual(runner.calls.map(\.arguments), [
             ["--sandbox", "--disable-slash-commands", "-p", prompt],
-            ["-p", "--tools", "", "--no-session-persistence", "--strict-mcp-config"],
+            ["-p", "--model", "sonnet", "--effort", "medium", "--tools", "", "--no-session-persistence", "--strict-mcp-config"],
         ])
         XCTAssertEqual(runner.calls.map(\.input), [nil, prompt], "claude reads the prompt on stdin")
         let searchPath = ["/opt/homebrew/bin", "/usr/local/bin", "/Users/test/.local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"]
