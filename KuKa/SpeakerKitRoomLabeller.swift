@@ -4,6 +4,7 @@ import WhisperKit
 
 struct SpeakerKitRoomLabeller: RoomLabelling {
     /// Changing the `argmaxinc/speakerkit-coreml` revision installs into a new folder.
+    /// The README credits this model and its CC BY 4.0 license; keep it in step with a new model.
     static let revision = "556fc52a13327837688f02289457cded017802e9"
 
     private let client: SpeakerKitClient

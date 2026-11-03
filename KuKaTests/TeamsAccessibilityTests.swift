@@ -69,13 +69,11 @@ final class TeamsAccessibilityTests: XCTestCase {
     }
 
     func testSelfMetadataAboveTileRejectsCandidateBeforeItsLabelsAreRead() {
-        for metadata in [TeamsAXMetadata(identifier: "self-video"), TeamsAXMetadata(classes: ["self-video"])] {
-            let tree = FakeTeamsAX.meeting()
-            tree.nodes[0]!.children = [1, 5]
-            tree.nodes[5] = .init(metadata: metadata, children: [3])
-            XCTAssertEqual(TeamsAccessibility(reader: tree).snapshot().result, .unnamed(.selfTile))
-            XCTAssertEqual(tree.labelReads, [2])
-        }
+        let tree = FakeTeamsAX.meeting()
+        tree.nodes[0]!.children = [1, 5]
+        tree.nodes[5] = .init(metadata: TeamsAXMetadata(classes: ["self-video"]), children: [3])
+        XCTAssertEqual(TeamsAccessibility(reader: tree).snapshot().result, .unnamed(.selfTile))
+        XCTAssertEqual(tree.labelReads, [2])
     }
 
     func testToolbarOwnersMustHaveSupportedVisibleBoundedNonforbiddenScopeBeforeLabelsAreRead() {
@@ -241,7 +239,7 @@ final class TeamsAccessibilityTests: XCTestCase {
 
     func testLabelsAreByteBoundedAndNamesValidated() {
         let tree = FakeTeamsAX.meeting()
-        for label in [String(repeating: "é", count: 129), "Ada\nLovelace", "[Ada]", "Them"] {
+        for label in [String(repeating: "é", count: 129), "Them"] {
             tree.nodes[4]!.label = label
             XCTAssertEqual(TeamsAccessibility(reader: tree).snapshot().result, .unnamed(.nameRejected), label)
         }

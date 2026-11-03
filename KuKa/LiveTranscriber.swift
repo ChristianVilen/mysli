@@ -12,6 +12,8 @@ protocol LiveTranscribing {
 /// track. Runs only for a locale whose model is already installed, and never downloads or
 /// reserves one. When the audio streams finish, the last text is finalized; when the reader goes
 /// away, the analyzers are cancelled.
+/// Without a reservation Speech logs "Cannot use modules with unallocated locales"; a future
+/// macOS may need `AssetInventory.reserve(locale:)` here and in `SpeechTranscriberAdapter`.
 struct AppleLiveTranscriber: LiveTranscribing {
     func updates(locale: Locale, audio: [MeetingTrack: AsyncStream<WrittenAudio>]) -> AsyncStream<LiveUpdate> {
         // Unbounded: speech limits the rate to a few results a second, and a dropped final
@@ -55,6 +57,7 @@ struct AppleLiveTranscriber: LiveTranscribing {
             try await withTaskCancellationHandler {
                 try await analyze(analyses, in: format, into: updates)
             } onCancel: {
+                // Cancelling the task alone does not stop Speech's input loop.
                 Task { for analysis in analyses { await analysis.analyzer.cancelAndFinishNow() } }
             }
         } catch {
@@ -119,7 +122,8 @@ private struct TrackAnalysis {
 
 extension WrittenAudio {
     /// The file position as a whole frame. `CMTime(seconds:preferredTimescale:)` rounds down,
-    /// and gives 64_319 for 64_320 / 16_000 s.
+    /// and gives 64_319 for 64_320 / 16_000 s. A buffer that starts one frame early overlaps the
+    /// one before, and Speech then ends the analysis with error 17.
     var startTime: CMTime {
         let sampleRate = buffer.format.sampleRate
         return CMTime(value: CMTimeValue((filePosition * sampleRate).rounded()), timescale: CMTimeScale(sampleRate))

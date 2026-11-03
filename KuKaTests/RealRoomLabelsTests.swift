@@ -2,16 +2,33 @@ import AVFAudio
 import XCTest
 @testable import KuKa
 
-/// xcodebuild passes the KUKA_ variables to the tests only with a
-/// TEST_RUNNER_ prefix, for example TEST_RUNNER_KUKA_SPEAKER_MODEL.
+/// Runs the real SpeakerKit model on a real me.caf, prints the voices it finds, and never
+/// downloads. Skipped unless KUKA_SPEAKER_MODEL names the installed folder that holds
+/// `speaker_segmenter` and KUKA_MEETING_AUDIO a folder with me.caf. xcodebuild passes the
+/// KUKA_ variables to the tests only with a TEST_RUNNER_ prefix:
+///
+///     TEST_RUNNER_KUKA_SPEAKER_MODEL="$HOME/Library/Application Support/Ku-Ka/speaker-models/speakerkit-coreml-556fc52a/models/argmaxinc/speakerkit-coreml" \
+///     TEST_RUNNER_KUKA_MEETING_AUDIO="$HOME/Meetings/<meeting folder>/audio" \
+///     xcodebuild -project KuKa.xcodeproj -scheme KuKa test -only-testing:KuKaTests/RealRoomLabelsTests
 @MainActor
 final class RealRoomLabelsTests: XCTestCase {
-    func testSpeakerKitTellsApartTheVoicesOnARealMicrophoneTrack() async throws {
+    private var modelPath = ""
+    private var audioPath = ""
+
+    /// Skips here, not in the test: in this test host, an async test on the main actor costs
+    /// about 0.1 s even when it only skips.
+    override func setUpWithError() throws {
+        try super.setUpWithError()
         let environment = ProcessInfo.processInfo.environment
         guard let modelPath = environment["KUKA_SPEAKER_MODEL"], !modelPath.isEmpty,
               let audioPath = environment["KUKA_MEETING_AUDIO"], !audioPath.isEmpty else {
             throw XCTSkip("Set KUKA_SPEAKER_MODEL to an installed speakerkit-coreml folder and KUKA_MEETING_AUDIO to a folder with me.caf.")
         }
+        self.modelPath = modelPath
+        self.audioPath = audioPath
+    }
+
+    func testSpeakerKitTellsApartTheVoicesOnARealMicrophoneTrack() async throws {
         // The labeller loads <models folder>/<installed name>/models/argmaxinc/speakerkit-coreml,
         // so a temporary models folder links that path to the given model.
         let modelsFolder = try makeTemporaryDirectory()

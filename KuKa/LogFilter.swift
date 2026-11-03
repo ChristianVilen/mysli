@@ -39,6 +39,9 @@ struct LogFilter: Sendable {
     var range: LogRange = .thisLaunch
     var category: String?
     var errorsOnly = false
+    var rowLimit = LogFilter.defaultRowLimit
+
+    static let defaultRowLimit = 5000
 
     func rows(_ rows: [LogRow], now: Date, launchDate: Date, processID: Int32,
               calendar: Calendar = .current) -> [LogRow] {
@@ -65,6 +68,6 @@ struct LogFilter: Sendable {
         }
         var ordered = dated.makeIterator()
         let result = matching.map { row in row.line == nil ? row : ordered.next()!.2 }
-        return Array(result.suffix(5000))
+        return Array(result.suffix(rowLimit))
     }
 }

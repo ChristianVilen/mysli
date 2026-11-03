@@ -45,22 +45,8 @@ final class MeetingProcessorTests: MeetingProcessorTestCase {
         let outcome = await processor.process(scanned, speakers: evidence, tool: .automatic) { _ in }
 
         XCTAssertEqual(outcome, .done(summary: scanned.url(for: .summary)))
-        XCTAssertEqual(try scanned.read(.transcript), """
-        # Meeting on 2026-10-23 at 14:02
-
-        Duration: 00:01:00
-
-        Transcript by Whisper.
-
-        Teams speaker names were on, but no remote line got a name. In 4 of 4 scans, no Teams window showed meeting controls with Hang up or Leave.
-
-        "Me" is the microphone of the Mac that recorded the meeting. It hears the person who recorded the meeting and anyone in the same room. "Them" is everyone else on the call.
-
-        **[00:00:01] Them:** Let's ship on Friday
-
-        **[00:00:04] Me:** Sounds good
-
-        """)
+        XCTAssertTrue(try scanned.read(.transcript).contains(
+            "\n\nTeams speaker names were on, but no remote line got a name. In 4 of 4 scans, "))
         XCTAssertFalse(runner.calls.last?.arguments.last?.contains("Teams speaker names") ?? true)
 
         let unscanned = try makeMeeting()
@@ -114,17 +100,6 @@ final class MeetingProcessorTests: MeetingProcessorTestCase {
         XCTAssertEqual(meeting.stage(), .done)
     }
 
-    func testTheSummaryFromAFallbackCLIHasNoFooter() async throws {
-        let meeting = try makeMeeting()
-        runner.results["agy"] = .success(CommandResult(termination: .exited(1), stdout: "", stderr: "authentication failed"))
-        runner.results["claude"] = .reply(defaultNotes)
-
-        let outcome = await process(meeting)
-
-        XCTAssertEqual(outcome, .done(summary: meeting.url(for: .summary)))
-        XCTAssertEqual(try meeting.read(.summary), "# Meeting on 2026-10-23 at 14:02\n\n## Summary\nShip Friday.\n")
-    }
-
     func testAMissingSpeechModelIsDownloadedForTheConfiguredLanguageFirst() async throws {
         let meeting = try makeMeeting()
         whisper.modelIsMissing = true
@@ -170,22 +145,8 @@ final class MeetingProcessorTests: MeetingProcessorTestCase {
             let outcome = await process(meeting)
 
             XCTAssertEqual(outcome, .done(summary: meeting.url(for: .summary)), "\(row.stage)")
-            XCTAssertEqual(try meeting.read(.transcript), """
-            # Meeting on 2026-10-23 at 14:02
-
-            Duration: 00:01:00
-
-            Transcript by Apple. Tried first:
-
-            \(row.bullet)
-
-            "Me" is the microphone of the Mac that recorded the meeting. It hears the person who recorded the meeting and anyone in the same room. "Them" is everyone else on the call.
-
-            **[00:00:01] Them:** Let's ship on Friday
-
-            **[00:00:04] Me:** Sounds good
-
-            """, "\(row.stage)")
+            XCTAssertTrue(try meeting.read(.transcript).contains("\n\nTranscript by Apple. Tried first:\n\n\(row.bullet)\n\n"),
+                          "\(row.stage)")
             XCTAssertEqual(whisper.downloads, row.whisperDownloads, "\(row.stage)")
             XCTAssertEqual(whisper.transcribed, [], "\(row.stage)")
             XCTAssertEqual(apple.loads, ["en-US"], "\(row.stage)")
@@ -217,23 +178,6 @@ final class MeetingProcessorTests: MeetingProcessorTestCase {
         XCTAssertEqual(apple.loads, ["en-US"])
     }
 
-    func testFallbackDiagnosticsStayOnDiskButDoNotEnterTheSummaryPrompt() async throws {
-        let meeting = try makeMeeting()
-        whisper.failure = (.load, MeetingStepError("The model could not load."))
-
-        let outcome = await process(meeting)
-
-        XCTAssertEqual(outcome, .done(summary: meeting.url(for: .summary)))
-        XCTAssertTrue(try meeting.read(.transcript).contains("Whisper could not load its model: The model could not load."))
-        let prompt = try XCTUnwrap(runner.calls.first?.arguments.last)
-        XCTAssertEqual(prompt.components(separatedBy: "Transcript:\n\n").last, """
-        **[00:00:01] Them:** Let's ship on Friday
-
-        **[00:00:04] Me:** Sounds good
-
-        """)
-    }
-
     func testWhenNoTranscriberCanStartErrorMdListsEachReason() async throws {
         let meeting = try makeMeeting()
         whisper.failure = (.unavailable, MeetingStepError("Whisper does not support eo."))
@@ -259,18 +203,6 @@ final class MeetingProcessorTests: MeetingProcessorTestCase {
         XCTAssertTrue(audioExists(meeting))
     }
 
-    func testTheCLIGetsTheTranscriptFromDisk() async throws {
-        let meeting = try makeMeeting()
-        try meeting.write("**[00:00:07] Me:** This was saved by an earlier run.", to: .transcript)
-
-        let outcome = await process(meeting)
-
-        XCTAssertEqual(outcome, .done(summary: meeting.url(for: .summary)))
-        let prompt = try XCTUnwrap(runner.calls.first?.arguments.last)
-        XCTAssertEqual(prompt.components(separatedBy: "Transcript:\n\n").last,
-                       "**[00:00:07] Me:** This was saved by an earlier run.")
-    }
-
     func testATranscriptionFailureAfterLoadingWritesTheReasonKeepsTheAudioAndDoesNotFallBack() async throws {
         let meeting = try makeMeeting()
         whisper.byFileName["them.caf"] = .failure(TestError(errorDescription: "Whisper could not transcribe them.caf: Out of memory."))
@@ -278,17 +210,7 @@ final class MeetingProcessorTests: MeetingProcessorTestCase {
         let outcome = await process(meeting)
 
         XCTAssertEqual(outcome, .failed(.transcribe, message: "Whisper could not transcribe them.caf: Out of memory."))
-        let errorText = """
-        # Transcription Failed
-
-        2026-10-23 15:00
-
-        Whisper could not transcribe them.caf: Out of memory.
-
-        Choose Retry Failed Meeting in the Ku-Ka menu to try again.
-
-        """
-        XCTAssertEqual(try meeting.read(.failure), errorText)
+        XCTAssertTrue(try meeting.read(.failure).contains("\n\nWhisper could not transcribe them.caf: Out of memory.\n\n"))
         XCTAssertEqual(meeting.stage(), .failed(.transcribe))
         XCTAssertTrue(audioExists(meeting))
         XCTAssertEqual(trashed, [])

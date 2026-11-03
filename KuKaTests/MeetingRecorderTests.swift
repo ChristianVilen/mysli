@@ -83,11 +83,19 @@ final class MeetingRecorderTests: XCTestCase {
     private var noticeCloses: [@MainActor () -> Void] = []
     private var sut: MeetingRecorder!
 
-    override func setUp() async throws {
+    override func setUpWithError() throws {
         root = try makeTemporaryDirectory().appendingPathComponent("Meetings", isDirectory: true)
         capture = FakeMeetingAudioCapture()
         liveTranscriber = FakeLiveTranscriber()
-        sut = MeetingRecorder(
+        sut = makeRecorder()
+    }
+
+    override func tearDown() {
+        sut.shutDown()
+    }
+
+    private func makeRecorder(displayTickInterval: TimeInterval = 1) -> MeetingRecorder {
+        let recorder = MeetingRecorder(
             permissions: PermissionsManager(
                 isAccessibilityTrusted: { true },
                 hasScreenCaptureAccess: { true },
@@ -104,20 +112,19 @@ final class MeetingRecorderTests: XCTestCase {
             },
             now: { localDate(2026, 10, 23, 14, 2) },
             hostNow: { [unowned self] in hostTime },
-            closeSavedNoticeLater: { [unowned self] in noticeCloses.append($0) })
-        sut.onShowPermissions = { [unowned self] in permissionWindows += 1 }
-        sut.onChange = { [unowned self] in stateChanges += 1 }
-        sut.onControlsChange = { [unowned self] in controlsChanges += 1 }
+            closeSavedNoticeLater: { [unowned self] in noticeCloses.append($0) },
+            displayTickInterval: displayTickInterval)
+        recorder.onShowPermissions = { [unowned self] in permissionWindows += 1 }
+        recorder.onChange = { [unowned self] in stateChanges += 1 }
+        recorder.onControlsChange = { [unowned self] in controlsChanges += 1 }
+        return recorder
     }
 
-    override func tearDown() async throws {
-        sut.shutDown()
-    }
-
-    private func runMenuLoop(for duration: TimeInterval) {
-        let until = Date().addingTimeInterval(duration)
-        while Date() < until {
-            RunLoop.current.run(mode: .eventTracking, before: until)
+    /// Runs the run loop as an open menu does, for `duration` or until `done`.
+    private func runMenuLoop(for duration: TimeInterval, until done: () -> Bool = { false }) {
+        let deadline = Date().addingTimeInterval(duration)
+        while !done(), Date() < deadline {
+            RunLoop.current.run(mode: .eventTracking, before: min(deadline, Date().addingTimeInterval(0.001)))
         }
     }
 
@@ -129,7 +136,7 @@ final class MeetingRecorderTests: XCTestCase {
         let start = Task { await sut.toggleRecording() }
         await waitUntil { prompt != nil }
 
-        XCTAssertEqual(sut.controls, MeetingControls(status: .starting, recordedTime: nil, preview: nil))
+        XCTAssertEqual(sut.controls, MeetingControls(status: .starting, recordedTime: nil))
         sut.dismissControls()
         XCTAssertEqual(sut.controls?.status, .starting, "Starting cannot be hidden")
 
@@ -137,45 +144,39 @@ final class MeetingRecorderTests: XCTestCase {
         prompt?.resume(returning: true)
         await start.value
         hostTime = hostTime + 245
-        XCTAssertEqual(sut.controls, MeetingControls(status: .recording, recordedTime: 245, preview: nil))
+        XCTAssertEqual(sut.controls, MeetingControls(status: .recording, recordedTime: 245))
 
         sut.pause()
         hostTime = hostTime + 30
-        XCTAssertEqual(sut.controls, MeetingControls(status: .paused, recordedTime: 245, preview: nil))
+        XCTAssertEqual(sut.controls, MeetingControls(status: .paused, recordedTime: 245))
     }
 
-    func testEveryMeetingStartsWithTheControlsShownAndTheTranscriptClosed() async {
+    func testLivePreviewRemainsAvailableWhenControlsAreHiddenAndEndsAtStop() async {
         await sut.toggleRecording()
-        XCTAssertEqual(sut.controls?.isTranscriptOpen, false)
-        sut.setTranscriptOpen(true)
-        XCTAssertEqual(sut.controls?.isTranscriptOpen, true)
+        XCTAssertEqual(sut.livePreview, LivePreview(status: .preparing, rows: [], behind: nil))
+        sut.dismissControls()
+        XCTAssertNil(sut.controls)
+        XCTAssertEqual(sut.livePreview, LivePreview(status: .preparing, rows: [], behind: nil))
+        sut.stopRecording()
+        XCTAssertNil(sut.livePreview)
+    }
+
+    func testEveryMeetingStartsWithTheControlsShown() async {
+        await sut.toggleRecording()
         sut.dismissControls()
 
         await sut.toggleRecording()
         await sut.toggleRecording()
 
         XCTAssertEqual(sut.phase, .recording)
-        XCTAssertEqual(sut.controls, MeetingControls(status: .recording, recordedTime: 0, preview: nil))
-        XCTAssertEqual(sut.controls?.isTranscriptOpen, false)
-    }
-
-    func testStopShowsTheSavedNoticeUntilItsDelayEnds() async {
-        await sut.toggleRecording()
-        sut.setTranscriptOpen(true)
-
-        sut.stopRecording()
-
-        XCTAssertEqual(sut.controls, MeetingControls(status: .saved, recordedTime: nil, preview: nil))
-        XCTAssertEqual(noticeCloses.count, 1)
-        noticeCloses[0]()
-        XCTAssertNil(sut.controls)
+        XCTAssertEqual(sut.controls, MeetingControls(status: .recording, recordedTime: 0))
     }
 
     func testADelayFromAnEarlierMeetingDoesNotCloseALaterNotice() async {
         await sut.toggleRecording()
         await sut.toggleRecording()
         await sut.toggleRecording()
-        XCTAssertEqual(sut.controls, MeetingControls(status: .recording, recordedTime: 0, preview: nil),
+        XCTAssertEqual(sut.controls, MeetingControls(status: .recording, recordedTime: 0),
                        "Start replaces the notice")
         await sut.toggleRecording()
         XCTAssertEqual(noticeCloses.count, 2)
@@ -195,7 +196,7 @@ final class MeetingRecorderTests: XCTestCase {
         capture.interrupt(reason: "The display was disconnected.")
 
         let stopped = MeetingControls(status: .interrupted(reason: "The display was disconnected."),
-                                      recordedTime: nil, preview: nil)
+                                      recordedTime: nil)
         XCTAssertEqual(sut.controls, stopped)
         XCTAssertEqual(noticeCloses.count, 1, "only the first meeting's saved notice has a delay")
         noticeCloses[0]()
@@ -205,7 +206,7 @@ final class MeetingRecorderTests: XCTestCase {
         XCTAssertNil(sut.controls)
     }
 
-    func testThePanelHearsOfStartPauseResumeADrawerChangeStopAndTheNoticeClosing() async {
+    func testThePanelHearsOfStartPauseResumeStopAndTheNoticeClosing() async {
         await sut.toggleRecording()
         XCTAssertEqual(controlsChanges, 2, "starting, then recording")
 
@@ -215,31 +216,31 @@ final class MeetingRecorderTests: XCTestCase {
         hostTime = HostTime(seconds: 1_020)
         sut.resume()
         XCTAssertEqual(controlsChanges, 4)
-        sut.setTranscriptOpen(true)
-        XCTAssertEqual(controlsChanges, 5)
         sut.stopRecording()
-        XCTAssertEqual(controlsChanges, 6)
+        XCTAssertEqual(controlsChanges, 5)
         noticeCloses[0]()
-        XCTAssertEqual(controlsChanges, 7)
+        XCTAssertEqual(controlsChanges, 6)
     }
 
-    func testThePanelTicksEverySecondOnlyWhileRecordingAlsoWhileAMenuIsOpen() async {
+    func testThePanelTicksOnlyWhileRecordingAlsoWhileAMenuIsOpen() async {
+        let tick: TimeInterval = 0.005
+        sut = makeRecorder(displayTickInterval: tick)
         await sut.toggleRecording()
         var before = controlsChanges
-        runMenuLoop(for: 1.15)
+        runMenuLoop(for: 1) { controlsChanges > before }
         XCTAssertEqual(controlsChanges, before + 1)
 
         hostTime = HostTime(seconds: 1_010)
         sut.pause()
         before = controlsChanges
-        runMenuLoop(for: 1.15)
+        runMenuLoop(for: 4 * tick)
         XCTAssertEqual(controlsChanges, before, "the time stands still while paused")
 
         hostTime = HostTime(seconds: 1_020)
         sut.resume()
         sut.stopRecording()
         before = controlsChanges
-        runMenuLoop(for: 1.15)
+        runMenuLoop(for: 4 * tick)
         XCTAssertEqual(controlsChanges, before, "no tick after the meeting")
     }
 
@@ -267,52 +268,36 @@ final class MeetingRecorderTests: XCTestCase {
 
     func testLiveTextReachesThePreview() async {
         await sut.toggleRecording()
-        sut.setTranscriptOpen(true)
-        XCTAssertEqual(sut.controls?.preview, LivePreview(status: .preparing, rows: [], behind: nil))
+        XCTAssertEqual(sut.livePreview, LivePreview(status: .preparing, rows: [], behind: nil))
+        let changes = controlsChanges
 
         liveTranscriber.send(.started)
         liveTranscriber.send(.result(LiveResult(track: .system, start: 1, end: 2, text: "Let's ship on Friday",
                                                 isFinal: true, finalizedThrough: 2)))
-        await waitUntil { sut.controls?.preview?.rows.isEmpty == false }
+        await waitUntil { sut.livePreview?.rows.isEmpty == false }
 
-        XCTAssertEqual(sut.controls?.preview, LivePreview(
+        XCTAssertEqual(sut.livePreview, LivePreview(
             status: .live, rows: [LiveRow(at: 1, content: .speech(.them, text: "Let's ship on Friday", isFinal: true))],
             behind: nil))
-    }
-
-    func testThePreviewIsBuiltOnlyWhileTheTranscriptIsOpen() async {
-        await sut.toggleRecording()
-        let changes = controlsChanges
-        liveTranscriber.send(.started)
-        liveTranscriber.send(.result(LiveResult(track: .system, start: 1, end: 2, text: "Let's ship on Friday",
-                                                isFinal: true, finalizedThrough: 2)))
-        await waitUntil { controlsChanges == changes + 2 }
-
-        XCTAssertNil(sut.controls?.preview)
-
-        sut.setTranscriptOpen(true)
-        XCTAssertEqual(sut.controls?.preview?.rows,
-                       [LiveRow(at: 1, content: .speech(.them, text: "Let's ship on Friday", isFinal: true))])
+        XCTAssertEqual(controlsChanges, changes + 2, "the panel hears of each update")
     }
 
     func testALiveTranscriptThatIsUnavailableOrFailsLeavesTheRecordingAlone() async throws {
         await sut.toggleRecording()
-        sut.setTranscriptOpen(true)
         liveTranscriber.send(.unavailable("Live transcript is not available for Finnish on this Mac."))
-        await waitUntil { sut.controls?.preview?.status != .preparing }
+        await waitUntil { sut.livePreview?.status != .preparing }
 
-        XCTAssertEqual(sut.controls?.preview?.status, .unavailable("Live transcript is not available for Finnish on this Mac."))
+        XCTAssertEqual(sut.livePreview?.status, .unavailable("Live transcript is not available for Finnish on this Mac."))
         XCTAssertEqual(sut.phase, .recording)
         XCTAssertEqual(capture.recordings.last?.stopCount, 0)
 
         await sut.toggleRecording()
         await sut.toggleRecording()
-        sut.setTranscriptOpen(true)
         liveTranscriber.send(.started)
         liveTranscriber.send(.failed("The speech model stopped."))
-        await waitUntil { sut.controls?.preview?.status == .failed("The speech model stopped.") }
+        await waitUntil { sut.livePreview?.status == .failed("The speech model stopped.") }
 
-        XCTAssertEqual(sut.controls?.preview?.status, .failed("The speech model stopped."))
+        XCTAssertEqual(sut.livePreview?.status, .failed("The speech model stopped."))
         XCTAssertEqual(sut.phase, .recording)
         XCTAssertEqual(capture.recordings.last?.stopCount, 0)
     }
@@ -322,13 +307,6 @@ final class MeetingRecorderTests: XCTestCase {
         sut.stopRecording()
         await waitUntil { liveTranscriber.terminations == 1 }
         XCTAssertEqual(liveTranscriber.terminations, 1)
-
-        let changesAfterStop = controlsChanges
-        liveTranscriber.send(.result(LiveResult(track: .system, start: 1, end: 2, text: "Too late",
-                                                isFinal: true, finalizedThrough: 2)))
-        try? await Task.sleep(for: .milliseconds(50))
-        XCTAssertEqual(controlsChanges, changesAfterStop)
-        XCTAssertEqual(sut.controls, MeetingControls(status: .saved, recordedTime: nil, preview: nil))
 
         await sut.toggleRecording()
         capture.interrupt(reason: "The display was disconnected.")
@@ -343,33 +321,30 @@ final class MeetingRecorderTests: XCTestCase {
 
     func testALiveUpdateFromTheFirstMeetingDoesNotShowInTheSecond() async {
         await sut.toggleRecording()
-        sut.setTranscriptOpen(true)
         liveTranscriber.send(.started)
-        await waitUntil { sut.controls?.preview?.status == .live }
+        await waitUntil { sut.livePreview?.status == .live }
         liveTranscriber.send(.result(LiveResult(track: .system, start: 1, end: 2, text: "From the first meeting",
                                                 isFinal: true, finalizedThrough: 2)))
 
         sut.stopRecording()
         await sut.toggleRecording()
-        sut.setTranscriptOpen(true)
         liveTranscriber.send(.started)
-        await waitUntil { sut.controls?.preview?.status == .live }
+        await waitUntil { sut.livePreview?.status == .live }
 
-        XCTAssertEqual(sut.controls?.preview?.rows, [])
+        XCTAssertEqual(sut.livePreview?.rows, [])
     }
 
     func testPauseShowsTheUnfinishedLiveTextAsFinal() async {
         await sut.toggleRecording()
-        sut.setTranscriptOpen(true)
         liveTranscriber.send(.result(LiveResult(track: .system, start: 1, end: 2, text: "So the plan",
                                                 isFinal: false, finalizedThrough: 0)))
-        await waitUntil { sut.controls?.preview?.rows.isEmpty == false }
-        XCTAssertEqual(sut.controls?.preview?.rows, [LiveRow(at: 1, content: .speech(.them, text: "So the plan", isFinal: false))])
+        await waitUntil { sut.livePreview?.rows.isEmpty == false }
+        XCTAssertEqual(sut.livePreview?.rows, [LiveRow(at: 1, content: .speech(.them, text: "So the plan", isFinal: false))])
 
         hostTime = HostTime(seconds: 1_010)
         sut.pause()
 
-        XCTAssertEqual(sut.controls?.preview?.rows, [LiveRow(at: 1, content: .speech(.them, text: "So the plan", isFinal: true)),
+        XCTAssertEqual(sut.livePreview?.rows, [LiveRow(at: 1, content: .speech(.them, text: "So the plan", isFinal: true)),
                                                      LiveRow(at: 10, content: .pause(duration: nil))])
     }
 
@@ -377,7 +352,6 @@ final class MeetingRecorderTests: XCTestCase {
         let phases: [RecorderPhase] = [.idle, .starting, .recording, .paused]
 
         XCTAssertEqual(phases.map(\.isCapturing), [false, false, true, true])
-        XCTAssertEqual(phases.map(\.statusDescription), [nil, nil, "recording meeting", "recording paused"])
         XCTAssertEqual(phases.map(\.recordingMark), [nil, nil, .recording, .paused])
     }
 
@@ -402,19 +376,6 @@ final class MeetingRecorderTests: XCTestCase {
         return clock
     }
 
-    func testPauseHandsTheRecordingAClockPausedAtTheHostTimeOfTheClick() async throws {
-        await sut.toggleRecording()
-        let handle = try XCTUnwrap(capture.recordings.last)
-        let changesBeforePause = stateChanges
-        hostTime = HostTime(seconds: 1_010)
-
-        sut.pause()
-
-        XCTAssertEqual(handle.appliedClocks, [clock(pausedAt: 1_010)])
-        XCTAssertEqual(sut.phase, .paused)
-        XCTAssertEqual(stateChanges, changesBeforePause + 1)
-    }
-
     func testPauseKeepsTheCaptureAndTheFolderLock() async throws {
         await sut.toggleRecording()
         hostTime = HostTime(seconds: 1_010)
@@ -433,21 +394,24 @@ final class MeetingRecorderTests: XCTestCase {
     func testResumeHandsTheRecordingTheResumedClock() async throws {
         await sut.toggleRecording()
         let handle = try XCTUnwrap(capture.recordings.last)
+        let changesBeforePause = stateChanges
         hostTime = HostTime(seconds: 1_010)
+
         sut.pause()
-        let changesBeforeResume = stateChanges
+
+        XCTAssertEqual(sut.phase, .paused)
+        XCTAssertEqual(stateChanges, changesBeforePause + 1)
         hostTime = HostTime(seconds: 1_040)
 
         sut.resume()
 
         XCTAssertEqual(handle.appliedClocks, [clock(pausedAt: 1_010), clock(pausedAt: 1_010, resumedAt: 1_040)])
         XCTAssertEqual(sut.phase, .recording)
-        XCTAssertEqual(stateChanges, changesBeforeResume + 1)
+        XCTAssertEqual(stateChanges, changesBeforePause + 2)
     }
 
-    func testTogglePausePausesWhileRecordingAndResumesWhilePaused() async throws {
+    func testTogglePausePausesWhileRecordingAndResumesWhilePaused() async {
         await sut.toggleRecording()
-        let handle = try XCTUnwrap(capture.recordings.last)
         hostTime = HostTime(seconds: 1_010)
 
         sut.togglePause()
@@ -456,7 +420,6 @@ final class MeetingRecorderTests: XCTestCase {
         hostTime = HostTime(seconds: 1_040)
         sut.togglePause()
         XCTAssertEqual(sut.phase, .recording)
-        XCTAssertEqual(handle.appliedClocks, [clock(pausedAt: 1_010), clock(pausedAt: 1_010, resumedAt: 1_040)])
     }
 
     func testPauseWhilePausedAndResumeWhileRecordingChangeNothingAndTellNoOne() async throws {

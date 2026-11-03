@@ -29,18 +29,22 @@ final class FakeOverlayPresenter: OverlayPresenting {
 final class SelectionSessionTests: XCTestCase {
     private let screen = ScreenGeometry(frame: CGRect(x: 0, y: 0, width: 1440, height: 900),
                                         visibleFrame: CGRect(x: 0, y: 25, width: 1440, height: 875))
+    private let rightScreen = ScreenGeometry(frame: CGRect(x: 1440, y: 0, width: 1920, height: 1080),
+                                             visibleFrame: CGRect(x: 1440, y: 0, width: 1920, height: 1080))
     private var presenter: FakeOverlayPresenter!
     private var session: SelectionSession!
 
-    override func setUp() async throws {
+    override func setUp() {
+        super.setUp()
         presenter = FakeOverlayPresenter()
         session = SelectionSession(presenter: presenter)
     }
 
     /// Starts run() in a child task and yields until the presenter has been
     /// asked to present, so the test can emit overlay events.
-    private func startRun(mouseLocation: CGPoint) async -> Task<SelectionResult, Never> {
-        let task = Task { await self.session.run(on: [self.screen], mouseLocation: mouseLocation) }
+    private func startRun(on layout: [ScreenGeometry]? = nil, mouseLocation: CGPoint) async -> Task<SelectionResult, Never> {
+        let layout = layout ?? [screen]
+        let task = Task { await self.session.run(on: layout, mouseLocation: mouseLocation) }
         for _ in 0..<100 where presenter.presentCount == 0 { await Task.yield() }
         return task
     }
@@ -69,12 +73,12 @@ final class SelectionSessionTests: XCTestCase {
     }
 
     func testWindowSelectionPicksScreenContainingWindow() async {
-        let task = await startRun(mouseLocation: mouseOnScreen)
-        let inside = CGRect(x: screen.frame.midX - 50, y: screen.frame.midY - 50, width: 100, height: 100)
-        let info = WindowInfo(windowID: 7, frame: inside, ownerName: "Test", layer: 0)
+        let task = await startRun(on: [screen, rightScreen], mouseLocation: mouseOnScreen)
+        let onRight = CGRect(x: rightScreen.frame.midX - 50, y: rightScreen.frame.midY - 50, width: 100, height: 100)
+        let info = WindowInfo(windowID: 7, frame: onRight, ownerName: "Test", layer: 0)
         presenter.emit(.windowSelected(info, screen: screen))
         let result = await task.value
-        XCTAssertEqual(result, .window(7, on: screen))
+        XCTAssertEqual(result, .window(7, on: rightScreen))
     }
 
     // MARK: - Lifecycle

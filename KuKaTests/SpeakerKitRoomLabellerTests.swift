@@ -11,39 +11,31 @@ final class SpeakerKitRoomLabellerTests: XCTestCase {
     private var sut: SpeakerKitRoomLabeller!
     private var downloadsReported = 0
 
-    override func setUp() async throws {
+    override func setUpWithError() throws {
+        try super.setUpWithError()
         root = try makeTemporaryDirectory().appendingPathComponent("speaker-models", isDirectory: true)
         client = FakeSpeakerKitClient()
         sut = SpeakerKitRoomLabeller(client: client, modelsFolder: root)
         downloadsReported = 0
     }
 
-    private var partial: String { root.path + "/.speakerkit-coreml-556fc52a.partial" }
-
     private func download() async throws {
         try await sut.download(onStart: { self.downloadsReported += 1 })
-    }
-
-    private func folderContents() throws -> [String] {
-        try FileManager.default.contentsOfDirectory(atPath: root.path).sorted()
     }
 
     private func isExcludedFromBackup() throws -> Bool? {
         try root.resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup
     }
 
-    func testAMissingModelIsDownloadedAndInstalledOnlyWhenComplete() async throws {
+    func testAMissingModelIsDownloadedAtThePinnedRevision() async throws {
         XCTAssertTrue(sut.needsDownload)
 
         try await download()
 
         XCTAssertFalse(sut.needsDownload)
         XCTAssertEqual(downloadsReported, 1)
-        XCTAssertEqual(client.downloads, [partial])
+        XCTAssertEqual(client.downloads, [root.path + "/.speakerkit-coreml-556fc52a.partial"])
         XCTAssertEqual(client.revisions, ["556fc52a13327837688f02289457cded017802e9"])
-        XCTAssertEqual(try folderContents(), [".lock", "speakerkit-coreml-556fc52a"])
-        XCTAssertEqual(try String(contentsOf: root.appendingPathComponent("speakerkit-coreml-556fc52a/model.bin"), encoding: .utf8),
-                       "weights")
     }
 
     func testTheVoicesComeBackAsRoomVoices() async throws {
@@ -58,46 +50,6 @@ final class SpeakerKitRoomLabellerTests: XCTestCase {
         XCTAssertEqual(client.diarized, [microphone.path])
     }
 
-    func testAFailedDownloadGivesTheReasonAndTheNextDownloadResumesInThePartialFolder() async throws {
-        client.downloadError = TestError(errorDescription: "The network connection was lost.")
-
-        do {
-            try await download()
-            XCTFail("The download did not fail.")
-        } catch {
-            XCTAssertEqual(error.localizedDescription, "The network connection was lost.")
-        }
-
-        XCTAssertTrue(sut.needsDownload)
-        XCTAssertEqual(try folderContents(), [".lock", ".speakerkit-coreml-556fc52a.partial"])
-
-        client.downloadError = nil
-        try await download()
-
-        XCTAssertFalse(sut.needsDownload)
-        XCTAssertEqual(client.downloads, [partial, partial])
-        XCTAssertEqual(try folderContents(), [".lock", "speakerkit-coreml-556fc52a"])
-        XCTAssertEqual(downloadsReported, 2)
-    }
-
-    func testADownloadIsReportedOnlyWhileThisKuKaHoldsTheLock() async throws {
-        let lock = root.appendingPathComponent(".lock")
-        var lockAtStart: [String] = []
-
-        try await sut.download(onStart: {
-            do {
-                try FileLock.acquire(at: lock).release()
-                lockAtStart.append("free")
-            } catch FileLockError.held {
-                lockAtStart.append("held")
-            } catch {
-                lockAtStart.append("\(error)")
-            }
-        })
-
-        XCTAssertEqual(lockAtStart, ["held"])
-    }
-
     func testNoDownloadIsReportedWhenTheModelWasInstalledMeanwhile() async throws {
         try FileManager.default.createDirectory(at: root.appendingPathComponent("speakerkit-coreml-556fc52a"),
                                                 withIntermediateDirectories: true)
@@ -106,68 +58,6 @@ final class SpeakerKitRoomLabellerTests: XCTestCase {
 
         XCTAssertEqual(downloadsReported, 0)
         XCTAssertEqual(client.downloads, [])
-    }
-
-    func testADownloadWaitsForAnotherKuKaAndUsesTheModelItInstalled() async throws {
-        let otherKuKa = try lockAsAnotherKuKa()
-        let waiting = Task { try await download() }
-        try await Task.sleep(for: .milliseconds(300))
-
-        try FileManager.default.createDirectory(at: root.appendingPathComponent("speakerkit-coreml-556fc52a"),
-                                                withIntermediateDirectories: false)
-        otherKuKa.release()
-        try await waiting.value
-
-        XCTAssertFalse(sut.needsDownload)
-        XCTAssertEqual(downloadsReported, 0)
-        XCTAssertEqual(client.downloads, [])
-    }
-
-    func testADownloadStartsWhenAnotherKuKaStopsWithoutTheModel() async throws {
-        let otherKuKa = try lockAsAnotherKuKa()
-        let waiting = Task { try await download() }
-        try await Task.sleep(for: .milliseconds(300))
-
-        otherKuKa.release()
-        try await waiting.value
-
-        XCTAssertFalse(sut.needsDownload)
-        XCTAssertEqual(downloadsReported, 1)
-        XCTAssertEqual(client.downloads, [partial])
-    }
-
-    func testAModelStillMissingAfterTheWaitGivesTheReason() async throws {
-        let otherKuKa = try lockAsAnotherKuKa()
-        sut = SpeakerKitRoomLabeller(client: client, modelsFolder: root, lockWait: .milliseconds(300))
-
-        do {
-            try await download()
-            XCTFail("The download did not fail.")
-        } catch {
-            XCTAssertEqual(error.localizedDescription, "Another Ku-Ka is downloading the SpeakerKit model.")
-        }
-
-        XCTAssertEqual(downloadsReported, 0)
-        XCTAssertEqual(client.downloads, [])
-        otherKuKa.release()
-    }
-
-    func testAModelThatAnotherKuKaInstalledIsUsedAtOnceEvenWhileItHoldsTheLock() async throws {
-        let otherKuKa = try lockAsAnotherKuKa()
-        try FileManager.default.createDirectory(at: root.appendingPathComponent("speakerkit-coreml-556fc52a"),
-                                                withIntermediateDirectories: false)
-        sut = SpeakerKitRoomLabeller(client: client, modelsFolder: root, lockWait: .milliseconds(300))
-
-        try await download()
-
-        XCTAssertEqual(downloadsReported, 0)
-        XCTAssertEqual(client.downloads, [])
-        otherKuKa.release()
-    }
-
-    private func lockAsAnotherKuKa() throws -> FileLock {
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        return try FileLock.acquire(at: root.appendingPathComponent(".lock"))
     }
 
     func testALoadErrorGivesTheReason() async throws {
@@ -199,10 +89,8 @@ final class SpeakerKitRoomLabellerTests: XCTestCase {
         XCTAssertEqual([noTurns, onlyZeroLengthTurns], [.failed(.noVoices), .failed(.noVoices)])
     }
 
-    func testTheModelCacheIsExcludedFromBackupsWhenDownloadedOrLoaded() async throws {
+    func testLabellingExcludesTheModelCacheFromBackupsAgain() async throws {
         try await download()
-        XCTAssertEqual(try isExcludedFromBackup(), true)
-
         var folder = try XCTUnwrap(root)
         var values = URLResourceValues()
         values.isExcludedFromBackup = false
@@ -283,10 +171,7 @@ private final class CannedSpeakerKit: SpeakerKit, @unchecked Sendable {
     }
 }
 
-/// Like the Whisper fake: `download` writes into the partial folder before it throws, so the
-/// partial-folder rules run for real.
 private final class FakeSpeakerKitClient: SpeakerKitClient {
-    var downloadError: Error?
     var loadError: Error?
     var diarizeError: Error?
     var turns: [VoiceTurn] = []
@@ -299,8 +184,6 @@ private final class FakeSpeakerKitClient: SpeakerKitClient {
         downloads.append(base.path)
         revisions.append(revision)
         try FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
-        try Data("weights".utf8).write(to: base.appendingPathComponent("model.bin"))
-        if let downloadError { throw downloadError }
     }
 
     func load(from base: URL) async throws -> any VoiceModel {

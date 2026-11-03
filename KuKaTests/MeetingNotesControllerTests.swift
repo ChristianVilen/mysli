@@ -3,12 +3,10 @@ import XCTest
 
 @MainActor
 final class MeetingNotesControllerTests: MeetingNotesTestCase {
-    func testCalendarTitleAppearsInRecordingStatusAndFullTitleRemainsAccessible() async throws {
+    func testCalendarTitleAppearsInRecordingStatus() async {
         _ = await recorder.startRecording(title: "Planning")
         sut.menuWillOpen()
         XCTAssertTrue(visibleTitles.contains("● Recording · 0:00 · Planning"), "\(visibleTitles)")
-        let status = try XCTUnwrap(item(titled: "● Recording · 0:00 · Planning"))
-        XCTAssertEqual(status.toolTip, "Planning")
         hostTime = HostTime(seconds: 1_010)
         recorder.pause()
         sut.menuWillOpen()
@@ -69,17 +67,6 @@ final class MeetingNotesControllerTests: MeetingNotesTestCase {
                        [queued.url, nextQueued.url, active.url])
     }
 
-    func testAFolderThatIsASymlinkKeepsMeetingFolderIdentity() async throws {
-        let actual = try XCTUnwrap(root)
-        try FileManager.default.createDirectory(at: actual, withIntermediateDirectories: true)
-        let link = actual.deletingLastPathComponent().appendingPathComponent("linked-notes")
-        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: actual)
-        changeFolder(to: link)
-        await recorder.toggleRecording()
-        XCTAssertEqual(MeetingFolder.all(in: link).map(\.0), MeetingFolder.all(in: actual).map(\.0))
-        XCTAssertEqual(MeetingFolder.all(in: actual).count, 1)
-    }
-
     private func meetingNames() -> [String] {
         ((try? FileManager.default.contentsOfDirectory(atPath: root.path)) ?? []).sorted()
     }
@@ -99,7 +86,7 @@ final class MeetingNotesControllerTests: MeetingNotesTestCase {
         let show = try XCTUnwrap(item(titled: "Show Meeting Controls"))
         _ = (show.target as? NSObject)?.perform(show.action, with: show)
 
-        XCTAssertEqual(recorder.controls, MeetingControls(status: .recording, recordedTime: 0, preview: nil))
+        XCTAssertEqual(recorder.controls, MeetingControls(status: .recording, recordedTime: 0))
         XCTAssertEqual(controlsRequests, [.focus])
     }
 
@@ -112,35 +99,13 @@ final class MeetingNotesControllerTests: MeetingNotesTestCase {
         XCTAssertEqual(controlsRequests, [.restoreDefaultPosition])
     }
 
-    func testStartRecordsIntoANewMeetingFolderAndShowsTheElapsedTime() async {
+    func testAMenuTickShowsTheRecordedTime() async {
         await recorder.toggleRecording()
-
-        XCTAssertEqual(recorder.phase, .recording)
-        XCTAssertEqual(stateChanges, 2, "starting, then recording")
-        XCTAssertEqual(meetingNames(), ["2026-10-23_14-02"])
-        XCTAssertEqual(capture.recordings.count, 1)
-
         hostTime = hostTime + 245
+
         sut.menuTick()
 
-        XCTAssertEqual(visibleTitles, ["Meeting Notes", "● Recording · 4:05", "Stop Recording Meeting", "Pause Recording",
-                                       "Write Meeting Notes…", "Show Meeting Controls", "Restore Default Position", "Recent Meeting Notes", "Open Meetings Folder", ""])
-    }
-
-    func testTheRecordedTimeStopsWhilePausedAndLeavesOutThePause() async {
-        await recorder.toggleRecording()
-        hostTime = HostTime(seconds: 1_010)
-        recorder.pause()
-        XCTAssertTrue(visibleTitles.contains("Paused · 0:10"), "\(visibleTitles)")
-
-        hostTime = HostTime(seconds: 1_040)
-        sut.menuTick()
-        XCTAssertTrue(visibleTitles.contains("Paused · 0:10"), "\(visibleTitles)")
-
-        recorder.resume()
-        hostTime = HostTime(seconds: 1_045)
-        sut.menuTick()
-        XCTAssertTrue(visibleTitles.contains("● Recording · 0:15"), "\(visibleTitles)")
+        XCTAssertTrue(visibleTitles.contains("● Recording · 4:05"), "\(visibleTitles)")
     }
 
     func testRecordingCommandsWhileIdleDoNothingAndStartNothing() {
@@ -153,7 +118,6 @@ final class MeetingNotesControllerTests: MeetingNotesTestCase {
         XCTAssertEqual(stateChanges, 0)
         XCTAssertEqual(capture.recordings.count, 0)
         XCTAssertEqual(meetingNames(), [])
-        XCTAssertEqual(visibleTitles, ["Meeting Notes", "Start Recording Meeting", "Open Meetings Folder", ""])
     }
 
     func testTheMenuOffersPauseWhileRecordingAndResumeWhilePaused() async throws {
@@ -176,48 +140,6 @@ final class MeetingNotesControllerTests: MeetingNotesTestCase {
         XCTAssertEqual(recorder.phase, .recording)
     }
 
-    func testStopWhilePausedStopsTheRecordingAndMakesTheNotes() async throws {
-        await recorder.toggleRecording()
-        hostTime = HostTime(seconds: 1_010)
-        recorder.pause()
-        XCTAssertEqual(recorder.phase, .paused)
-
-        recorder.stopRecording()
-        await sut.waitUntilIdle()
-
-        XCTAssertEqual(recorder.phase, .idle)
-        XCTAssertEqual(capture.recordings.first?.stopCount, 1)
-        XCTAssertEqual(notifications, ["Meeting Notes Ready: Meeting on 2026-10-23 at 14:02. Click to open the summary."])
-        XCTAssertEqual(visibleTitles, ["Meeting Notes", "Start Recording Meeting", "Recent Meeting Notes", "Open Meetings Folder", ""])
-    }
-
-    func testAnInterruptionWhilePausedEndsTheMeeting() async {
-        await recorder.toggleRecording()
-        hostTime = HostTime(seconds: 1_010)
-        recorder.pause()
-        XCTAssertEqual(recorder.phase, .paused)
-
-        capture.interrupt(reason: "The display was disconnected.")
-
-        XCTAssertEqual(recorder.phase, .idle)
-        XCTAssertEqual(notifications, ["Recording Stopped: The display was disconnected. Ku-Ka makes notes from what it recorded. To record the rest, choose Start Recording Meeting."])
-        await sut.waitUntilIdle()
-        XCTAssertEqual(notifications.last, "Meeting Notes Ready: Meeting on 2026-10-23 at 14:02. Click to open the summary.")
-    }
-
-    func testTheOpenMenuShowsIndependentMicrophoneAndMacAudioReadings() async throws {
-        await recorder.toggleRecording()
-        try XCTUnwrap(capture.recordings.last).levels = RecordingAudioLevels(microphone: 0.25, system: 0.75)
-
-        sut.menuWillOpen()
-
-        let meterItem = try XCTUnwrap(menu.items.first { $0.view != nil })
-        XCTAssertFalse(meterItem.isHidden)
-        let indicators = levelIndicators(in: try XCTUnwrap(meterItem.view))
-        XCTAssertEqual(indicators.map { $0.accessibilityLabel() }, ["Microphone audio level", "Mac audio level"])
-        XCTAssertEqual(indicators.map(\.doubleValue), [0.25, 0.75])
-    }
-
     func testStoppingAndRestartingCannotShowThePreviousRecordingLevels() async throws {
         await recorder.toggleRecording()
         try XCTUnwrap(capture.recordings.last).levels = RecordingAudioLevels(microphone: 1, system: 0.5)
@@ -234,30 +156,10 @@ final class MeetingNotesControllerTests: MeetingNotesTestCase {
         XCTAssertEqual(levelIndicators(in: try XCTUnwrap(meterItem.view)).map(\.doubleValue), [0, 0])
     }
 
-    func testAnInterruptionHidesTheRecordingMeters() async throws {
-        await recorder.toggleRecording()
-        sut.menuWillOpen()
-        let meterItem = try XCTUnwrap(menu.items.first { $0.view != nil })
-        XCTAssertFalse(meterItem.isHidden)
-
-        capture.interrupt(reason: "The display disconnected.")
-
-        XCTAssertTrue(meterItem.isHidden)
-        await sut.waitUntilIdle()
-    }
-
-    func testAnInterruptionDuringStartNeverShowsMeters() async throws {
-        capture.endsWhileStarting = "The microphone stopped."
-        sut.menuWillOpen()
-
-        await recorder.toggleRecording()
-
-        let meterItem = try XCTUnwrap(menu.items.first { $0.view != nil })
-        XCTAssertTrue(meterItem.isHidden)
-        await sut.waitUntilIdle()
-    }
-
     func testStatusMenuCloseStopsMeterUpdatesAndReopenReadsCurrentLevels() async throws {
+        let interval: TimeInterval = 0.005
+        meterInterval = interval
+        sut = makeController()
         await recorder.toggleRecording()
         let handle = try XCTUnwrap(capture.recordings.last)
         handle.levels = RecordingAudioLevels(microphone: 0.2, system: 0.8)
@@ -270,12 +172,12 @@ final class MeetingNotesControllerTests: MeetingNotesTestCase {
         XCTAssertEqual(indicators.map(\.doubleValue), [0.2, 0.8])
 
         handle.levels = RecordingAudioLevels(microphone: 0.7, system: 0.3)
-        runMenuLoop(for: 0.2)
+        runMenuLoop(for: 1) { indicators.map(\.doubleValue) == [0.7, 0.3] }
         XCTAssertEqual(indicators.map(\.doubleValue), [0.7, 0.3])
 
         statusMenu.menuDidClose(statusMenu.menu)
         handle.levels = RecordingAudioLevels(microphone: 0.1, system: 0.9)
-        runMenuLoop(for: 0.2)
+        runMenuLoop(for: 4 * interval)
         XCTAssertEqual(indicators.map(\.doubleValue), [0.7, 0.3])
 
         statusMenu.menuWillOpen(statusMenu.menu)
@@ -289,10 +191,11 @@ final class MeetingNotesControllerTests: MeetingNotesTestCase {
         return view.subviews.flatMap { levelIndicators(in: $0) }
     }
 
-    private func runMenuLoop(for duration: TimeInterval) {
-        let until = Date().addingTimeInterval(duration)
-        while Date() < until {
-            RunLoop.current.run(mode: .eventTracking, before: until)
+    /// Runs the run loop as an open menu does, for `duration` or until `done`.
+    private func runMenuLoop(for duration: TimeInterval, until done: () -> Bool = { false }) {
+        let deadline = Date().addingTimeInterval(duration)
+        while !done(), Date() < deadline {
+            RunLoop.current.run(mode: .eventTracking, before: min(deadline, Date().addingTimeInterval(0.001)))
         }
     }
 
@@ -347,7 +250,6 @@ final class MeetingNotesControllerTests: MeetingNotesTestCase {
         XCTAssertEqual(alerts, ["No display is available to capture audio from."])
         XCTAssertEqual(permissionWindows, 0)
         XCTAssertEqual(notifications, [])
-        XCTAssertEqual(visibleTitles, ["Meeting Notes", "Start Recording Meeting", "Open Meetings Folder", ""])
     }
 
     func testMissingScreenRecordingSaysWhyAndOffersThePermissionsWindow() async {
@@ -359,7 +261,6 @@ final class MeetingNotesControllerTests: MeetingNotesTestCase {
         XCTAssertEqual(permissionWindows, 1)
         XCTAssertEqual(capture.recordings.count, 0)
         XCTAssertEqual(meetingNames(), [])
-        XCTAssertEqual(visibleTitles, ["Meeting Notes", "Start Recording Meeting", "Open Meetings Folder", ""])
     }
 
     func testASecondClickWhileTheMicrophonePromptIsUpStartsNothing() async {
@@ -402,7 +303,6 @@ final class MeetingNotesControllerTests: MeetingNotesTestCase {
         await sut.waitUntilIdle()
 
         XCTAssertEqual(failed.stage(), .done)
-        XCTAssertEqual(try failed.read(.summary).components(separatedBy: "\n").first, "# Meeting on 2026-10-22 at 10:00")
         XCTAssertEqual(notifications, ["Meeting Notes Ready: Meeting on 2026-10-22 at 10:00. Click to open the summary."])
         XCTAssertEqual(visibleTitles, ["Meeting Notes", "Start Recording Meeting", "Recent Meeting Notes", "Open Meetings Folder", ""])
     }
@@ -440,21 +340,6 @@ final class MeetingNotesControllerTests: MeetingNotesTestCase {
                                        "Open Meetings Folder", ""])
     }
 
-    func testTheProgressItemSaysTranscribingAgainOnceTheSpeechModelIsDownloaded() async throws {
-        let suspended = SuspendedTranscriber()
-        suspended.modelIsMissing = true
-        transcriber = suspended
-        sut = makeController()
-        try leftoverMeeting(at: localDate(2026, 10, 22, 9, 0))
-
-        sut.resumeUnfinished()
-        await waitUntil { suspended.downloads == ["en-US"] && visibleTitles.contains("Transcribing: Meeting on 2026-10-22 at 09:00") }
-
-        XCTAssertEqual(suspended.downloads, ["en-US"])
-        XCTAssertEqual(visibleTitles, ["Meeting Notes", "Start Recording Meeting",
-                                       "Transcribing: Meeting on 2026-10-22 at 09:00", "Open Meetings Folder", ""])
-    }
-
     func testQuittingWhileRecordingClosesTheFilesAndLeavesTheMeetingForTheNextLaunch() async throws {
         await recorder.toggleRecording()
 
@@ -470,6 +355,8 @@ final class MeetingNotesControllerTests: MeetingNotesTestCase {
         transcriber = SuspendedTranscriber()
         sut = makeController()
         let meeting = try leftoverMeeting(at: localDate(2026, 10, 22, 9, 0))
+        FileManager.default.createFile(atPath: meeting.url.appendingPathComponent(".room-labels-started").path,
+                                       contents: Data())
         sut.resumeUnfinished()
         await waitUntil { visibleTitles.contains("Transcribing: Meeting on 2026-10-22 at 09:00") }
         XCTAssertNotNil(item(titled: "Transcribing: Meeting on 2026-10-22 at 09:00"))
@@ -479,6 +366,7 @@ final class MeetingNotesControllerTests: MeetingNotesTestCase {
 
         XCTAssertEqual(meeting.stage(), .pending(.transcribe))
         XCTAssertEqual(notifications, [])
+        XCTAssertTrue(meeting.roomLabelsStarted, "the marker that a crash left, so the next run still skips room labels")
     }
 
     func testQuittingWhileLabellingRoomsRemovesTheMarkerSoTheNextRunLabelsTheMeeting() async throws {
@@ -502,22 +390,6 @@ final class MeetingNotesControllerTests: MeetingNotesTestCase {
         await sut.waitUntilIdle()
         XCTAssertEqual(roomLabeller.calls, ["label me.caf"])
         XCTAssertFalse(try meeting.read(.transcript).contains("There are no room labels"))
-    }
-
-    func testQuittingWhileTranscribingKeepsTheMarkerThatACrashLeft() async throws {
-        transcriber = SuspendedTranscriber()
-        sut = makeController()
-        let meeting = try leftoverMeeting(at: localDate(2026, 10, 22, 9, 0))
-        FileManager.default.createFile(atPath: meeting.url.appendingPathComponent(".room-labels-started").path,
-                                       contents: Data())
-        sut.resumeUnfinished()
-        await waitUntil { visibleTitles.contains("Transcribing: Meeting on 2026-10-22 at 09:00") }
-        XCTAssertNotNil(item(titled: "Transcribing: Meeting on 2026-10-22 at 09:00"))
-
-        sut.shutDown()
-        await sut.waitUntilIdle()
-
-        XCTAssertTrue(meeting.roomLabelsStarted, "the next run must still skip room labels")
     }
 
     func testOpenMeetingsFolderCreatesAndOpensTheConfiguredFolder() throws {

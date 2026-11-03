@@ -17,10 +17,6 @@ final class LogWindowControllerTests: XCTestCase {
         sut = makeWindow(reader, copy: { copied = $0 }, save: { _, text in saved = text })
         sut.show()
         await sut.refresh()?.value
-        XCTAssertEqual(sut.range.titleOfSelectedItem, "This launch")
-        XCTAssertEqual(sut.category.itemTitles, ["All", "app", "capture", "tiling", "hotkeys", "permissions", "keepAwake", "clipboard", "meeting", "teams"])
-        XCTAssertFalse(sut.textView.isEditable)
-        XCTAssertTrue(sut.textView.isSelectable)
         XCTAssertFalse(sut.textView.string.contains("previous"))
         XCTAssertFalse(sut.textView.string.contains("other process"))
         sut.category.selectItem(withTitle: "meeting")
@@ -82,8 +78,6 @@ final class LogWindowControllerTests: XCTestCase {
         XCTAssertEqual(sut.textView.string, "")
         XCTAssertFalse(sut.copyAll.isEnabled)
         let alert = LogWindowController.deletionAlert()
-        XCTAssertEqual(alert.messageText, "Delete all Ku-Ka logs?")
-        XCTAssertEqual(alert.informativeText, "This can't be undone.")
         XCTAssertEqual(alert.buttons.map(\.title), ["Delete", "Cancel"])
         XCTAssertEqual(alert.buttons[1].keyEquivalent, "\u{1b}")
     }
@@ -101,15 +95,15 @@ final class LogWindowControllerTests: XCTestCase {
     }
 
     func testNewTextPreservesScrollAndSelectionUntilTheUserReturnsToTheBottom() async throws {
-        let rows = (0..<152).map { row("line \($0)") }
-        let reader = WindowLogReader(Array(rows.prefix(150)))
+        let rows = (0..<62).map { row("line \($0)") }
+        let reader = WindowLogReader(Array(rows.prefix(60)))
         sut = makeWindow(reader)
         sut.show()
         await sut.refresh()?.value
         sut.textView.setSelectedRange(NSRange(location: 4, length: 10))
         sut.scrollView.contentView.scroll(to: .zero)
         sut.scrollView.reflectScrolledClipView(sut.scrollView.contentView)
-        await reader.setRows(Array(rows.prefix(151)))
+        await reader.setRows(Array(rows.prefix(61)))
         await sut.refresh()?.value
         XCTAssertEqual(sut.scrollView.contentView.bounds.origin.y, 0, accuracy: 1)
         XCTAssertEqual(sut.textView.selectedRange(), NSRange(location: 4, length: 10))
@@ -156,20 +150,28 @@ final class LogWindowControllerTests: XCTestCase {
 
     func testClosingStopsPeriodicReads() async throws {
         let reader = WindowLogReader([])
-        sut = makeWindow(reader, refreshInterval: 0.02)
+        var ticks: [@MainActor () -> Void] = []
+        var stops = 0
+        sut = makeWindow(reader, repeatRefresh: { tick in
+            ticks.append(tick)
+            return { stops += 1 }
+        })
         sut.show()
         await sut.refresh()?.value
+        let tick = try XCTUnwrap(ticks.first)
         let before = await reader.readCount
-        try await Task.sleep(for: .milliseconds(100))
+        tick()
+        for _ in 0..<1000 {
+            if await reader.readCount > before { break }
+            await Task.yield()
+        }
         let during = await reader.readCount
-        XCTAssertGreaterThan(during, before)
-        let last = sut.refresh()
+        XCTAssertEqual(during, before + 1)
         sut.close()
-        await last?.value
-        let stopped = await reader.readCount
-        try await Task.sleep(for: .milliseconds(80))
+        XCTAssertEqual(stops, 1)
+        tick()
         let after = await reader.readCount
-        XCTAssertEqual(after, stopped)
+        XCTAssertEqual(after, during)
     }
 
     func testReadFailureRetainsTextAndTheNextSuccessfulReadRecovers() async {
@@ -216,7 +218,7 @@ final class LogWindowControllerTests: XCTestCase {
     }
 
     func testFilterWithIdenticalResultsDoesNotForceAFutureScrollToTheBottom() async {
-        let reader = WindowLogReader((0..<150).map { row("line \($0)") })
+        let reader = WindowLogReader((0..<60).map { row("line \($0)") })
         sut = makeWindow(reader)
         sut.show()
         await sut.refresh()?.value
@@ -224,24 +226,24 @@ final class LogWindowControllerTests: XCTestCase {
         sut.range.sendAction(sut.range.action!, to: sut.range.target)
         await sut.refresh()?.value
         sut.scrollView.contentView.scroll(to: .zero)
-        await reader.setRows((0..<151).map { row("line \($0)") })
+        await reader.setRows((0..<61).map { row("line \($0)") })
         await sut.refresh()?.value
         XCTAssertEqual(sut.scrollView.contentView.bounds.origin.y, 0, accuracy: 1)
     }
 
     func testTheDisplayCapPreservesSelectedAndVisibleRetainedText() async throws {
-        let oldRows = (0..<5000).map { row("line \($0)") }
+        let oldRows = (0..<100).map { row("line \($0)") }
         let reader = WindowLogReader(oldRows)
-        sut = makeWindow(reader)
+        sut = makeWindow(reader, rowLimit: 100)
         sut.show()
         await sut.refresh()?.value
-        let selected = (sut.textView.string as NSString).range(of: "line 2500")
+        let selected = (sut.textView.string as NSString).range(of: "line 50")
         sut.textView.setSelectedRange(selected)
         sut.scrollView.contentView.scroll(to: NSPoint(x: 0, y: 400))
         let before = firstVisibleLine()
-        await reader.setRows(oldRows + [row("line 5000")])
+        await reader.setRows(oldRows + [row("line 100")])
         await sut.refresh()?.value
-        XCTAssertEqual((sut.textView.string as NSString).substring(with: sut.textView.selectedRange()), "line 2500")
+        XCTAssertEqual((sut.textView.string as NSString).substring(with: sut.textView.selectedRange()), "line 50")
         XCTAssertEqual(firstVisibleLine(), before)
     }
 
@@ -294,6 +296,10 @@ final class LogWindowControllerTests: XCTestCase {
                                length: selected.length))
     }
 
+    /// Writes pictures of the log window when KUKA_LOG_SNAPSHOTS names a folder:
+    ///
+    ///     TEST_RUNNER_KUKA_LOG_SNAPSHOTS="$HOME/log-snapshots" xcodebuild -project KuKa.xcodeproj \
+    ///         -scheme KuKa test -only-testing:KuKaTests/LogWindowControllerTests/testRendersLogWindowStates
     func testRendersLogWindowStates() async throws {
         guard let path = ProcessInfo.processInfo.environment["KUKA_LOG_SNAPSHOTS"] else {
             throw XCTSkip("Set KUKA_LOG_SNAPSHOTS to render the log window")
@@ -339,12 +345,15 @@ final class LogWindowControllerTests: XCTestCase {
                             save: @escaping (NSWindow, String) -> Void = { _, _ in },
                             confirm: @escaping (NSWindow) async -> Bool = { _ in false },
                             delete: @escaping () async throws -> Void = {},
-                            activation: OrdinaryWindowActivation? = nil, refreshInterval: TimeInterval = 2,
+                            activation: OrdinaryWindowActivation? = nil,
+                            repeatRefresh: @escaping (@escaping @MainActor () -> Void) -> () -> Void = { _ in {} },
+                            rowLimit: Int = LogFilter.defaultRowLimit,
                             launchDate: Date = logDate("2026-10-30T10:00:00Z")) -> LogWindowController {
         LogWindowController(reader: reader, launchDate: launchDate, processID: 42,
                             now: { logDate("2026-10-30T11:00:00Z") }, calendar: Calendar(identifier: .gregorian),
                             activation: activation ?? .fake(), present: { _ in }, copy: copy, save: save,
-                            confirmDelete: confirm, deleteLogs: delete, refreshInterval: refreshInterval)
+                            confirmDelete: confirm, deleteLogs: delete, repeatRefresh: repeatRefresh,
+                            rowLimit: rowLimit)
     }
 
     private func row(_ message: String, date: String = "2026-10-30T11:00:00Z", pid: Int32 = 42,

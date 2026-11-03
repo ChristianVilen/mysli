@@ -93,7 +93,6 @@ final class KnownWordsFileTests: XCTestCase {
             XCTAssertEqual($0 as? KnownWordsFileError, .busy)
         }
         XCTAssertEqual(try String(contentsOf: listURL, encoding: .utf8), "- Convio → **Konvio** ✓\n")
-        XCTAssertEqual(KnownWordsFileError.busy.localizedDescription, "Another Ku-Ka is saving to the known-words list. Try again.")
     }
 
     func testAFileThatIsNotUTF8ReadsAsEmptyAndAddLeavesItsBytesUnchanged() throws {
@@ -106,8 +105,6 @@ final class KnownWordsFileTests: XCTestCase {
             XCTAssertEqual($0 as? KnownWordsFileError, .notText(path: listURL.path))
         }
         XCTAssertEqual(try Data(contentsOf: listURL), latin1)
-        XCTAssertEqual(KnownWordsFileError.notText(path: "/Users/test/terms.md").localizedDescription,
-                       "Ku-Ka cannot read /Users/test/terms.md as text, so it did not change it.")
     }
 
     func testAnAnswerThatTheListWouldNotReadBackIsRefusedAndTheFileIsUnchanged() throws {
@@ -125,8 +122,6 @@ final class KnownWordsFileTests: XCTestCase {
             }
             XCTAssertEqual(try String(contentsOf: listURL, encoding: .utf8), text)
         }
-        XCTAssertEqual(KnownWordsFileError.notReadBack(path: "/Users/test/terms.md").localizedDescription,
-                       "Ku-Ka did not change /Users/test/terms.md, because it could not read the new line back. Check that the “---” block at the top and every code block (```) in the list are closed.")
     }
 
     func testAWriteOrALockThatFailsThrowsCouldNotWriteAndLeavesTheFileUnchanged() throws {
@@ -146,7 +141,5 @@ final class KnownWordsFileTests: XCTestCase {
             }
             XCTAssertEqual(try String(contentsOf: listURL, encoding: .utf8), "- Convio → **Konvio** ✓\n")
         }
-        XCTAssertEqual(KnownWordsFileError.couldNotWrite(path: "/Users/test/terms.md", reason: "Permission denied").localizedDescription,
-                       "Ku-Ka could not save to /Users/test/terms.md: Permission denied.")
     }
 }

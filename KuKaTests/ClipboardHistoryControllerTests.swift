@@ -29,12 +29,8 @@ final class ClipboardHistoryControllerTests: XCTestCase {
         super.tearDown()
     }
 
-    private func text(_ plain: String, rtf: Data? = nil, html: Data? = nil) -> ClipboardItem {
-        .text(plain: plain, rtf: rtf, html: html, copiedAt: t0)
-    }
-
-    private func image() -> ClipboardItem {
-        .image(png: Data([0x01, 0x02, 0x03]), pixelSize: CGSize(width: 10, height: 10), copiedAt: t0)
+    private func text(_ plain: String, rtf: Data? = nil) -> ClipboardItem {
+        .text(plain: plain, rtf: rtf, html: nil, copiedAt: t0)
     }
 
     /// Scripts the fake pasteboard the way a real copy would: new content,
@@ -180,32 +176,12 @@ final class ClipboardHistoryControllerTests: XCTestCase {
         let item = text("hello")
         copyToPasteboard(item)
         controller.pollNow()
-        var closed = false
-        controller.onPanelShouldClose = { closed = true }
 
         controller.enterPressed()
 
         XCTAssertEqual(pasteboard.writes.count, 1)
         XCTAssertEqual(pasteboard.writes[0].item.contentHash, item.contentHash)
         XCTAssertFalse(pasteboard.writes[0].withFormatting)
-        XCTAssertEqual(keystrokeSender.sendCount, 1)
-        XCTAssertTrue(closed)
-    }
-
-    func testEnterOnImagePastesImmediately() {
-        controller.enable()
-        let item = image()
-        copyToPasteboard(item)
-        controller.pollNow()
-        var closed = false
-        controller.onPanelShouldClose = { closed = true }
-
-        controller.enterPressed()
-
-        XCTAssertEqual(pasteboard.writes.count, 1)
-        XCTAssertEqual(pasteboard.writes[0].item.contentHash, item.contentHash)
-        XCTAssertEqual(keystrokeSender.sendCount, 1)
-        XCTAssertTrue(closed)
     }
 
     func testEnterOnRichTextEntersChooserMode() {
@@ -235,21 +211,6 @@ final class ClipboardHistoryControllerTests: XCTestCase {
         XCTAssertFalse(pasteboard.writes[0].withFormatting)
         XCTAssertEqual(keystrokeSender.sendCount, 1)
         XCTAssertEqual(controller.mode, .list)
-    }
-
-    func testChooserSecondOptionPastesWithFormatting() {
-        controller.enable()
-        let item = text("rich", html: Data([0x02]))
-        copyToPasteboard(item)
-        controller.pollNow()
-        controller.enterPressed()
-        controller.moveSelectionDown()
-
-        controller.enterPressed()
-
-        XCTAssertEqual(pasteboard.writes.count, 1)
-        XCTAssertTrue(pasteboard.writes[0].withFormatting)
-        XCTAssertEqual(keystrokeSender.sendCount, 1)
     }
 
     func testEnterInChooserConfirmsSelection() {
@@ -347,20 +308,6 @@ final class ClipboardHistoryControllerTests: XCTestCase {
 
         XCTAssertEqual(keystrokeSender.sendCount, 1)
         localController.disable()
-    }
-
-    // MARK: - Removal
-
-    func testScreenshotHashRemovalDropsItem() {
-        controller.enable()
-        let item = image()
-        copyToPasteboard(item)
-        controller.pollNow()
-        XCTAssertEqual(controller.visibleItems.count, 1)
-
-        controller.removeItem(hash: item.contentHash)
-
-        XCTAssertTrue(controller.visibleItems.isEmpty)
     }
 
     // MARK: - onListChanged

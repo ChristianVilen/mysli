@@ -60,7 +60,8 @@ final class IOKitSleepPreventer: SleepPreventing {
 final class WakeManager {
     private let preventer: SleepPreventing
     private let now: () -> Date
-    private var timer: Timer?
+    private let scheduleExpiry: (TimeInterval, @escaping () -> Void) -> () -> Void
+    private var cancelExpiry: (() -> Void)?
 
     private(set) var session: WakeSession?
     var isActive: Bool { session != nil }
@@ -87,14 +88,24 @@ final class WakeManager {
     /// Fired only when a timed session reaches its expiry (not on manual off).
     var onExpire: (() -> Void)?
 
-    init(preventer: SleepPreventing = IOKitSleepPreventer(), now: @escaping () -> Date = { Date() }) {
+    /// `scheduleExpiry` runs its work once after the interval and returns a
+    /// closure that cancels it.
+    init(preventer: SleepPreventing = IOKitSleepPreventer(), now: @escaping () -> Date = { Date() },
+         scheduleExpiry: @escaping (TimeInterval, @escaping () -> Void) -> () -> Void = WakeManager.afterInterval) {
         self.preventer = preventer
         self.now = now
+        self.scheduleExpiry = scheduleExpiry
+    }
+
+    static func afterInterval(_ interval: TimeInterval, _ work: @escaping () -> Void) -> () -> Void {
+        let timer = Timer(timeInterval: interval, repeats: false) { _ in work() }
+        RunLoop.main.add(timer, forMode: .common)
+        return { timer.invalidate() }
     }
 
     func activate(_ duration: WakeDuration) {
-        timer?.invalidate()
-        timer = nil
+        cancelExpiry?()
+        cancelExpiry = nil
 
         // If this fails we were not preventing, so no session existed either —
         // returning leaves the manager honestly inactive.
@@ -105,11 +116,9 @@ final class WakeManager {
 
         if let expiresAt = session.expiresAt {
             let interval = max(0, expiresAt.timeIntervalSince(now()))
-            let timer = Timer(timeInterval: interval, repeats: false) { [weak self] _ in
+            cancelExpiry = scheduleExpiry(interval) { [weak self] in
                 self?.deactivate(expired: true)
             }
-            RunLoop.main.add(timer, forMode: .common)
-            self.timer = timer
         }
 
         onStateChange?()
@@ -117,8 +126,8 @@ final class WakeManager {
 
     func deactivate(expired: Bool = false) {
         guard session != nil else { return }
-        timer?.invalidate()
-        timer = nil
+        cancelExpiry?()
+        cancelExpiry = nil
         preventer.end()
         session = nil
         onStateChange?()

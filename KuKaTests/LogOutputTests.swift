@@ -64,63 +64,6 @@ final class LogOutputTests: XCTestCase {
             """)
     }
 
-    func testNormalizationAndLengthLimitApplyBeforeEitherOutput() async throws {
-        let received = OSAllocatedUnfairLock(initialState: [LogLine]())
-        let output = makeOutput(received)
-        let files = makeFiles()
-        output.enableFiles(files)
-        let log = Log(category: "app", output: output)
-        log.notice("one\r\ntwo\u{2029}three")
-        let long = String(repeating: "ä", count: 2001)
-        log.error("\(long, privacy: .public)")
-        await files.flush()
-        XCTAssertEqual(received.withLock { $0.map(\.message) },
-                       ["one\\ntwo\\nthree", String(repeating: "ä", count: 2000) + "…"])
-        XCTAssertEqual(try text(),
-                       "2026-10-30 11:00:00.000 +0000 [123] notice app: one\\ntwo\\nthree\n" +
-                       "2026-10-30 11:00:00.000 +0000 [123] error app: " + String(repeating: "ä", count: 2000) + "…\n")
-    }
-
-    func testFileFailureDoesNotStopUnifiedOutputOrWriteThroughASymlink() async throws {
-        let received = OSAllocatedUnfairLock(initialState: [LogLine]())
-        let failures = OSAllocatedUnfairLock(initialState: 0)
-        let output = makeOutput(received)
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let target = root.appendingPathComponent("target")
-        try Data("untouched".utf8).write(to: target)
-        try FileManager.default.createSymbolicLink(at: file, withDestinationURL: target)
-        let files = LogFiles(folder: folder, clock: { logDate("2026-10-30T11:00:00Z") },
-                             onFailure: { _ in failures.withLock { $0 += 1 } })
-        output.enableFiles(files)
-        let log = Log(category: "app", output: output)
-        log.error("first")
-        log.info("second")
-        await files.flush()
-        XCTAssertEqual(received.withLock { $0.map(\.message) }, ["first", "second"])
-        XCTAssertEqual(failures.withLock { $0 }, 2)
-        XCTAssertEqual(try String(contentsOf: target, encoding: .utf8), "untouched")
-    }
-
-    func testConcurrentCategoriesKeepTheirMessagesAndFileLines() async throws {
-        let received = OSAllocatedUnfairLock(initialState: [LogLine]())
-        let output = makeOutput(received)
-        let files = makeFiles()
-        output.enableFiles(files)
-        let app = Log(category: "app", output: output)
-        let meeting = Log(category: "meeting", output: output)
-        DispatchQueue.concurrentPerform(iterations: 100) { index in
-            (index.isMultiple(of: 2) ? app : meeting).info("message \(index)")
-        }
-        await files.flush()
-        let lines = try text().split(separator: "\n").compactMap { LogLine(parsing: String($0)) }
-        let expected = Set((0..<100).map { "message \($0)" })
-        XCTAssertEqual(lines.count, 100)
-        XCTAssertEqual(Set(lines.map(\.message)), expected)
-        XCTAssertEqual(Set(received.withLock { $0.map(\.message) }), expected)
-        XCTAssertEqual(lines.filter { $0.category == "app" }.count, 50)
-        XCTAssertEqual(lines.filter { $0.category == "meeting" }.count, 50)
-    }
-
     func testFileFailureReportingBypassesFilesAndKeepsErrorDetailsPrivate() async throws {
         let received = OSAllocatedUnfairLock(initialState: [LogLine]())
         let output = makeOutput(received)

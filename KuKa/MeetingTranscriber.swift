@@ -49,6 +49,8 @@ struct SpeechTranscriberAdapter: Transcribing {
             throw MeetingStepError("Speech recognition does not support \(wanted) on this Mac. "
                                    + "Supported: \(supported.sorted().joined(separator: ", ")).")
         }
+        // Not `AssetInventory.status(forModules:)`: it gave `supported`, not `installed`, for an
+        // installed en-US model.
         return await !SpeechTranscriber.installedLocales.contains { $0.identifier(.bcp47) == wanted }
     }
 

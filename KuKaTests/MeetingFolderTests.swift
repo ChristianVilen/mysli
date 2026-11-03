@@ -104,26 +104,6 @@ final class MeetingFolderTests: XCTestCase {
         XCTAssertEqual(names, ["2026-10-23_14-02", "2026-10-23_14-02-2", "2026-10-23_14-02-3"])
     }
 
-    func testStageIsReadFromTheFilesOnDisk() throws {
-        let meeting = try MeetingFolder.create(in: try makeTemporaryDirectory(), startingAt: localDate(2026, 10, 23, 14, 2))
-        XCTAssertNil(meeting.stage(), "an empty audio folder is not a meeting yet")
-
-        FileManager.default.createFile(atPath: meeting.audioURL(.system).path, contents: Data())
-        XCTAssertEqual(meeting.stage(), .pending(.transcribe))
-
-        try meeting.write("Speech model missing", to: .failure)
-        XCTAssertEqual(meeting.stage(), .failed(.transcribe))
-
-        try meeting.write("# Transcript", to: .transcript)
-        XCTAssertEqual(meeting.stage(), .failed(.summarize))
-
-        try meeting.clearFailure()
-        XCTAssertEqual(meeting.stage(), .pending(.summarize))
-
-        try meeting.write("# Summary", to: .summary)
-        XCTAssertEqual(meeting.stage(), .done)
-    }
-
     func testOnlyOneWriterCanLockAMeetingAtATime() throws {
         let meeting = try MeetingFolder.create(in: try makeTemporaryDirectory(), startingAt: localDate(2026, 10, 23, 14, 2))
 

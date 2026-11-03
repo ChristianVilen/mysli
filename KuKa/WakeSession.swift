@@ -21,11 +21,6 @@ struct WakeSession: Equatable {
         }
     }
 
-    func isExpired(now: Date) -> Bool {
-        guard let expiresAt = expiresAt else { return false }
-        return now >= expiresAt
-    }
-
     func remaining(now: Date) -> TimeInterval? {
         guard let expiresAt = expiresAt else { return nil }
         return max(0, expiresAt.timeIntervalSince(now))

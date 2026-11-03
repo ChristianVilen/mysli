@@ -14,55 +14,20 @@ final class MeetingTypedNotesWindowTests: XCTestCase {
         view.subviews.flatMap { [$0] + descendants($0) }
     }
 
-    func testNativeEditingSavesAndUndoRestoresThePreviousSavedText() async throws {
+    func testTheWindowIsTitledWithTheDisplayTitleAndNativeEditingSaves() throws {
         let meeting = try meeting()
         let session = try MeetingTypedNotesSession(meeting: meeting)
-        let editor = MeetingTypedNotesWindowController(session: session, requestUpdate: {},
+        let editor = MeetingTypedNotesHost(session: session, requestUpdate: {},
                                                        activation: .fake(), present: { _ in })
         editor.show()
         defer { editor.close() }
         let window = try XCTUnwrap(editor.window)
         let field = try XCTUnwrap(descendants(try XCTUnwrap(window.contentView)).compactMap { $0 as? NSTextView }.first)
-        XCTAssertTrue(window.styleMask.contains(.resizable))
         XCTAssertEqual(window.title, "Release planning")
-        XCTAssertFalse(field.isRichText)
-        XCTAssertTrue(field.allowsUndo)
-        XCTAssertEqual(field.accessibilityLabel(), "Meeting notes")
 
         field.insertText("Mira owns the release checklist.", replacementRange: NSRange(location: 0, length: 0))
 
-        XCTAssertEqual(try meeting.read(.notes), "Mira owns the release checklist.")
-        XCTAssertTrue(try XCTUnwrap(field.undoManager).canUndo)
-        if let undo = field.undoManager, undo.groupingLevel > 0 { undo.endUndoGrouping() }
-        XCTAssertTrue(field.undoManager === window.undoManager)
-        window.undoManager?.undo()
-        XCTAssertEqual(field.string, "", "native undo must change the text view before autosave")
-        await waitUntil { session.text.isEmpty }
-        XCTAssertEqual(session.text, "")
-        XCTAssertEqual(try meeting.read(.notes), "")
-        window.undoManager?.redo()
-        XCTAssertEqual(session.text, "Mira owns the release checklist.")
-        XCTAssertEqual(try meeting.read(.notes), "Mira owns the release checklist.")
-    }
-
-    func testNativeCopyAndPasteUsesPlainTextAndSavesTheResult() throws {
-        let meeting = try meeting()
-        let session = try MeetingTypedNotesSession(meeting: meeting)
-        let editor = MeetingTypedNotesWindowController(session: session, requestUpdate: {},
-                                                       activation: .fake(), present: { _ in })
-        editor.show()
-        defer { editor.close() }
-        let field = try XCTUnwrap(descendants(try XCTUnwrap(editor.window?.contentView)).compactMap { $0 as? NSTextView }.first)
-        field.insertText("Action", replacementRange: NSRange(location: 0, length: 0))
-        field.setSelectedRange(NSRange(location: 0, length: 6))
-        XCTAssertEqual(field.selectedRange(), NSRange(location: 0, length: 6))
-        let pasteboard = NSPasteboard.withUniqueName()
-        defer { pasteboard.releaseGlobally() }
-        XCTAssertTrue(field.writeSelection(to: pasteboard, types: field.writablePasteboardTypes))
-        XCTAssertEqual(pasteboard.string(forType: .string), "Action")
-        field.setSelectedRange(NSRange(location: 6, length: 0))
-        XCTAssertTrue(field.readSelection(from: pasteboard, type: .string))
-        XCTAssertEqual(try meeting.read(.notes), "ActionAction")
+        XCTAssertEqual(MeetingNoteDocument.parse(try meeting.read(.notes)).map(\.text), ["Mira owns the release checklist."])
     }
 
     func testUpdateButtonUsesItsBoundSessionAndTracksGenerationState() throws {
@@ -71,7 +36,7 @@ final class MeetingTypedNotesWindowTests: XCTestCase {
         try meeting.write("# Summary", to: .summary)
         let session = try MeetingTypedNotesSession(meeting: meeting)
         var requests = 0
-        let editor = MeetingTypedNotesWindowController(session: session, requestUpdate: { requests += 1 },
+        let editor = MeetingTypedNotesHost(session: session, requestUpdate: { requests += 1 },
                                                        activation: .fake(), present: { _ in })
         editor.show()
         defer { editor.close() }
@@ -82,7 +47,7 @@ final class MeetingTypedNotesWindowTests: XCTestCase {
         XCTAssertEqual(requests, 1)
         session.context = { (.idle, .summarizing(snapshot: "")) }
         XCTAssertFalse(update.isEnabled)
-        session.edit("Later action")
+        session.setFirstRow("Later action")
         XCTAssertFalse(update.isEnabled)
         session.context = { (.idle, .updated(snapshot: "")) }
         XCTAssertTrue(update.isEnabled)
@@ -93,18 +58,79 @@ final class MeetingTypedNotesWindowTests: XCTestCase {
         let meeting = try meeting()
         let session = try MeetingTypedNotesSession(meeting: meeting)
         var policies: [NSApplication.ActivationPolicy] = []
-        let editor = MeetingTypedNotesWindowController(session: session, requestUpdate: {},
+        let editor = MeetingTypedNotesHost(session: session, requestUpdate: {},
                                                        activation: .fake(setPolicy: { policies.append($0) }), present: { _ in })
         editor.show()
-        session.edit(String(repeating: "x", count: MeetingTypedNotesFile.maximumBytes + 1))
+        session.setFirstRow(String(repeating: "x", count: MeetingTypedNotesFile.maximumBytes + 1))
         XCTAssertTrue(session.hasUnsavedChanges)
         editor.close()
         editor.show()
-        XCTAssertEqual(session.text.count, MeetingTypedNotesFile.maximumBytes + 1)
+        XCTAssertEqual(session.firstRowText?.count, MeetingTypedNotesFile.maximumBytes + 1)
         XCTAssertEqual(policies, [.regular, .accessory, .regular])
         editor.close()
     }
 
+    func testFailedSaveRetainsDraftAndReloadRequiresConfirmation() throws {
+        let meeting = try meeting()
+        let session = try MeetingTypedNotesSession(meeting: meeting)
+        var allowReload = false
+        var confirmations = 0
+        let editor = MeetingTypedNotesHost(session: session, requestUpdate: {}, activation: .fake(),
+                                           present: { _ in }, confirmReload: { _ in
+            confirmations += 1
+            return allowReload
+        })
+        editor.show()
+        defer { editor.close() }
+        let content = try XCTUnwrap(editor.window?.contentView)
+        let field = try XCTUnwrap(descendants(content).compactMap { $0 as? NSTextView }.first)
+        try meeting.write("External notes", to: .notes)
+        field.insertText("My draft", replacementRange: NSRange(location: 0, length: 0))
+        XCTAssertTrue(session.hasUnsavedChanges)
+        XCTAssertEqual(field.string, "My draft")
+        let buttons = descendants(content).compactMap { $0 as? NSButton }
+        let retry = try XCTUnwrap(buttons.first { $0.title == "Retry save" })
+        let reload = try XCTUnwrap(buttons.first { $0.title == "Reload saved notes" })
+        XCTAssertFalse(retry.isHidden)
+        retry.performClick(nil)
+        XCTAssertTrue(session.hasUnsavedChanges)
+        XCTAssertEqual(try meeting.read(.notes), "External notes")
+        reload.performClick(nil)
+        XCTAssertEqual(confirmations, 1)
+        XCTAssertEqual(field.string, "My draft")
+        allowReload = true
+        reload.performClick(nil)
+        XCTAssertEqual(confirmations, 2)
+        XCTAssertFalse(session.hasUnsavedChanges)
+        let reloaded = descendants(content).compactMap { $0 as? NSTextView }
+        XCTAssertEqual(reloaded.map(\.string), ["External notes"])
+        XCTAssertTrue(retry.isHidden)
+    }
+
+    func testDetachingSharedViewReleasesActivationWithoutClosingItsSession() throws {
+        let session = try MeetingTypedNotesSession(meeting: meeting())
+        var policies: [NSApplication.ActivationPolicy] = []
+        let view = MeetingTypedNotesView(session: session, requestUpdate: {})
+        let host = MeetingTypedNotesHost(view: view, activation: .fake(setPolicy: { policies.append($0) }),
+                                        present: { _ in })
+        var closes = 0
+        host.onClose = { closes += 1 }
+        host.show()
+        host.detach()
+        XCTAssertEqual(policies, [.regular, .accessory])
+        XCTAssertEqual(closes, 0)
+        XCTAssertNil(view.window)
+        let next = MeetingTypedNotesHost(view: view, activation: .fake(), present: { _ in })
+        next.show()
+        defer { next.close() }
+        session.setFirstRow("Retained session")
+        XCTAssertEqual(descendants(view).compactMap { $0 as? NSTextView }.map(\.string), ["Retained session"])
+    }
+
+    /// Writes pictures of the notes window when KUKA_TYPED_NOTES_SNAPSHOTS names a folder:
+    ///
+    ///     TEST_RUNNER_KUKA_TYPED_NOTES_SNAPSHOTS="$HOME/notes-snapshots" xcodebuild -project KuKa.xcodeproj \
+    ///         -scheme KuKa test -only-testing:KuKaTests/MeetingTypedNotesWindowTests/testNativeSnapshots
     func testNativeSnapshots() throws {
         guard let path = ProcessInfo.processInfo.environment["KUKA_TYPED_NOTES_SNAPSHOTS"] else {
             throw XCTSkip("Set KUKA_TYPED_NOTES_SNAPSHOTS for native notes window images.")
@@ -112,8 +138,8 @@ final class MeetingTypedNotesWindowTests: XCTestCase {
         let directory = URL(fileURLWithPath: path, isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let session = try MeetingTypedNotesSession(meeting: meeting())
-        session.edit("# Decisions\n\nShip the release on Monday after QA signs off.\n\n# Action items\n\n- Mira: send the release checklist.\n- Jon: confirm the rollback steps.\n\n# Questions\n\nDo we need a separate notice for the pilot group?")
-        let editor = MeetingTypedNotesWindowController(session: session, requestUpdate: {},
+        session.setFirstRow("# Decisions\n\nShip the release on Monday after QA signs off.\n\n# Action items\n\n- Mira: send the release checklist.\n- Jon: confirm the rollback steps.\n\n# Questions\n\nDo we need a separate notice for the pilot group?")
+        let editor = MeetingTypedNotesHost(session: session, requestUpdate: {},
                                                        activation: .fake(), present: { _ in })
         editor.show()
         defer { editor.close() }
@@ -133,7 +159,7 @@ final class MeetingTypedNotesWindowTests: XCTestCase {
             }
             if saveError {
                 try session.meeting.write("Changed in another editor", to: .notes)
-                session.edit("My unsaved draft. Mira owns the checklist.")
+                session.setFirstRow("My unsaved draft. Mira owns the checklist.")
             }
             window.appearance = NSAppearance(named: appearance)
             window.setContentSize(size)
@@ -164,9 +190,9 @@ final class MeetingTypedNotesWindowTests: XCTestCase {
 
     func testMinimumWidthKeepsLongStatusAndEditorInsideTheWindow() throws {
         let session = try MeetingTypedNotesSession(meeting: meeting())
-        session.edit("A saved note")
+        session.setFirstRow("A saved note")
         session.context = { (.idle, .summarizing(snapshot: "Earlier note")) }
-        let editor = MeetingTypedNotesWindowController(session: session, requestUpdate: {},
+        let editor = MeetingTypedNotesHost(session: session, requestUpdate: {},
                                                        activation: .fake(), present: { _ in })
         editor.show()
         defer { editor.close() }

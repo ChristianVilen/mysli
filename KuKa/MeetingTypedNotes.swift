@@ -68,6 +68,10 @@ final class MeetingTypedNotesSession {
     private(set) var text: String
     private(set) var savedText: String
     private(set) var saveError: String?
+    private(set) var entries: [MeetingNoteEntry]
+    private var pendingEntries: Set<UUID> = []
+    let undoManager = UndoManager()
+    var noteTime: () -> MeetingNoteTime = { .afterRecording }
     var context: () -> (recordingPhase: RecorderPhase, summaryState: TypedNotesSummaryState) = { (.idle, .idle) } {
         didSet { onChange?() }
     }
@@ -83,6 +87,8 @@ final class MeetingTypedNotesSession {
         }
         text = try MeetingTypedNotesFile.read(in: meeting)
         savedText = text
+        entries = MeetingNoteDocument.parse(text)
+        addPlaceholderIfEmpty()
     }
 
     var hasUnsavedChanges: Bool { text != savedText || saveError != nil }
@@ -97,8 +103,82 @@ final class MeetingTypedNotesSession {
         !recordingPhase.isCapturing && !summaryState.isBusy && !hasUnsavedChanges && meeting.stage() == .done
     }
 
-    func edit(_ text: String) {
-        self.text = text
+    /// The editor always has a row to type into. An empty row is not saved, so it changes no file.
+    private func addPlaceholderIfEmpty() {
+        guard entries.isEmpty else { return }
+        let entry = MeetingNoteEntry(time: noteTime())
+        pendingEntries.insert(entry.id)
+        entries.append(entry)
+    }
+
+    func updateEntry(id: UUID, text: String) {
+        guard let index = entries.firstIndex(where: { $0.id == id }) else { return }
+        entries[index].text = text
+        stampFirstContent(at: index)
+        saveEntries()
+    }
+
+    func splitEntry(id: UUID, selection: NSRange) -> UUID? {
+        guard let entry = entries.first(where: { $0.id == id }), let range = Range(selection, in: entry.text) else { return nil }
+        let next = MeetingNoteEntry(time: noteTime(), text: String(entry.text[range.upperBound...]))
+        pendingEntries.insert(next.id)
+        applySplit(id: id, first: String(entry.text[..<range.lowerBound]), next: next)
+        return next.id
+    }
+
+    private func applySplit(id: UUID, first: String, next: MeetingNoteEntry) {
+        guard let index = entries.firstIndex(where: { $0.id == id }) else { return }
+        let original = entries[index].text
+        entries[index].text = first
+        entries.insert(next, at: index + 1)
+        stampFirstContent(at: index)
+        stampFirstContent(at: index + 1)
+        saveEntries()
+        undoManager.registerUndo(withTarget: self) { session in
+            session.joinSplit(id: id, original: original, nextID: next.id)
+        }
+    }
+
+    private func joinSplit(id: UUID, original: String, nextID: UUID) {
+        guard let index = entries.firstIndex(where: { $0.id == id }),
+              let next = entries.first(where: { $0.id == nextID }) else { return }
+        let first = entries[index].text
+        entries[index].text = original
+        entries.removeAll { $0.id == nextID }
+        saveEntries()
+        undoManager.registerUndo(withTarget: self) { session in
+            session.applySplit(id: id, first: first, next: next)
+        }
+    }
+
+    func addScreenshot(_ screenshot: MeetingScreenshot, to id: UUID) throws {
+        guard entries.contains(where: { $0.id == id }) else { throw MeetingStepError("Reopen the note before adding a screenshot.") }
+        let name = try MeetingScreenshotStore(meeting: meeting).write(screenshot)
+        setAttachment(name, on: id, present: true)
+    }
+
+    /// Undo removes only the reference and keeps the PNG, so redo can add it back.
+    private func setAttachment(_ name: String, on id: UUID, present: Bool) {
+        guard let index = entries.firstIndex(where: { $0.id == id }) else { return }
+        if present { entries[index].attachments.append(name) }
+        else { entries[index].attachments.removeAll { $0 == name } }
+        stampFirstContent(at: index)
+        saveEntries()
+        undoManager.registerUndo(withTarget: self) { session in
+            session.setAttachment(name, on: id, present: !present)
+        }
+    }
+
+    private func stampFirstContent(at index: Int) {
+        let entry = entries[index]
+        if pendingEntries.contains(entry.id), !entry.text.isEmpty || !entry.attachments.isEmpty {
+            entries[index].time = noteTime()
+            pendingEntries.remove(entry.id)
+        }
+    }
+
+    private func saveEntries() {
+        text = MeetingNoteDocument.render(entries)
         save()
     }
 
@@ -106,6 +186,8 @@ final class MeetingTypedNotesSession {
         do {
             guard lock != nil else { throw MeetingStepError("Reopen the notes window before editing this meeting.") }
             try MeetingTypedNotesFile.validate(text)
+            // Finds an outside edit, but is no lock: an edit by a text editor between this read
+            // and the atomic rename is lost.
             guard try MeetingTypedNotesFile.read(in: meeting) == savedText else {
                 throw MeetingStepError("notes.md changed outside this window. Copy your draft, then choose Reload saved notes.")
             }
@@ -124,6 +206,10 @@ final class MeetingTypedNotesSession {
             let saved = try MeetingTypedNotesFile.read(in: meeting)
             text = saved
             savedText = saved
+            entries = MeetingNoteDocument.parse(saved)
+            pendingEntries.removeAll()
+            addPlaceholderIfEmpty()
+            undoManager.removeAllActions()
             saveError = nil
             onSaved?()
         } catch {

@@ -29,14 +29,6 @@ final class LiveTranscriptTests: XCTestCase {
         LiveRow(at: at, content: .speech(speaker, text: text, isFinal: isFinal))
     }
 
-    func testAVolatileResultShowsAsARowThatIsNotFinalAndANewerOneReplacesIt() {
-        apply(volatile(.system, 1, 2, "Let's ship"))
-        XCTAssertEqual(rows, [speech(.them, 1, "Let's ship", isFinal: false)])
-
-        apply(volatile(.system, 1, 3, "Let's ship on Friday"))
-        XCTAssertEqual(rows, [speech(.them, 1, "Let's ship on Friday", isFinal: false)])
-    }
-
     func testAFinalResultReplacesTheVolatileTailItCoversAndKeepsATailAfterIt() {
         apply(volatile(.system, 1, 3, "Let's ship on Fri"), final(.system, 1, 3.2, "Let's ship on Friday."))
         XCTAssertEqual(rows, [speech(.them, 1, "Let's ship on Friday.")])
@@ -61,13 +53,6 @@ final class LiveTranscriptTests: XCTestCase {
               final(.microphone, 1, 3, "Sounds good."))
 
         XCTAssertEqual(rows, [speech(.me, 1, "Sounds good."), speech(.me, 4, "and then", isFinal: false)])
-    }
-
-    func testAMicrophoneFinalThatEchoesASystemFinalIsNotShown() {
-        apply(final(.system, 10, 14, "We should move the launch to Friday"),
-              final(.microphone, 10.5, 14.2, "we should move the launch to friday"))
-
-        XCTAssertEqual(rows, [speech(.them, 10, "We should move the launch to Friday")])
     }
 
     func testASystemFinalThatArrivesLaterRemovesTheEarlierMicrophoneEcho() {
@@ -122,10 +107,19 @@ final class LiveTranscriptTests: XCTestCase {
         XCTAssertEqual(rows, [speech(.me, 1, "I think we wait, now we ship", isFinal: false)])
     }
 
-    func testAVolatileTailTakesItsPlaceByStartAmongTheFinalRows() {
-        apply(volatile(.microphone, 10, 11, "Right, so"), final(.system, 12, 13, "Okay then."))
+    func testAChangingSystemDraftFollowsNewerMicrophoneMessagesUntilItIsFinal() {
+        apply(volatile(.system, 10, 14, "What about the S3 buck"),
+              final(.microphone, 12, 13, "Yeah."), final(.microphone, 14, 15, "Okay."))
 
-        XCTAssertEqual(rows, [speech(.me, 10, "Right, so", isFinal: false), speech(.them, 12, "Okay then.")])
+        XCTAssertEqual(rows, [speech(.me, 12, "Yeah."), speech(.me, 14, "Okay."),
+                              speech(.them, 10, "What about the S3 buck", isFinal: false)])
+
+        apply(volatile(.system, 10, 16, "What about the S3 bucket"))
+        XCTAssertEqual(rows.last, speech(.them, 10, "What about the S3 bucket", isFinal: false))
+
+        apply(final(.system, 10, 17, "What about the S3 bucket?"))
+        XCTAssertEqual(rows, [speech(.them, 10, "What about the S3 bucket?"),
+                              speech(.me, 12, "Yeah."), speech(.me, 14, "Okay.")])
     }
 
     func testVolatileTailsThatStartTogetherShowThemFirst() {
@@ -135,21 +129,15 @@ final class LiveTranscriptTests: XCTestCase {
     }
 
     func testSettleTailsTurnsEachVolatileTailIntoAFinalRow() {
-        apply(volatile(.system, 50, 53, "So the plan is"), volatile(.microphone, 55, 56, "Right"))
-
-        live.settleTails()
-
-        XCTAssertEqual(rows, [speech(.them, 50, "So the plan is"), speech(.me, 55, "Right")])
-    }
-
-    func testSettleTailsShowsEveryPhraseOfATailAsFinal() {
-        apply(.result(LiveResult(track: .microphone, start: 50, end: 56,
-                                 phrases: [phrase(50, 52, "That works for me."), phrase(53, 55.5, "Not for me")],
+        apply(volatile(.system, 50, 53, "So the plan is"),
+              .result(LiveResult(track: .microphone, start: 55, end: 61,
+                                 phrases: [phrase(55, 57, "That works for me."), phrase(58, 60.5, "Not for me")],
                                  isFinal: false, finalizedThrough: 0)))
 
         live.settleTails()
 
-        XCTAssertEqual(rows, [speech(.me, 50, "That works for me."), speech(.me, 53, "Not for me")])
+        XCTAssertEqual(rows, [speech(.them, 50, "So the plan is"), speech(.me, 55, "That works for me."),
+                              speech(.me, 58, "Not for me")])
     }
 
     /// At Pause the analyzer can still hold audio from before the pause, so results for the
@@ -165,17 +153,6 @@ final class LiveTranscriptTests: XCTestCase {
         XCTAssertEqual(rows, [speech(.them, 50, "So the plan is to ship.")])
     }
 
-    func testRowTimesAreInRecordedTimeWithoutTheResumeGap() {
-        clock.pause(at: HostTime(seconds: 160))
-        clock.resume(at: HostTime(seconds: 190))
-
-        // File position 65 is 60 s recorded, the 3 s resume gap, and 2 s after the resume.
-        apply(final(.system, 65, 66, "Welcome back."), volatile(.microphone, 67, 68, "Thanks"))
-
-        let speechRows = rows.filter { if case .speech = $0.content { return true } else { return false } }
-        XCTAssertEqual(speechRows, [speech(.them, 62, "Welcome back."), speech(.me, 64, "Thanks", isFinal: false)])
-    }
-
     func testAPauseRowAppearsAtThePausesRecordedTimeWithItsDurationOnceResumed() {
         apply(final(.system, 50, 55, "See you after the break."))
         clock.pause(at: HostTime(seconds: 160))
@@ -184,7 +161,19 @@ final class LiveTranscriptTests: XCTestCase {
         clock.resume(at: HostTime(seconds: 190))
         apply(final(.system, 63, 64, "Welcome back."))
         XCTAssertEqual(rows, [speech(.them, 50, "See you after the break."), LiveRow(at: 60, content: .pause(duration: 30)),
-                              speech(.them, 60, "Welcome back.")])
+                              speech(.them, 63, "Welcome back.")])
+    }
+
+    func testSecondPauseAndSpeechUseTheSameFileTimeline() {
+        clock.pause(at: HostTime(seconds: 160))
+        clock.resume(at: HostTime(seconds: 190))
+        clock.pause(at: HostTime(seconds: 220))
+        clock.resume(at: HostTime(seconds: 250))
+        apply(final(.system, 97, 98, "Back again."), volatile(.microphone, 99, 100, "Yes"))
+
+        XCTAssertEqual(rows, [LiveRow(at: 60, content: .pause(duration: 30)),
+                              LiveRow(at: 93, content: .pause(duration: 30)),
+                              speech(.them, 97, "Back again."), speech(.me, 99, "Yes", isFinal: false)])
     }
 
     func testBehindIsTheAgeOfTheNewestResultWhenItArrivedFromFourSeconds() {

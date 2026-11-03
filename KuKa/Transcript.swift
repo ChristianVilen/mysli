@@ -167,6 +167,8 @@ enum Transcript {
         }
     }
 
+    /// ScreenCaptureKit does not cancel echo (measured on laptop speakers), so the microphone
+    /// track can repeat what Them says.
     static func isEcho(_ microphone: TranscriptSegment, of system: TranscriptSegment) -> Bool {
         guard nearInTime(microphone, system) else { return false }
         let micWords = words(microphone.text)

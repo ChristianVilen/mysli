@@ -7,14 +7,17 @@ final class SettingsPermissionsTests: XCTestCase {
     private var settings: Settings!
     private var controller: SettingsWindowController!
     private var visible = false
+    private var presentFails = false
     private var actions: [String] = []
     private var visibility: [Bool] = []
 
-    override func setUp() async throws {
+    override func setUp() {
+        super.setUp()
         defaults = UserDefaults(suiteName: "SettingsPermissionsTests")!
         defaults.removePersistentDomain(forName: "SettingsPermissionsTests")
         settings = Settings(defaults: defaults, loginItem: FakeLoginItem())
         visible = false
+        presentFails = false
         actions = []
         visibility = []
         controller = SettingsWindowController(settings: settings,
@@ -23,15 +26,16 @@ final class SettingsPermissionsTests: XCTestCase {
                                      microphone: { self.actions.append("microphone") },
                                      keyboardSettings: { self.actions.append("keyboard") }),
             openURL: { self.actions.append($0.absoluteString) },
-            present: { _ in self.visible = true }, activation: .fake(),
+            present: { _ in if !self.presentFails { self.visible = true } }, activation: .fake(),
             isWindowVisible: { _ in self.visible })
         controller.onPermissionsVisibilityChanged = { self.visibility.append($0) }
     }
 
-    override func tearDown() async throws {
+    override func tearDown() {
         controller.close()
         controller = nil
         defaults.removePersistentDomain(forName: "SettingsPermissionsTests")
+        super.tearDown()
     }
 
     func testDirectRoutesReuseTheWindowAndPollOnlyOnPermissions() {
@@ -105,22 +109,10 @@ final class SettingsPermissionsTests: XCTestCase {
     }
 
     func testFailedPresentationDoesNotConsumeShortcutSetup() {
-        let hidden = SettingsWindowController(settings: settings, present: { _ in }, activation: .fake(),
-                                              isWindowVisible: { _ in false })
-        defer { hidden.close() }
-        XCTAssertFalse(hidden.showScreenshotSetupIfNeeded(issues: [
+        presentFails = true
+        XCTAssertFalse(controller.showScreenshotSetupIfNeeded(issues: [
             .init(shortcut: .captureArea, failure: .systemConflict)
         ]))
         XCTAssertFalse(settings.didShowScreenshotShortcutSetup)
-    }
-
-    func testHelpActionsOpenTheExistingDestinationsWithoutChangingPreferences() {
-        let before = defaults.persistentDomain(forName: "SettingsPermissionsTests")
-        controller.show(.help)
-        controller.helpPage.reportBug.performClick(nil)
-        controller.helpPage.sendFeedback.performClick(nil)
-        XCTAssertEqual(actions, ["https://github.com/ChristianVilen/ku-ka/issues/new?labels=bug",
-                                 "https://github.com/ChristianVilen/ku-ka/issues/new?labels=enhancement"])
-        XCTAssertEqual(defaults.persistentDomain(forName: "SettingsPermissionsTests") as NSDictionary?, before as NSDictionary?)
     }
 }

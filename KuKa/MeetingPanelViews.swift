@@ -85,6 +85,7 @@ final class MeetingPanelFill: NSView {
         self.radius = radius
         self.rounded = rounded
         super.init(frame: .zero)
+        clipsToBounds = true
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
@@ -277,86 +278,5 @@ final class MeetingDrawerGrip: MeetingPanelDragView {
 
     override func resetCursorRects() {
         addCursorRect(bounds, cursor: .resizeUpDown)
-    }
-}
-
-final class TranscriptSpeechCell: NSTableCellView {
-    private typealias Layout = MeetingControlsPanel.Layout
-
-    private let speakerLabel = NSTextField.makeLabel(size: 11.5, weight: .semibold)
-    private let timeLabel = NSTextField.makeLabel(size: 10.5, weight: .medium, color: .tertiaryLabelColor, digits: true)
-    private let speechLabel = NSTextField.makeWrappingLabel(size: Layout.textSize)
-    private var topGap = Layout.rowTopGap
-
-    init() {
-        super.init(frame: .zero)
-        for label in [speakerLabel, timeLabel, speechLabel] { addSubview(label) }
-    }
-
-    required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
-
-    override var isFlipped: Bool { true }
-
-    func configure(speaker: Speaker, at time: TimeInterval, text: String, isFinal: Bool, isContinuation: Bool) {
-        speakerLabel.stringValue = speaker.label
-        speakerLabel.textColor = MeetingControlsPanel.Colors.speaker(speaker)
-        timeLabel.stringValue = RecordedTime.format(time)
-        speakerLabel.isHidden = isContinuation
-        timeLabel.isHidden = isContinuation
-        speechLabel.stringValue = MeetingPanelCopy.speech(text, isFinal: isFinal)
-        speechLabel.textColor = isFinal ? .labelColor : .secondaryLabelColor
-        topGap = isContinuation ? Layout.continuationTopGap : Layout.rowTopGap
-        needsLayout = true
-    }
-
-    override func layout() {
-        super.layout()
-        speakerLabel.frame = NSRect(x: Layout.rowInset, y: topGap, width: Layout.speakerColumn, height: Layout.speakerHeight)
-        timeLabel.frame = NSRect(x: Layout.rowInset, y: topGap + Layout.speakerHeight,
-                                 width: Layout.speakerColumn, height: Layout.rowTimeHeight)
-        speechLabel.frame = NSRect(x: Layout.rowInset + Layout.speakerColumn + Layout.columnGap, y: topGap,
-                                   width: Layout.transcriptTextWidth, height: bounds.height - topGap - Layout.rowBottomGap)
-    }
-
-    static func height(text: String, isFinal: Bool, isContinuation: Bool) -> CGFloat {
-        measuring.stringValue = MeetingPanelCopy.speech(text, isFinal: isFinal)
-        let textHeight = measuring.cell!.cellSize(forBounds: NSRect(x: 0, y: 0, width: Layout.transcriptTextWidth,
-                                                                    height: .greatestFiniteMagnitude)).height
-        let labels = isContinuation ? 0 : Layout.speakerHeight + Layout.rowTimeHeight
-        let top = isContinuation ? Layout.continuationTopGap : Layout.rowTopGap
-        return top + ceil(max(textHeight, labels)) + Layout.rowBottomGap
-    }
-
-    private static let measuring = NSTextField.makeWrappingLabel(size: Layout.textSize)
-}
-
-final class TranscriptPauseCell: NSTableCellView {
-    private let label = NSTextField.makeLabel(size: 11, weight: .semibold, color: .secondaryLabelColor, digits: true)
-
-    init() {
-        super.init(frame: .zero)
-        addSubview(label)
-    }
-
-    required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
-
-    func configure(at time: TimeInterval, duration: TimeInterval?) {
-        label.stringValue = MeetingPanelCopy.pauseRow(at: time, duration: duration)
-        needsLayout = true
-    }
-
-    override func layout() {
-        super.layout()
-        label.sizeToFit()
-        label.frame.origin = NSPoint(x: ((bounds.width - label.frame.width) / 2).rounded(),
-                                     y: ((bounds.height - label.frame.height) / 2).rounded())
-    }
-
-    override func draw(_ dirtyRect: NSRect) {
-        let inset = MeetingControlsPanel.Layout.rowInset
-        let y = label.frame.midY.rounded() + 0.25
-        NSColor.separatorColor.setFill()
-        NSRect(x: inset, y: y, width: max(0, label.frame.minX - 8 - inset), height: 0.5).fill()
-        NSRect(x: label.frame.maxX + 8, y: y, width: max(0, bounds.width - inset - label.frame.maxX - 8), height: 0.5).fill()
     }
 }

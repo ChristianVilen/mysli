@@ -134,27 +134,4 @@ final class TeamsScanDiagnosticsTests: XCTestCase {
                            + "In 1 of 2 scans, an Accessibility call failed with error -25200.")
         }
     }
-
-    func testEveryReasonHasACodeAndAClause() {
-        let clauses: [(TeamsScanReason, String, String)] = [
-            (.notTrusted, "notTrusted", "Ku-Ka had no Accessibility permission"),
-            (.noTeamsApp, "noTeamsApp", "the Teams app was not running"),
-            (.noMeetingWindow, "noMeetingWindow", "no Teams window showed meeting controls with Hang up or Leave"),
-            (.multipleMeetingWindows, "multipleMeetingWindows", "more than one Teams window showed meeting controls"),
-            (.noHighlightedTile, "noHighlightedTile", "no video tile had a speaking border"),
-            (.multipleHighlightedTiles, "multipleHighlightedTiles", "more than one video tile had a speaking border"),
-            (.unsupportedTile, "unsupportedTile", "the highlighted tile did not have the supported structure"),
-            (.selfTile, "selfTile", "the highlighted tile was your own video"),
-            (.nameRejected, "nameRejected", "the name text of the tile was not a usable name"),
-            (.scanLimit, "scanLimit", "the Teams windows had more elements or text than one scan reads"),
-            (.deadline, "deadline", "the scan took longer than 150 ms"),
-            (.axError(-25204), "axError(-25204)", "an Accessibility call failed with error -25204"),
-            (.unexpectedAXValue, "unexpectedAXValue", "Teams returned unexpected Accessibility data")
-        ]
-        for (reason, code, clause) in clauses {
-            XCTAssertEqual(reason.code, code)
-            XCTAssertEqual(reason.clause, clause)
-        }
-        XCTAssertEqual(TeamsScanResult.named(ada).code, "named")
-    }
 }

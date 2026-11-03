@@ -52,7 +52,8 @@ final class CaptureFlowTests: XCTestCase {
     private var flashedScreens: [ScreenGeometry] = []
     private var flow: CaptureFlow!
 
-    override func setUp() async throws {
+    override func setUp() {
+        super.setUp()
         selection = FakeSelection()
         capture = FakeCapture()
         capture.result = CaptureResult(image: NSImage(), fileURL: URL(fileURLWithPath: "/tmp/kuka-test.png"))
@@ -80,6 +81,7 @@ final class CaptureFlowTests: XCTestCase {
         XCTAssertEqual(capture.calls, ["rect"])
         XCTAssertEqual(thumbnails.added.count, 1)
         XCTAssertEqual(thumbnails.added.first?.screen, screen)
+        XCTAssertEqual(thumbnails.added.first?.duration, 5.0)
         XCTAssertTrue(flashedScreens.isEmpty, "interactive capture must not flash")
     }
 
@@ -137,21 +139,5 @@ final class CaptureFlowTests: XCTestCase {
         await flow.start(.fullScreen, layout: [screen], mouseLocation: mouseOnScreen)
         XCTAssertTrue(flashedScreens.isEmpty)
         XCTAssertTrue(thumbnails.added.isEmpty)
-    }
-
-    // MARK: - Duration
-
-    func testThumbnailDurationComesFromInjectedClosure() async {
-        flow = CaptureFlow(
-            selection: selection,
-            capture: capture,
-            thumbnails: thumbnails,
-            thumbnailDuration: { 3.25 },
-            flash: { _ in },
-            settleDelay: 0
-        )
-        selection.result = .rect(CGRect(x: 0, y: 0, width: 10, height: 10), on: screen)
-        await flow.start(.interactive, layout: [screen], mouseLocation: mouseOnScreen)
-        XCTAssertEqual(thumbnails.added.first?.duration, 3.25)
     }
 }

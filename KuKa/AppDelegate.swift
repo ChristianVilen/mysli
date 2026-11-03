@@ -47,7 +47,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         summaryTool: { [settings] in settings.summaryTool }
     )
     private lazy var meetingControlsPanel = MeetingControlsPanel(recorder: meetingRecorder, settings: settings)
-    private var typedNotesWindows: [MeetingFolder: MeetingTypedNotesWindowController] = [:]
+    private lazy var notesHosting = MeetingNotesHosting(panel: meetingControlsPanel, recorder: meetingRecorder,
+                                                        notes: meetingNotes)
     private(set) var calendarReminders: CalendarReminderController?
     private var calendarReminderStartup: Task<Void, Never>?
     private lazy var wordReview = WordReviewController(
@@ -293,6 +294,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         meetingNotes.onStateChange = { [weak self] in
             self?.updateStatus()
             self?.calendarReminders?.recorderDidChange()
+            self?.notesHosting.activeMeetingChanged()
         }
         meetingRecorder.onShowPermissions = { [weak self] in self?.settingsWindow.show(.permissions) }
         meetingNotes.onCheckWords = { [weak self] in self?.wordReviewWindow.show($0) }
@@ -303,21 +305,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func openTypedNotes(_ meeting: MeetingFolder) {
-        if let window = typedNotesWindows[meeting] {
-            window.show()
-            return
-        }
         do {
-            let session = try meetingNotes.typedNotes(for: meeting)
-            let window = MeetingTypedNotesWindowController(session: session, requestUpdate: { [weak self] in
-                self?.meetingNotes.updateSummary(meeting)
-            })
-            window.onClose = { [weak self] in
-                guard let self, self.meetingNotes.closeTypedNotes(for: meeting) else { return }
-                self.typedNotesWindows.removeValue(forKey: meeting)
-            }
-            typedNotesWindows[meeting] = window
-            window.show()
+            try notesHosting.open(meeting)
         } catch {
             let alert = NSAlert()
             alert.messageText = "Could not open meeting notes"

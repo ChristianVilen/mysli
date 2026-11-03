@@ -40,10 +40,6 @@ struct MeetingControls: Equatable {
     let status: Status
     /// Recorded seconds. Nil outside a meeting.
     let recordedTime: TimeInterval?
-    /// Nil while starting, after the meeting, and while the transcript is closed.
-    let preview: LivePreview?
-
-    var isTranscriptOpen: Bool { preview != nil }
 }
 
 /// One-shot requests from the recorder to the panel, for things that are not state.
@@ -88,7 +84,6 @@ final class MeetingRecorder {
             var clock: RecordingClock
             var live = LiveTranscript()
             var isHidden = false
-            var isTranscriptOpen = false
         }
 
         let session: Session
@@ -113,10 +108,13 @@ final class MeetingRecorder {
     private let now: () -> Date
     private let hostNow: () -> HostTime
     private let closeSavedNoticeLater: @MainActor (@escaping @MainActor () -> Void) -> Void
+    private let displayTickInterval: TimeInterval
 
     private var state: State = .idle(notice: nil) {
         didSet {
             reconcileDisplayTimer()
+            // Before `onControlsChange`: `onChange` reaches `MeetingNotesHosting`, which must move
+            // the last meeting's notes out of the panel before the panel draws the new recording.
             if oldValue.phase != state.phase { onChange?() }
             onControlsChange?()
         }
@@ -167,6 +165,17 @@ final class MeetingRecorder {
         return meeting.state.clock.recordedTime(at: hostNow())
     }
 
+    /// Built only when a caller needs it. Available even when the controls are hidden.
+    var livePreview: LivePreview? {
+        guard case .active(let meeting) = state else { return nil }
+        return meeting.state.live.preview(on: meeting.state.clock)
+    }
+
+    func noteTime(for folder: MeetingFolder) -> MeetingNoteTime {
+        guard case .active(let meeting) = state, meeting.folder == folder else { return .afterRecording }
+        return .recording(meeting.state.clock.notePosition(at: hostNow()))
+    }
+
     /// Nil when the panel is off screen.
     var controls: MeetingControls? {
         let status: MeetingControls.Status
@@ -183,10 +192,9 @@ final class MeetingRecorder {
             let current = meeting.state
             guard !current.isHidden else { return nil }
             return MeetingControls(status: current.clock.isPaused ? .paused : .recording,
-                                   recordedTime: current.clock.recordedTime(at: hostNow()),
-                                   preview: current.isTranscriptOpen ? current.live.preview(on: current.clock) : nil)
+                                   recordedTime: current.clock.recordedTime(at: hostNow()))
         }
-        return MeetingControls(status: status, recordedTime: nil, preview: nil)
+        return MeetingControls(status: status, recordedTime: nil)
     }
 
     init(permissions: PermissionsManager,
@@ -200,7 +208,8 @@ final class MeetingRecorder {
          alertStartFailure: @escaping @MainActor (String, Bool) -> Bool = MeetingRecorder.showStartFailureAlert,
          now: @escaping () -> Date = { Date() },
          hostNow: @escaping () -> HostTime = HostTime.now,
-         closeSavedNoticeLater: @escaping @MainActor (@escaping @MainActor () -> Void) -> Void = MeetingRecorder.afterSixSeconds) {
+         closeSavedNoticeLater: @escaping @MainActor (@escaping @MainActor () -> Void) -> Void = MeetingRecorder.afterSixSeconds,
+         displayTickInterval: TimeInterval = 1) {
         self.permissions = permissions
         self.root = root
         self.locale = locale
@@ -213,6 +222,7 @@ final class MeetingRecorder {
         self.now = now
         self.hostNow = hostNow
         self.closeSavedNoticeLater = closeSavedNoticeLater
+        self.displayTickInterval = displayTickInterval
     }
 
     isolated deinit {
@@ -338,6 +348,8 @@ final class MeetingRecorder {
         state = .idle(notice: nil)
     }
 
+    /// Changes only the clock. The stream, files, and folder lock stay, so Resume cannot fail,
+    /// and the system microphone indicator stays on while paused.
     func pause() {
         let time = hostNow()
         updateActive { state in
@@ -357,14 +369,6 @@ final class MeetingRecorder {
 
     func togglePause() {
         phase == .paused ? resume() : pause()
-    }
-
-    func setTranscriptOpen(_ isOpen: Bool) {
-        updateActive { $0.isTranscriptOpen = isOpen }
-    }
-
-    func toggleTranscript() {
-        updateActive { $0.isTranscriptOpen.toggle() }
     }
 
     /// The panel's Hide while recording, or its Close on a notice.
@@ -425,8 +429,9 @@ final class MeetingRecorder {
         guard displayTimer == nil else { return }
         // The first tick comes on the next whole recorded second, so the shown seconds change on time.
         let recorded = meeting.state.clock.recordedTime(at: hostNow())
-        let firstTick = Date().addingTimeInterval(1 - recorded.truncatingRemainder(dividingBy: 1))
-        let timer = Timer(fire: firstTick, interval: 1, repeats: true) { [weak self] _ in
+        let interval = displayTickInterval
+        let firstTick = Date().addingTimeInterval(interval - recorded.truncatingRemainder(dividingBy: interval))
+        let timer = Timer(fire: firstTick, interval: interval, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.onControlsChange?() }
         }
         RunLoop.main.add(timer, forMode: .common)

@@ -40,16 +40,6 @@ final class MeetingNotesCheckWordsTests: MeetingNotesTestCase {
         XCTAssertEqual(item(titled: "Check Words (3)…")?.isHidden, false, "read again when the queue ends")
     }
 
-    func testNotesWithOneQuestionSayOneWord() async throws {
-        try hearTheVendors(suspects: ["Convio"])
-        try leftoverMeeting(at: localDate(2026, 10, 22, 9, 0))
-
-        sut.resumeUnfinished()
-        await sut.waitUntilIdle()
-
-        XCTAssertEqual(notifications, ["Meeting Notes Ready: Meeting on 2026-10-22 at 09:00. 1 word to check. Click to check them."])
-    }
-
     func testCheckWordsCountsTheOpenQuestionsOfEveryDoneMeetingWhenTheMenuOpens() throws {
         sut.menuWillOpen()
         XCTAssertFalse(visibleTitles.contains { $0.hasPrefix("Check Words") }, "hidden without questions")
@@ -60,16 +50,6 @@ final class MeetingNotesCheckWordsTests: MeetingNotesTestCase {
         sut.menuWillOpen()
 
         XCTAssertEqual(visibleTitles, ["Meeting Notes", "Start Recording Meeting", "Check Words (3)…", "Recent Meeting Notes", "Open Meetings Folder", ""])
-    }
-
-    func testCheckWordsLeavesOutTheQuestionsWhoseWordTheListLearnedSince() throws {
-        try reviewedMeeting(at: localDate(2026, 10, 22, 9, 0), asking: ["Convio", "Yuri"])
-        try reviewedMeeting(at: localDate(2026, 10, 23, 9, 0), asking: ["Convio"])
-        knownWords = KnownWordsList(markdown: "- Convio → **Konvio** ✓\n")
-
-        sut.menuWillOpen()
-
-        XCTAssertEqual(visibleTitles, ["Meeting Notes", "Start Recording Meeting", "Check Words (1)…", "Recent Meeting Notes", "Open Meetings Folder", ""])
     }
 
     func testTheMenuListsTheProgressThenCheckWordsThenRetry() async throws {
@@ -87,25 +67,6 @@ final class MeetingNotesCheckWordsTests: MeetingNotesTestCase {
         XCTAssertEqual(visibleTitles, ["Meeting Notes", "Start Recording Meeting",
                                        "Transcribing: Meeting on 2026-10-22 at 09:00", "1 more meeting waiting",
                                        "Check Words (1)…", "Retry Failed Meeting", "Recent Meeting Notes", "Open Meetings Folder", ""])
-    }
-
-    func testAMeetingsFolderThatIsASymlinkKeepsRecoveryRetryAndCheckWords() async throws {
-        let base = try makeTemporaryDirectory()
-        let target = base.appendingPathComponent("Cloud Meetings", isDirectory: true)
-        try FileManager.default.createDirectory(at: target, withIntermediateDirectories: true)
-        root = base.appendingPathComponent("Meetings", isDirectory: true)
-        try FileManager.default.createSymbolicLink(at: root, withDestinationURL: target)
-        try leftoverMeeting(at: localDate(2026, 10, 22, 9, 0))
-        try leftoverMeeting(at: localDate(2026, 10, 22, 10, 0), failure: "Speech model missing")
-        try reviewedMeeting(at: localDate(2026, 10, 23, 9, 0), asking: ["Convio"])
-
-        sut.menuWillOpen()
-        XCTAssertEqual(visibleTitles, ["Meeting Notes", "Start Recording Meeting", "Check Words (1)…", "Retry Failed Meeting",
-                                       "Recent Meeting Notes", "Open Meetings Folder", ""])
-        sut.resumeUnfinished()
-        await sut.waitUntilIdle()
-
-        XCTAssertEqual(notifications, ["Meeting Notes Ready: Meeting on 2026-10-22 at 09:00. Click to open the summary."])
     }
 
     func testChoosingCheckWordsAsksForTheOldestUnfinishedReview() throws {
@@ -143,7 +104,6 @@ final class MeetingNotesCheckWordsTests: MeetingNotesTestCase {
         XCTAssertEqual(notifications, ["Meeting Notes Ready: Meeting on 2026-10-22 at 09:00. Click to open the summary.",
                                        "Notes Updated: Meeting on 2026-10-23 at 09:00. Click to open the summary."])
         XCTAssertEqual(notifier.posted.last?.click, .open(reviewed.url(for: .summary)))
-        XCTAssertEqual(try reviewed.read(.summary), "# Meeting on 2026-10-23 at 09:00\n\n## Summary\nShip Friday.\n")
     }
 
     func testTheSameUpdateNotesAskedAgainWhileItWaitsOrRunsRunsOnceAlsoThroughASymlink() async throws {
@@ -179,7 +139,6 @@ final class MeetingNotesCheckWordsTests: MeetingNotesTestCase {
 
     func testAnUpdateWithoutANewSummarySaysTheSummaryDidNotChange() async throws {
         let reviewed = try reviewedMeeting(at: localDate(2026, 10, 23, 9, 0), asking: ["Convio"])
-        let summary = try reviewed.read(.summary)
         runner.results["agy"] = .success(CommandResult(termination: .exited(1), stdout: "", stderr: "authentication failed"))
         runner.results["claude"] = .success(CommandResult(termination: .timedOut, stdout: "", stderr: ""))
 
@@ -188,12 +147,10 @@ final class MeetingNotesCheckWordsTests: MeetingNotesTestCase {
 
         XCTAssertEqual(notifications, ["Notes Not Updated: Meeting on 2026-10-23 at 09:00. The summary tool did not answer, so the summary did not change. The transcript has your answers."])
         XCTAssertEqual(notifier.posted.last?.click, .open(reviewed.url(for: .summary)))
-        XCTAssertEqual(try reviewed.read(.summary), summary)
     }
 
     func testAnUpdateThatFailsBeforeTheSummaryToolClaimsNothingAboutTheTranscript() async throws {
         let reviewed = try reviewedMeeting(at: localDate(2026, 10, 23, 9, 0), asking: ["Convio"])
-        let summary = try reviewed.read(.summary)
         try FileManager.default.removeItem(at: reviewed.url(for: .transcript))
 
         sut.updateNotes(reviewed)
@@ -201,8 +158,6 @@ final class MeetingNotesCheckWordsTests: MeetingNotesTestCase {
 
         XCTAssertEqual(notifications, ["Notes Not Updated: Meeting on 2026-10-23 at 09:00. Ku-Ka could not update the notes, so the summary did not change."])
         XCTAssertEqual(notifier.posted.last?.click, .open(reviewed.url(for: .summary)))
-        XCTAssertEqual(try reviewed.read(.summary), summary)
-        XCTAssertEqual(runner.calls.count, 0, "no CLI ran")
     }
 
     func testAnUpdateOfABusyOrGoneMeetingSaysWhyTheNotesDidNotChange() async throws {

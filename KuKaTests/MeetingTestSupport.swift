@@ -7,6 +7,20 @@ struct TestError: LocalizedError {
 
 let defaultNotes = "## Summary\nShip Friday."
 
+extension MeetingTypedNotesSession {
+    /// Gives the first row `text`, as typing into a new editor does.
+    func setFirstRow(_ text: String) {
+        updateEntry(id: entries[0].id, text: text)
+    }
+
+    var firstRowText: String? { entries.first?.text }
+}
+
+/// The text of each row that notes.md holds.
+func savedNoteTexts(in meeting: MeetingFolder) throws -> [String] {
+    MeetingNoteDocument.parse(try meeting.read(.notes)).map(\.text)
+}
+
 extension Result where Success == CommandResult, Failure == any Error {
     static func reply(_ stdout: String) -> Self {
         .success(CommandResult(termination: .exited(0), stdout: stdout, stderr: ""))
@@ -60,7 +74,8 @@ class MeetingProcessorTestCase: XCTestCase {
     /// Read by the processor at each use, so a test can change the list between two runs.
     var knownWords = KnownWordsList.empty
 
-    override func setUp() async throws {
+    override func setUp() {
+        super.setUp()
         whisper = makeTranscriber(named: "Whisper")
         apple = makeTranscriber(named: "Apple")
         labeller = FakeRoomLabeller()
@@ -101,7 +116,10 @@ class MeetingProcessorTestCase: XCTestCase {
     }
 
     func process(_ meeting: MeetingFolder, with processor: MeetingProcessor? = nil) async -> MeetingOutcome {
-        await (processor ?? makeProcessor()).process(meeting, tool: .automatic) { [unowned self] in progress.append($0) }
+        // Measured in this test host: an async test on the main actor that never suspends takes about
+        // 0.1 s longer, and a busy, gone, or failed meeting returns before the processor suspends.
+        await Task.yield()
+        return await (processor ?? makeProcessor()).process(meeting, tool: .automatic) { [unowned self] in progress.append($0) }
     }
 
     func audioExists(_ meeting: MeetingFolder) -> Bool {
@@ -124,6 +142,7 @@ class MeetingNotesTestCase: XCTestCase {
     var gate: CommandRunning?
     var clock = localDate(2026, 10, 23, 14, 2)
     var hostTime = HostTime(seconds: 1_000)
+    var meterInterval: TimeInterval = 0.1
     var notifier: FakeNotifier!
     var notifications: [String] { notifier.posted.map { "\($0.title): \($0.body)" } }
     /// Read by the processor and the controller at each use.
@@ -137,7 +156,7 @@ class MeetingNotesTestCase: XCTestCase {
     var sut: MeetingNotesController!
     var menu: NSMenu!
 
-    override func setUp() async throws {
+    override func setUpWithError() throws {
         root = try makeTemporaryDirectory().appendingPathComponent("Meetings", isDirectory: true)
         capture = FakeMeetingAudioCapture()
         liveTranscriber = FakeLiveTranscriber()
@@ -152,9 +171,20 @@ class MeetingNotesTestCase: XCTestCase {
         sut = makeController()
     }
 
-    override func tearDown() async throws {
+    /// Runs the main run loop until the cancelled jobs end. An async tearDown that awaits
+    /// `waitUntilIdle()` costs this test host about 0.1 s per test, also when nothing runs.
+    override func tearDown() {
         sut.shutDown()
-        await sut.waitUntilIdle()
+        var idle = false
+        Task { [sut] in
+            await sut?.waitUntilIdle()
+            idle = true
+        }
+        let deadline = Date().addingTimeInterval(5)
+        while !idle, Date() < deadline {
+            RunLoop.main.run(mode: .default, before: Date().addingTimeInterval(0.001))
+        }
+        XCTAssertTrue(idle, "The jobs did not end within 5 s of shutDown().")
     }
 
     func makeController() -> MeetingNotesController {
@@ -189,7 +219,8 @@ class MeetingNotesTestCase: XCTestCase {
             wordsToCheck: { [unowned self] in WordReview.openQuestionCount(of: $0, in: root, knownWords: knownWords) },
             summaryTool: { .automatic },
             notifier: notifier,
-            openURL: { [unowned self] in opened.append($0) })
+            openURL: { [unowned self] in opened.append($0) },
+            meterInterval: meterInterval)
         controller.onStateChange = { [unowned self] in stateChanges += 1 }
         menu = NSMenu()
         controller.buildMenuSection(into: menu)

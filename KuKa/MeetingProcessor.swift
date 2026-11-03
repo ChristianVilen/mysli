@@ -171,7 +171,8 @@ struct MeetingProcessor {
     }
 
     /// The session lives only in here, so the Whisper model is released
-    /// before the room labeller loads its own model.
+    /// before the room labeller loads its own model. A transcription error
+    /// fails the step with no fallback, so both tracks come from one transcriber.
     private func transcribeTracks(_ meeting: MeetingFolder, progress: (MeetingProgress) -> Void)
         async throws -> (tracks: [MeetingTrack: TrackTranscript], transcriber: String, failures: [TranscriberFailure]) {
         let (session, transcriber, failures) = try await startTranscriber(progress: progress)
@@ -299,9 +300,10 @@ struct MeetingProcessor {
     private func summarizeContent(_ content: String, in meeting: MeetingFolder, list: KnownWordsList,
                                   typedNotes: String, tool: SummaryTool,
                                   summaryInput: (String) -> Void) async throws -> SummaryResult {
+        // The saved text, not `summaryText`: the notes editor compares this snapshot with its own text.
         summaryInput(typedNotes)
         let result = await summarizer.summarize(transcript: content, knownWords: list.relevant(to: content), tool: tool,
-                                                typedNotes: typedNotes)
+                                                typedNotes: MeetingNoteDocument.summaryText(MeetingNoteDocument.parse(typedNotes)))
         try Task.checkCancellation()
         if case .written(_, _, let cli, let earlier) = result, !earlier.isEmpty {
             for failure in earlier {

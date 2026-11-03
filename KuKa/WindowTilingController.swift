@@ -16,6 +16,8 @@ final class WindowTilingController {
 
     private var savedFrames: [WindowHandle: TilingRestoreState] = [:]
 
+    // These defaults construct @MainActor types. In Swift 5 mode that compiles only with
+    // the KuKa target's `-enable-upcoming-feature IsolatedDefaultValues` flag.
     init(
         windowControl: WindowControlling = AccessibilityWindowControl(),
         stageManager: StageManagerDetecting = StageManagerDetector(),

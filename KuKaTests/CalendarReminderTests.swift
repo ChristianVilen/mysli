@@ -13,7 +13,7 @@ final class CalendarReminderTests: XCTestCase {
     private var sut: CalendarReminderController!
     private var time = Date(timeIntervalSince1970: 10_000)
 
-    override func setUp() async throws {
+    override func setUp() {
         suite = "CalendarReminderTests.\(UUID())"
         defaults = UserDefaults(suiteName: suite)!
         settings = Settings(defaults: defaults)
@@ -24,7 +24,7 @@ final class CalendarReminderTests: XCTestCase {
         sut = makeController()
     }
 
-    override func tearDown() async throws {
+    override func tearDown() {
         sut.shutDown()
         defaults.removePersistentDomain(forName: suite)
     }

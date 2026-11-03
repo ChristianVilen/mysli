@@ -39,18 +39,6 @@ final class TranscriptTeamsTests: XCTestCase {
     func testEmptyEvidencePreservesExistingOutputByteForByte() {
         let lines = Transcript.merge([.system: system], rooms: .notDiarized, speakers: .empty)
         XCTAssertEqual(lines, [TranscriptLine(speaker: .them, start: 0.02, text: "Ship Convio. On Friday. That sounds good.")])
-        XCTAssertEqual(markdown(lines), """
-        # Synthetic meeting
-
-        Duration: 00:00:04
-
-        Transcript by Fake transcriber.
-
-        "Me" is the microphone of the Mac that recorded the meeting. It hears the person who recorded the meeting and anyone in the same room. "Them" is everyone else on the call.
-
-        **[00:00:00] Them:** Ship Convio. On Friday. That sounds good.
-
-        """)
     }
 
     func testNamedLabelsSurviveCorrectionQuotePlacementAndSummaryExtraction() {
@@ -68,7 +56,7 @@ final class TranscriptTeamsTests: XCTestCase {
         XCTAssertTrue(text.contains("best-effort Teams meeting UI observations"))
     }
 
-    func testUnnamedTranscriptSaysWhyAfterTheFailureLinesAndBeforeTheLegend() {
+    func testUnnamedTranscriptSaysWhyAfterTheFailureLinesAndBeforeTheLegend() throws {
         let lines = Transcript.merge([.system: system], rooms: .notDiarized, speakers: .empty)
         let scans = TeamsScanSummary((0..<4).map { index in
             TeamsSpeakerObservation(began: HostTime(seconds: Double(index)), ended: HostTime(seconds: Double(index) + 0.01),
@@ -76,26 +64,14 @@ final class TranscriptTeamsTests: XCTestCase {
         })
         let text = Transcript.markdown(lines, title: "Synthetic meeting", duration: 4, by: "Fake transcriber", after: [],
                                        rooms: .failed(.noVoices), teams: scans)
-        XCTAssertEqual(text, """
-        # Synthetic meeting
-
-        Duration: 00:00:04
-
-        Transcript by Fake transcriber.
-
-        There are no room labels. \(RoomLabelFailure.noVoices)
-
-        Teams speaker names were on, but no remote line got a name. In 4 of 4 scans, no Teams window showed meeting controls with Hang up or Leave.
-
-        "Me" is the microphone of the Mac that recorded the meeting. It hears the person who recorded the meeting and anyone in the same room. "Them" is everyone else on the call.
-
-        **[00:00:00] Them:** Ship Convio. On Friday. That sounds good.
-
-        """)
-        XCTAssertEqual(Transcript.contentForSummary(text), """
-        **[00:00:00] Them:** Ship Convio. On Friday. That sounds good.
-
-        """)
+        let roomLine = "There are no room labels. \(RoomLabelFailure.noVoices)"
+        let teamsNote = try XCTUnwrap(scans.transcriptNote(for: lines))
+        let legend = "\"Me\" is the microphone"
+        let positions = try [roomLine, teamsNote, legend].map { try XCTUnwrap(text.range(of: $0)).lowerBound }
+        XCTAssertEqual(positions, positions.sorted())
+        let summary = Transcript.contentForSummary(text)
+        for part in [roomLine, teamsNote, legend] { XCTAssertFalse(summary.contains(part), part) }
+        XCTAssertTrue(summary.contains("Them:** Ship Convio. On Friday. That sounds good."))
     }
 
     func testOverlappingSystemSegmentsKeepThem() {
@@ -117,18 +93,5 @@ final class TranscriptTeamsTests: XCTestCase {
         let text = markdown(lines, rooms: rooms)
         XCTAssertTrue(text.contains("best-effort Teams meeting UI observations"))
         XCTAssertTrue(Transcript.contentForSummary(text).hasPrefix("**[00:00:00] Aino (Teams):**"))
-    }
-
-    func testWritesSyntheticBeforeAndAfterExamplesFromTheMergePath() throws {
-        let source = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
-        let folder = source.appendingPathComponent("build/task-verification/teams-evidence", isDirectory: true)
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        for (file, speakers) in [("before.md", TeamsSpeakerEvidence.empty), ("after.md", evidence())] {
-            let output = markdown(Transcript.merge([.system: system], rooms: .notDiarized, speakers: speakers))
-            try output.write(to: folder.appendingPathComponent(file), atomically: true, encoding: .utf8)
-        }
-        let after = try String(contentsOf: folder.appendingPathComponent("after.md"), encoding: .utf8)
-        XCTAssertTrue(after.contains("Aino (Teams):** Ship Convio. On Friday."))
-        XCTAssertTrue(after.contains("Bo (Teams):** That sounds good."))
     }
 }

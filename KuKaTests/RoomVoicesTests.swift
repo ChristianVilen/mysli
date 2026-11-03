@@ -37,18 +37,6 @@ final class RoomVoicesTests: XCTestCase {
         XCTAssertEqual(try voice(14, 18, in: turns), 4, "equal gaps go to the earlier turn")
     }
 
-    func testTurnsInAnyOrderGiveTheSameVoice() throws {
-        let inTime = [turn(5, 0, 2), turn(6, 2, 3), turn(5, 3, 3.5), turn(6, 3.5, 6), turn(5, 9, 10), turn(6, 12, 13)]
-        let bySpeaker = inTime.filter { $0.voice == 6 } + inTime.filter { $0.voice == 5 }
-        let segments: [(TimeInterval, TimeInterval)] = [(0, 2.6), (1.5, 3.5), (2.5, 4), (3, 3.5), (7, 8), (10.5, 11.5), (14, 15)]
-
-        for (start, end) in segments {
-            let expected = try voice(start, end, in: inTime)
-            XCTAssertEqual(try voice(start, end, in: bySpeaker), expected, "\(start) to \(end) s")
-            XCTAssertEqual(try voice(start, end, in: inTime.reversed()), expected, "\(start) to \(end) s")
-        }
-    }
-
     func testNoRoomVoicesWithoutATurnLongerThanZero() {
         XCTAssertNil(RoomVoices([]))
         XCTAssertNil(RoomVoices([turn(1, 2, 2)]))

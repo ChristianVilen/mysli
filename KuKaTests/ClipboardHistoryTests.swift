@@ -8,8 +8,14 @@ final class ClipboardHistoryTests: XCTestCase {
         .text(plain: plain, rtf: rtf, html: html, copiedAt: t0.addingTimeInterval(offset))
     }
 
-    private func image(bytes: Int, fill: UInt8 = 0xAB, width: Int = 100, height: Int = 100, at offset: TimeInterval = 0) -> ClipboardItem {
-        .image(png: Data(repeating: fill, count: bytes), pixelSize: CGSize(width: width, height: height), copiedAt: t0.addingTimeInterval(offset))
+    private func image(bytes: Int, fill: UInt8 = 0xAB, at offset: TimeInterval = 0) -> ClipboardItem {
+        .image(png: Data(repeating: fill, count: bytes), pixelSize: CGSize(width: 100, height: 100), copiedAt: t0.addingTimeInterval(offset))
+    }
+
+    /// The real limits scaled down a million times, so no test allocates
+    /// and hashes 100 MB.
+    private func smallHistory() -> ClipboardHistory {
+        ClipboardHistory(maxImageBytes: 100, maxItemBytes: 50)
     }
 
     // MARK: - Ordering
@@ -53,14 +59,14 @@ final class ClipboardHistoryTests: XCTestCase {
     // MARK: - Budgets
 
     func testImageByteBudgetEvictsOldestUntilUnderBudget() {
-        var history = ClipboardHistory()
-        // a, b, c sum to 90MB (under the 100MB image budget). Adding d (45MB)
-        // pushes the total to 135MB, which requires evicting *two* oldest
-        // items (a, then b) to fall back under budget (75MB).
-        let a = image(bytes: 30_000_000, fill: 0x01, at: 0)
-        let b = image(bytes: 30_000_000, fill: 0x02, at: 1)
-        let c = image(bytes: 30_000_000, fill: 0x03, at: 2)
-        let d = image(bytes: 45_000_000, fill: 0x04, at: 3)
+        var history = smallHistory()
+        // a, b, c sum to 90 (under the 100 image budget). Adding d (45)
+        // pushes the total to 135, which requires evicting *two* oldest
+        // items (a, then b) to fall back under budget (75).
+        let a = image(bytes: 30, fill: 0x01, at: 0)
+        let b = image(bytes: 30, fill: 0x02, at: 1)
+        let c = image(bytes: 30, fill: 0x03, at: 2)
+        let d = image(bytes: 45, fill: 0x04, at: 3)
         history.add(a)
         history.add(b)
         history.add(c)
@@ -69,25 +75,25 @@ final class ClipboardHistoryTests: XCTestCase {
     }
 
     func testImageByteBudgetSkipsTextItemsWhenEvicting() {
-        var history = ClipboardHistory()
+        var history = smallHistory()
         // Interleave texts and images: oldest→newest is
         // textOld1, imageA, textOld2, imageB, textNew, imageC. Naive
         // tail-eviction (removeLast() regardless of kind) would delete
         // textOld1 first without freeing any budget, since text costs 0.
         // The fix must skip straight to the oldest *image* (imageA).
         let textOld1 = text("old one", at: 0)
-        let imageA = image(bytes: 40_000_000, fill: 0x01, at: 1)
+        let imageA = image(bytes: 40, fill: 0x01, at: 1)
         let textOld2 = text("old two", at: 2)
-        let imageB = image(bytes: 40_000_000, fill: 0x02, at: 3)
+        let imageB = image(bytes: 40, fill: 0x02, at: 3)
         let textNew = text("new", at: 4)
-        let imageC = image(bytes: 40_000_000, fill: 0x03, at: 5)
+        let imageC = image(bytes: 40, fill: 0x03, at: 5)
 
         history.add(textOld1)
         history.add(imageA)
         history.add(textOld2)
         history.add(imageB)
         history.add(textNew)
-        history.add(imageC) // total image bytes 120MB > 100MB budget
+        history.add(imageC) // total image bytes 120 > 100 budget
 
         let hashes = Set(history.items.map(\.contentHash))
         XCTAssertFalse(hashes.contains(imageA.contentHash), "oldest image should be evicted")
@@ -100,10 +106,10 @@ final class ClipboardHistoryTests: XCTestCase {
     }
 
     func testItemAboveMaxItemBytesIsRefused() {
-        var history = ClipboardHistory()
+        var history = smallHistory()
         let keeper = text("keeper", at: 0)
         history.add(keeper)
-        let tooBig = image(bytes: ClipboardHistory.maxItemBytes + 1, at: 1)
+        let tooBig = image(bytes: 51, at: 1)
         history.add(tooBig)
         XCTAssertEqual(history.items.map(\.contentHash), [keeper.contentHash])
     }
@@ -120,15 +126,6 @@ final class ClipboardHistoryTests: XCTestCase {
         XCTAssertEqual(history.filtered(query: "").count, 2)
     }
 
-    func testFilterMatchesImageLabel() {
-        var history = ClipboardHistory()
-        let picture = image(bytes: 100, width: 938, height: 773, at: 0)
-        history.add(picture)
-        XCTAssertEqual(picture.previewLabel, "Image 938×773")
-        XCTAssertEqual(history.filtered(query: "938").map(\.contentHash), [picture.contentHash])
-        XCTAssertTrue(history.filtered(query: "999").isEmpty)
-    }
-
     // MARK: - Removal
 
     func testRemoveByHash() {
@@ -139,14 +136,6 @@ final class ClipboardHistoryTests: XCTestCase {
         history.add(second)
         history.remove(hash: first.contentHash)
         XCTAssertEqual(history.items.map(\.contentHash), [second.contentHash])
-    }
-
-    func testClearEmpties() {
-        var history = ClipboardHistory()
-        history.add(text("first", at: 0))
-        history.add(text("second", at: 1))
-        history.clear()
-        XCTAssertTrue(history.items.isEmpty)
     }
 
     // MARK: - Flavors

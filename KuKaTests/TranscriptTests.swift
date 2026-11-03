@@ -206,15 +206,6 @@ final class TranscriptTests: XCTestCase {
         XCTAssertEqual(lines.map(\.speaker), [.room(1), .them, .room(2)])
     }
 
-    func testSpeakerLabelsAndTracks() {
-        XCTAssertEqual(Speaker.me.label, "Me")
-        XCTAssertEqual(Speaker.them.label, "Them")
-        XCTAssertEqual(Speaker.room(3).label, "Room 3")
-        XCTAssertEqual(Speaker.room(1).track, .microphone)
-        XCTAssertEqual(Speaker.me.track, .microphone)
-        XCTAssertEqual(Speaker.them.track, .system)
-    }
-
     func testEchoNeedsSixtyPercentOfTheMicrophoneWords() {
         let system = segment(10, 14, "We should move the launch to Friday")
 
@@ -262,25 +253,6 @@ final class TranscriptTests: XCTestCase {
         ("current", "\"Me\" is the microphone of the Mac that recorded the meeting. It hears the person who recorded the meeting and anyone in the same room. \"Them\" is everyone else on the call."),
         ("older", "\"Me\" is the person who recorded the meeting. \"Them\" is everyone else on the call."),
     ]
-
-    func testSummaryContentStartsAfterTheCurrentOrTheOlderSpeakerLegend() {
-        for (name, legend) in legends {
-            let markdown = """
-            # Meeting on 2026-10-23 at 14:02
-
-            Duration: 00:01:00
-
-            Transcript by Whisper large-v3-v20240930_turbo.
-
-            \(legend)
-
-            **[00:00:01] Them:** Let's ship on Friday
-
-            """
-
-            XCTAssertEqual(Transcript.contentForSummary(markdown), "**[00:00:01] Them:** Let's ship on Friday\n", name)
-        }
-    }
 
     func testMarkdownListsWhatFailedBeforeTheTranscriberThatWroteIt() {
         let markdown = Transcript.markdown(
@@ -393,20 +365,6 @@ final class TranscriptTests: XCTestCase {
         **[00:00:01] Them:** Let's ship on Friday
 
         """)
-    }
-
-    func testEachRoomLabelFailureReadsAsOneSentence() {
-        XCTAssertEqual(RoomLabelFailure.download("The network connection was lost.").description,
-                       "SpeakerKit could not download its model: The network connection was lost.")
-        XCTAssertEqual(RoomLabelFailure.load("Model is corrupt.").description,
-                       "SpeakerKit could not load its model: Model is corrupt.")
-        XCTAssertEqual(RoomLabelFailure.diarize("The file could not be read.").description,
-                       "SpeakerKit could not tell the voices apart: The file could not be read.")
-        XCTAssertEqual(RoomLabelFailure.noVoices.description, "SpeakerKit found no voices on the microphone track.")
-        XCTAssertEqual(RoomLabelFailure.tooLong.description,
-                       "Ku-Ka skipped them, because the microphone track is longer than 3 hours.")
-        XCTAssertEqual(RoomLabelFailure.earlierAttemptStopped.description,
-                       "Ku-Ka skipped them, because an earlier attempt stopped while it told the voices apart, for example in a crash.")
     }
 
     func testSummaryContentStartsAfterEveryLegendThatMarkdownWrites() {

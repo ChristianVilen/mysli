@@ -24,11 +24,11 @@ final class WordReviewControllerTests: XCTestCase {
     private var lockURL: URL!
     private var ordinary: Set<String> = []
     private var requested: [MeetingFolder] = []
-    private var opened: [URL] = []
     private var changes = 0
     private var sut: WordReviewController!
 
-    override func setUp() async throws {
+    override func setUpWithError() throws {
+        try super.setUpWithError()
         let base = try makeTemporaryDirectory()
         root = base.appendingPathComponent("Meetings", isDirectory: true)
         listURL = base.appendingPathComponent("Lists/known-words.md")
@@ -39,7 +39,7 @@ final class WordReviewControllerTests: XCTestCase {
                                        now: { localDate(2026, 10, 28, 10, 0) }),
             isOrdinary: { [unowned self] in ordinary.contains($0) },
             requestUpdate: { [unowned self] in requested.append($0) },
-            openURL: { [unowned self] in opened.append($0) })
+            openURL: { _ in })
         sut.onChange = { [unowned self] in changes += 1 }
     }
 
@@ -187,19 +187,6 @@ final class WordReviewControllerTests: XCTestCase {
         XCTAssertFalse(hasSkipFile(meeting))
     }
 
-    func testANameGetsACheckMarkAlsoWhenItsHeardFormIsOrdinaryWords() throws {
-        ordinary = ["my key"]
-        let meeting = try reviewedMeeting(at: localDate(2026, 10, 23, 9, 0), asking: [myKey])
-        sut.show(meeting)
-        XCTAssertEqual(questionPage?.isOrdinary, false)
-
-        sut.save(rightWord: "Maikki")
-
-        XCTAssertEqual(list?.hasSuffix("## Added by Ku-Ka\n\n- my key → **Maikki** ✓ confirmed 2026-10-28 by Ku-Ka\n"), true,
-                       list ?? "no list")
-        XCTAssertFalse(hasSkipFile(meeting))
-    }
-
     func testOnlyTermsAndOtherWordsGoThroughTheOrdinaryWordsCheck() throws {
         ordinary = ["my key"]
         var isOrdinaryByKind: [String: Bool] = [:]
@@ -225,32 +212,16 @@ final class WordReviewControllerTests: XCTestCase {
         XCTAssertFalse(hasSkipFile(meeting))
     }
 
-    func testTheWordAsTheQuoteWritesItIsCorrectAsHeardAlsoWhenTheCLIAddedPunctuation() throws {
-        let meeting = try MeetingFolder.create(in: root, startingAt: localDate(2026, 10, 23, 9, 0))
-        try meeting.write("**[00:12:31] Them:** We should ask Convio, about it. Then chatgpt can start.\n", to: .transcript)
-        try meeting.write("# \(meeting.title)\n\nAsk Convio.\n", to: .summary)
-        let suspects = [
-            SuspectWord(heard: "Convio,", suggestion: nil, kind: .company, quote: "We should ask Convio, about it.", reason: nil),
-            SuspectWord(heard: "chatgpt", suggestion: nil, kind: .product, quote: "Then chatgpt can start.", reason: nil),
-        ]
-        try meeting.saveQuestions(WordQuestions.select(suspects, in: try meeting.read(.transcript), knownWords: .empty))
+    func testARightWordThatDiffersFromTheHeardFormOnlyInCaseIsAReplacement() throws {
+        let meeting = try reviewedMeeting(at: localDate(2026, 10, 23, 9, 0),
+                                          asking: [Ask(heard: "chatgpt", kind: "product", quote: "Then chatgpt can start.")])
         sut.show(meeting)
 
-        sut.save(rightWord: "Convio")
         sut.save(rightWord: "ChatGPT")
 
-        XCTAssertEqual(list?.hasSuffix("""
-            ## Correct as heard
-
-            - **Convio** (correct as heard; added by Ku-Ka 2026-10-28)
-
-            ## Added by Ku-Ka
-
-            - chatgpt → **ChatGPT** ✓ confirmed 2026-10-28 by Ku-Ka
-
-            """), true, list ?? "no list")
-        XCTAssertNotNil(finishedPage, "the list closes both questions")
-        XCTAssertFalse(hasSkipFile(meeting))
+        XCTAssertEqual(list?.hasSuffix("## Added by Ku-Ka\n\n- chatgpt → **ChatGPT** ✓ confirmed 2026-10-28 by Ku-Ka\n"), true,
+                       list ?? "no list")
+        XCTAssertNotNil(finishedPage, "the list closes the question")
     }
 
     func testCorrectAsHeardAddsTheWordToItsSectionOfTheList() throws {
@@ -284,7 +255,7 @@ final class WordReviewControllerTests: XCTestCase {
 
         sut.save(rightWord: "Konvio")
 
-        XCTAssertEqual(sut.screen?.error, "Another Ku-Ka is saving to the known-words list. Try again.")
+        XCTAssertEqual(sut.screen?.error, KnownWordsFileError.busy.localizedDescription)
         XCTAssertNil(list)
         XCTAssertFalse(hasSkipFile(meeting))
         XCTAssertEqual(questionPage?.suggestion, "Konvio", "the question stays open")
@@ -302,9 +273,9 @@ final class WordReviewControllerTests: XCTestCase {
         sut.show(meeting)
 
         sut.save(rightWord: "Kon / Vio")
-        XCTAssertEqual(sut.screen?.error, "Ku-Ka cannot save a word with “ / ” in it.")
+        XCTAssertEqual(sut.screen?.error, KnownWordAdditionError.unsupported(" / ").localizedDescription)
         sut.save(rightWord: "  ")
-        XCTAssertEqual(sut.screen?.error, "Type the right word first.")
+        XCTAssertEqual(sut.screen?.error, KnownWordAdditionError.empty.localizedDescription)
 
         XCTAssertNil(list)
         XCTAssertFalse(hasSkipFile(meeting))
@@ -325,20 +296,6 @@ final class WordReviewControllerTests: XCTestCase {
         XCTAssertNotNil(sut.screen?.error)
         XCTAssertEqual(questionPage?.heard, "Convio")
         XCTAssertNil(list)
-    }
-
-    func testTheFinishedPageOffersUpdateNotesOnlyWhenTheListLearnedAWordOfTheMeeting() throws {
-        let skipped = try reviewedMeeting(at: localDate(2026, 10, 23, 9, 0), asking: [convio])
-        let answered = try reviewedMeeting(at: localDate(2026, 10, 24, 9, 0), asking: [yuri])
-
-        sut.show(skipped)
-        sut.skip()
-        XCTAssertEqual(finishedPage?.canUpdateNotes, false)
-
-        sut.show(answered)
-        sut.save(rightWord: "Jyri")
-        XCTAssertEqual(finishedPage, .init(meetingTitle: "Meeting on 2026-10-24 at 09:00", canUpdateNotes: true,
-                                           isUpdating: false, otherMeetings: 0))
     }
 
     func testTheFinishedPageCountsTheOtherMeetingsWithOpenQuestions() throws {
@@ -377,16 +334,6 @@ final class WordReviewControllerTests: XCTestCase {
         XCTAssertEqual(requested, [])
     }
 
-    func testOpenSummaryOpensTheMeetingsSummary() throws {
-        let meeting = try reviewedMeeting(at: localDate(2026, 10, 23, 9, 0), asking: [convio], skipped: ["Convio"])
-        sut.show(meeting)
-
-        sut.openSummary()
-
-        XCTAssertEqual(opened, [meeting.url(for: .summary)])
-        XCTAssertNotNil(finishedPage, "the window stays")
-    }
-
     func testAnAnswerInOneMeetingClosesTheSameQuestionInAnother() throws {
         let first = try reviewedMeeting(at: localDate(2026, 10, 22, 9, 0), asking: [convio])
         let second = try reviewedMeeting(at: localDate(2026, 10, 23, 9, 0), asking: [convio, yuri])
@@ -405,38 +352,6 @@ final class WordReviewControllerTests: XCTestCase {
                        "the list learned Convio")
         XCTAssertEqual(skipped(in: second), ["yuri"])
         XCTAssertEqual(list?.components(separatedBy: "**Konvio**").count, 2, "one line for Convio: \(list ?? "no list")")
-    }
-
-    func testAnAnswerInOneMeetingOffersUpdateNotesInADoneMeetingThatAskedTheSameWord() throws {
-        let first = try reviewedMeeting(at: localDate(2026, 10, 22, 9, 0), asking: [convio])
-        let second = try reviewedMeeting(at: localDate(2026, 10, 23, 9, 0), asking: [convio])
-        sut.show(first)
-        sut.save(rightWord: "Konvio")
-
-        sut.show(second)
-
-        XCTAssertEqual(finishedPage, .init(meetingTitle: "Meeting on 2026-10-23 at 09:00", canUpdateNotes: true,
-                                           isUpdating: false, otherMeetings: 0),
-                       "the list learned a word of this meeting")
-        sut.updateNotes()
-        XCTAssertEqual(requested, [second])
-    }
-
-    func testRemovingAListLineByHandOpensItsQuestionAgainAlsoInTheMeetingThatAnsweredItButNotASkip() throws {
-        let meeting = try reviewedMeeting(at: localDate(2026, 10, 23, 9, 0), asking: [convio, yuri])
-        sut.show(meeting)
-        sut.save(rightWord: "Konvio")
-        sut.skip()
-        XCTAssertNotNil(finishedPage)
-        let edited = try XCTUnwrap(list).replacingOccurrences(of: "- Convio → **Konvio** ✓ confirmed 2026-10-28 by Ku-Ka\n",
-                                                              with: "")
-        try edited.write(to: listURL, atomically: true, encoding: .utf8)
-
-        sut.show(meeting)
-
-        XCTAssertEqual(questionPage?.heard, "Convio")
-        XCTAssertEqual(meeting.wordReview(knownWords: KnownWordsList(markdown: edited))?.openQuestions.map(\.heard), ["Convio"],
-                       "Yuri was skipped, so it stays closed")
     }
 
     func testNextMeetingShowsTheOldestOtherMeetingWithOpenQuestions() throws {

@@ -1,8 +1,16 @@
 import XCTest
 @testable import KuKa
 
-/// xcodebuild passes the KUKA_ variables to the tests only with a
-/// TEST_RUNNER_ prefix, for example TEST_RUNNER_KUKA_MEETING_AUDIO.
+/// Runs the real Whisper model, and SpeakerKit when KUKA_SPEAKER_MODELS is set, on real audio.
+/// Skipped unless KUKA_MEETING_AUDIO names a folder with me.caf and them.caf. The audio of a
+/// processed meeting is in the Trash, so take it back from there first. xcodebuild passes the
+/// KUKA_ variables to the tests only with a TEST_RUNNER_ prefix:
+///
+///     TEST_RUNNER_KUKA_MEETING_AUDIO="$HOME/Meetings/<meeting folder>/audio" \
+///     TEST_RUNNER_KUKA_WHISPER_MODELS="$HOME/Library/Application Support/Ku-Ka/whisper-models" \
+///     TEST_RUNNER_KUKA_SPEAKER_MODELS="$HOME/Library/Application Support/Ku-Ka/speaker-models" \
+///     TEST_RUNNER_KUKA_TRANSCRIPT_OUT="$HOME/whisper-check" \
+///     xcodebuild -project KuKa.xcodeproj -scheme KuKa test -only-testing:KuKaTests/RealMeetingAudioTests
 final class RealMeetingAudioTests: XCTestCase {
     func testWhisperTranscribesRealMeetingAudio() async throws {
         let environment = ProcessInfo.processInfo.environment

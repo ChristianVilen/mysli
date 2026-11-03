@@ -61,6 +61,11 @@ struct RecordingClock: Equatable, Sendable {
         runs.reduce(0) { sum, run in sum + max(0, min(run.end ?? time, time) - run.start) }
     }
 
+    /// The file position of `time`. While paused, the position where the pause started.
+    func notePosition(at time: HostTime) -> TimeInterval {
+        filePosition(at: time, inRun: runs.lastIndex { $0.start <= time } ?? 0)
+    }
+
     /// Where audio captured at `time` lands in the files. Nil before `origin` or inside a pause.
     func filePosition(at time: HostTime) -> TimeInterval? {
         runs.firstIndex { $0.contains(time) }.map { filePosition(at: time, inRun: $0) }
@@ -94,20 +99,28 @@ struct RecordingClock: Equatable, Sendable {
     func recordedTime(atFilePosition position: TimeInterval) -> TimeInterval {
         var gaps: TimeInterval = 0
         for pause in pauses {
-            if position < pause.at + gaps { return position - gaps }
-            if pause.duration == nil || position < pause.at + gaps + Self.resumeGap { return pause.at }
+            if position < pause.filePosition { return position - gaps }
+            if pause.duration == nil || position < pause.filePosition + Self.resumeGap { return pause.at }
             gaps += Self.resumeGap
         }
         return position - gaps
     }
 
-    /// Each pause so far, in recorded time. `duration` is host seconds paused, nil while the
-    /// pause lasts.
-    var pauses: [(at: TimeInterval, duration: TimeInterval?)] {
+    struct Pause: Equatable {
+        /// Recorded time when the pause started.
+        let at: TimeInterval
+        /// Where the pause's resume gap starts in the files.
+        let filePosition: TimeInterval
+        /// Host seconds paused. Nil while the pause lasts.
+        let duration: TimeInterval?
+    }
+
+    var pauses: [Pause] {
         stride(from: 0, to: boundaries.count, by: 2).map { index in
             let pause = boundaries[index]
             let resume = index + 1 < boundaries.count ? boundaries[index + 1] : nil
-            return (recordedTime(at: pause), resume.map { $0 - pause })
+            return Pause(at: recordedTime(at: pause), filePosition: filePosition(at: pause, inRun: index / 2),
+                         duration: resume.map { $0 - pause })
         }
     }
 

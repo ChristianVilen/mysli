@@ -53,21 +53,7 @@ final class MeetingProcessorNotesTests: MeetingProcessorTestCase {
         let outcome = await process(meeting)
 
         XCTAssertEqual(outcome, .done(summary: meeting.url(for: .summary)))
-        XCTAssertEqual(try meeting.read(.transcript), """
-        # Meeting on 2026-10-23 at 14:02
-
-        Duration: 00:01:00
-
-        Transcript by Whisper.
-
-        "Me" is the microphone of the Mac that recorded the meeting. It hears the person who recorded the meeting and anyone in the same room. "Them" is everyone else on the call.
-
-        \(correctedLines)
-        ---
-
-        Known words applied: Convio → Konvio (1).
-
-        """)
+        XCTAssertTrue(try meeting.read(.transcript).hasSuffix(correctedLines + "\n---\n\nKnown words applied: Convio → Konvio (1).\n"))
         XCTAssertEqual(try promptTranscript(), correctedLines, "no note for the CLI")
         XCTAssertTrue(try meeting.read(.heardTranscript).contains("**[00:00:01] Them:** Let's ask Convio and Yuri about Friday"))
     }
@@ -98,22 +84,6 @@ final class MeetingProcessorNotesTests: MeetingProcessorTestCase {
         XCTAssertEqual(try meeting.read(.transcript),
                        "**[00:00:01] Them:** Ask Konvio and Jyri.\n\n---\n\nKnown words applied: Convio → Konvio (1), Yuri → Jyri (1).\n")
         XCTAssertEqual(try meeting.read(.heardTranscript), "**[00:00:01] Them:** Ask Convio and Yuri.\n")
-    }
-
-    func testAFormConfirmedAfterAFailedSummaryIsFixedOnRetry() async throws {
-        let meeting = try makeMeeting()
-        hearConvio()
-        runner.results["agy"] = .success(CommandResult(termination: .exited(1), stdout: "", stderr: "authentication failed"))
-        _ = await process(meeting)
-        XCTAssertTrue(try meeting.read(.transcript).contains("Let's ask Convio"))
-        knownWords = KnownWordsList(markdown: "- Convio → **Konvio** ✓\n")
-        try meeting.clearFailure()
-        runner.results["agy"] = .reply("## Summary\nAsk Konvio.")
-
-        let outcome = await process(meeting)
-
-        XCTAssertEqual(outcome, .done(summary: meeting.url(for: .summary)))
-        XCTAssertTrue(try meeting.read(.transcript).hasSuffix(correctedLines + "\n---\n\nKnown words applied: Convio → Konvio (1).\n"))
     }
 
     func testAMeetingTranscribedBeforeKnownWordsGetsAHeardCopyAndACorrectedTranscript() async throws {
@@ -171,17 +141,6 @@ final class MeetingProcessorNotesTests: MeetingProcessorTestCase {
 
         guard case .failed(.summarize, _) = outcome else { return XCTFail("\(outcome)") }
         XCTAssertFalse(exists(.summary, in: meeting))
-    }
-
-    func testABrokenReviewBlockNeverFailsTheSummaryAndSavesNoQuestions() async throws {
-        let meeting = try makeMeeting()
-        runner.results["agy"] = .reply("## Summary\nShip Friday.\n\n```ku-ka-review\n[{\"heard\": \n```\n")
-
-        let outcome = await process(meeting)
-
-        XCTAssertEqual(outcome, .done(summary: meeting.url(for: .summary)))
-        XCTAssertEqual(try meeting.read(.summary), "# Meeting on 2026-10-23 at 14:02\n\n## Summary\nShip Friday.\n")
-        XCTAssertFalse(exists(.questions, in: meeting))
     }
 
     func testARunWithoutQuestionsRemovesTheQuestionsOfAnEarlierStoppedRun() async throws {

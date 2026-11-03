@@ -10,6 +10,7 @@ struct ModelInstall {
     let label: String
     /// How long `install` waits while another Ku-Ka holds the lock.
     var lockWait: Duration = .zero
+    var lockRetryInterval: Duration = .milliseconds(250)
 
     var folder: URL { root.appendingPathComponent(name, isDirectory: true) }
     private var partial: URL { root.appendingPathComponent(".\(name).partial", isDirectory: true) }
@@ -42,7 +43,7 @@ struct ModelInstall {
                 guard clock.now < deadline else {
                     throw MeetingStepError("Another Ku-Ka is downloading the \(label) model.")
                 }
-                try await Task.sleep(for: .milliseconds(250))
+                try await Task.sleep(for: lockRetryInterval)
             } catch FileLockError.failed(let reason) {
                 throw MeetingStepError("Ku-Ka could not lock the \(label) models folder \(root.path): \(reason).")
             }

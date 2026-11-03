@@ -48,6 +48,7 @@ struct MeetingContextFile {
             omit(url, reason: "not UTF-8 text")
             return nil
         }
+        // agy gets the context in its prompt argument, and Foundation cannot pass a NUL byte there.
         guard !text.utf8.contains(0) else {
             omit(url, reason: "contains a NUL byte")
             return nil

@@ -6,7 +6,10 @@ import os
 /// The gated tests run Apple's speech model for `meetingLocale`, which must already be
 /// installed, on real audio at real-time pace. They are skipped unless KUKA_LIVE_AUDIO names a
 /// folder with me.caf and them.caf. xcodebuild passes it to the tests only with a TEST_RUNNER_
-/// prefix: TEST_RUNNER_KUKA_LIVE_AUDIO.
+/// prefix:
+///
+///     TEST_RUNNER_KUKA_LIVE_AUDIO="$HOME/live-check/audio" \
+///     xcodebuild -project KuKa.xcodeproj -scheme KuKa test -only-testing:KuKaTests/RealLiveTranscriptTests
 final class RealLiveTranscriptTests: XCTestCase {
     /// About one ScreenCaptureKit buffer.
     private static let chunkDuration = Duration.milliseconds(20)

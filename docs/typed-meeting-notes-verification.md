@@ -1,5 +1,7 @@
 # Typed meeting notes verification
 
+This page records the original notes editor checks from 2026-10-30. See [Meeting panel cleanup verification](meeting-panel-cleanup-verification.md) for the combined floating panel and timestamped rows.
+
 The feature uses a separate native notes window and keeps the live transcript drawer. All verification uses synthetic meetings and temporary folders.
 
 ## Tests

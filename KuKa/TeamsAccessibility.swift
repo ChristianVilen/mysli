@@ -173,6 +173,8 @@ struct TeamsAXSnapshot: Equatable, Sendable {
     var nodes = 0
 }
 
+/// Not checked in a real Teams call: the bundle ID, the English control labels, the tile
+/// structure, and the highlight classes in `borders` are guesses. Fake trees test policy only.
 final class TeamsAccessibility<Reader: TeamsAXReading> {
     private struct Item {
         let node: Reader.Node

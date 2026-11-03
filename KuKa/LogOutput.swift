@@ -33,12 +33,15 @@ final class LogOutput: Sendable {
         fileOutput?.append(line)
     }
 
+    // Unified logging only: a file failure sent back to the files would fail again and repeat.
     func reportFileFailure(_ error: Error) {
         let message: LogMessage = "Could not write log file (code \((error as NSError).code)): \(error.localizedDescription)"
         unified(LogLine(date: clock(), processID: processID, level: .error,
                         category: "app", message: message.text, timeZone: timeZone()))
     }
 
+    // LogMessage already put <private> in place of private values, so .public leaks nothing,
+    // also on a Mac that shows private log data.
     private static func writeUnified(_ line: LogLine) {
         let logger = Logger(subsystem: Log.subsystem, category: line.category)
         switch line.level {

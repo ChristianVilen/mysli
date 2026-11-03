@@ -119,7 +119,8 @@ final class PermissionsManagerTests: XCTestCase {
         var axGranted = false
         let sut = PermissionsManager(
             isAccessibilityTrusted: { axGranted },
-            hasScreenCaptureAccess: { true }
+            hasScreenCaptureAccess: { true },
+            pollInterval: 0.001
         )
         sut.refresh()
 

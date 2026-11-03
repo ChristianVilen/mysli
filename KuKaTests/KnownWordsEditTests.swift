@@ -219,14 +219,6 @@ final class KnownWordsEditTests: XCTestCase {
     }
 
     func testAnEmptyListStartsWithTheNewFileHeader() throws {
-        XCTAssertEqual(KnownWordsList.newFileHeader, """
-        # Known words
-
-        Ku-Ka reads this list before it writes meeting notes, and adds to it when you answer Check Words. You can edit it in any text editor.
-
-        Each line is: what speech recognition wrote → **the right form**. Separate several wrong forms with " / ". Ku-Ka replaces a wrong form in the transcript only when the line has ✓. Lines without ✓ only help the summary. Words under "Correct as heard" are right as written.
-
-        """)
         XCTAssertEqual(try adding(.replacement(heard: "Konvya", right: "Konvio", confirmed: true), to: ""),
                        KnownWordsList.newFileHeader + "\n## Added by Ku-Ka\n\n- Konvya → **Konvio** ✓ confirmed 2026-10-28 by Ku-Ka\n")
         XCTAssertEqual(try adding(.correctAsHeard("Aino"), to: ""),
@@ -269,12 +261,6 @@ final class KnownWordsEditTests: XCTestCase {
         XCTAssertEqual(addition.kind, .replacement(heard: try XCTUnwrap(Phrase("Konvya")), right: "Konvio (Oy)", confirmed: true),
                        "both are trimmed")
         XCTAssertEqual(KnownWordsList(markdown: try adding(addition, to: "")).words.map(\.right), ["Konvio (Oy)"])
-    }
-
-    func testTheErrorsSayWhatToChange() {
-        XCTAssertEqual(KnownWordAdditionError.empty.localizedDescription, "Type the right word first.")
-        XCTAssertEqual(KnownWordAdditionError.lineBreak.localizedDescription, "Ku-Ka cannot save a word with a line break in it.")
-        XCTAssertEqual(KnownWordAdditionError.unsupported(" / ").localizedDescription, "Ku-Ka cannot save a word with “ / ” in it.")
     }
 
     /// `text` without `block`, a run of whole lines that must occur in it once.

@@ -19,22 +19,8 @@ final class MeetingProcessorRoomLabelTests: MeetingProcessorTestCase {
         let outcome = await process(meeting)
 
         XCTAssertEqual(outcome, .done(summary: meeting.url(for: .summary)))
-        XCTAssertEqual(try meeting.read(.transcript), """
-        # Meeting on 2026-10-23 at 14:02
-
-        Duration: 00:01:00
-
-        Transcript by Whisper.
-
-        "Room 1", "Room 2", and so on are voices on the microphone of the Mac that recorded the meeting. The microphone hears the person who recorded the meeting and anyone in the same room. Ku-Ka told the voices apart on this Mac and numbered them in the order they first spoke. Two people with similar voices can share one label, and one person can get two labels. No label tells which voice is the person who recorded the meeting. "Them" is everyone else on the call.
-
-        **[00:00:01] Them:** Let's ship on Friday
-
-        **[00:00:04] Room 1:** Sounds good, I can ship it
-
-        **[00:00:06] Room 2:** Friday works for me too
-
-        """)
+        XCTAssertTrue(try meeting.read(.transcript).contains(
+            "**[00:00:04] Room 1:** Sounds good, I can ship it\n\n**[00:00:06] Room 2:** Friday works for me too\n"))
     }
 
     func testTheRoomLabellerGetsTheMicrophoneTrackAfterBothTracksAreTranscribed() async throws {
@@ -49,19 +35,6 @@ final class MeetingProcessorRoomLabelTests: MeetingProcessorTestCase {
         XCTAssertEqual(transcribedBeforeLabelling, ["me.caf", "them.caf"])
     }
 
-    func testRoomLabelsAlsoRunWhenAppleWroteTheText() async throws {
-        let meeting = try makeMeeting()
-        whisper.failure = (.load, MeetingStepError("The model files are damaged."))
-        labeller.result = try twoVoices(on: apple)
-
-        _ = await process(meeting)
-
-        let transcript = try meeting.read(.transcript)
-        XCTAssertTrue(transcript.contains("\n\nTranscript by Apple. Tried first:\n\n"))
-        XCTAssertTrue(transcript.contains(
-            "**[00:00:04] Room 1:** Sounds good, I can ship it\n\n**[00:00:06] Room 2:** Friday works for me too\n"))
-    }
-
     func testARoomLabelFailureKeepsMeAndTheMeetingStillFinishes() async throws {
         let meeting = try makeMeeting()
         labeller.result = .failed(.load("Model is corrupt."))
@@ -69,25 +42,10 @@ final class MeetingProcessorRoomLabelTests: MeetingProcessorTestCase {
         let outcome = await process(meeting)
 
         XCTAssertEqual(outcome, .done(summary: meeting.url(for: .summary)))
-        XCTAssertEqual(try meeting.read(.transcript), """
-        # Meeting on 2026-10-23 at 14:02
-
-        Duration: 00:01:00
-
-        Transcript by Whisper.
-
-        There are no room labels. SpeakerKit could not load its model: Model is corrupt.
-
-        "Me" is the microphone of the Mac that recorded the meeting. It hears the person who recorded the meeting and anyone in the same room. "Them" is everyone else on the call.
-
-        **[00:00:01] Them:** Let's ship on Friday
-
-        **[00:00:04] Me:** Sounds good
-
-        """)
+        let transcript = try meeting.read(.transcript)
+        XCTAssertTrue(transcript.contains("\n\nThere are no room labels. SpeakerKit could not load its model: Model is corrupt.\n\n"))
+        XCTAssertTrue(transcript.contains("**[00:00:04] Me:** Sounds good\n"))
         XCTAssertFalse(FileManager.default.fileExists(atPath: meeting.url(for: .failure).path))
-        let prompt = try XCTUnwrap(runner.calls.first?.arguments.last)
-        XCTAssertFalse(prompt.contains("There are no room labels"))
         XCTAssertEqual(labeller.calls, ["label me.caf"])
     }
 

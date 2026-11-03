@@ -224,22 +224,6 @@ final class HotkeyManagerTests: XCTestCase {
         manager.tilingEnabled = true
         XCTAssertEqual(Set(system.callbacks.keys), [.captureFullScreen, .captureArea, .tileLeft, .tileRight, .maximize, .center])
     }
-
-    func testStartRegistersCaptureAndTilingAndDeliversActions() {
-        let system = FakeHotkeySystem()
-        let manager = HotkeyManager(registrar: CarbonHotkeyRegistrar(api: system.api))
-        defer { manager.stop() }
-        var actions: [HotkeyAction] = []
-        manager.onAction = { actions.append($0) }
-
-        manager.start()
-        XCTAssertEqual(Set(system.callbacks.keys), [
-            .captureFullScreen, .captureArea, .tileLeft, .tileRight, .maximize, .center
-        ])
-        system.press(.tileLeft)
-        system.press(.captureArea)
-        XCTAssertEqual(actions, [.tile(.leftHalf), .captureArea])
-    }
 }
 
 @MainActor

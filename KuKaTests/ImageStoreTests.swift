@@ -38,6 +38,7 @@ final class ImageStoreTests: XCTestCase {
 
         XCTAssertEqual(mockFileManager.createdDirectories.count, 1)
         XCTAssertTrue(mockFileManager.createdDirectories[0].path.hasSuffix("Screenshots"))
+        XCTAssertTrue(mockFileManager.createdDirectories[0].path.hasPrefix(mockFileManager.homeDirectoryForCurrentUser.path))
         XCTAssertEqual(mockFileManager.writtenFiles.count, 1)
         XCTAssertEqual(mockFileManager.writtenFiles[0].url, result.fileURL)
         XCTAssertEqual(mockClipboard.copiedCount, 1)
@@ -46,29 +47,18 @@ final class ImageStoreTests: XCTestCase {
 
     // MARK: - File naming
 
-    func testStoreTwiceInSameSecondProducesDistinctFileNames() {
-        // File names have one-second resolution; a second capture in the
-        // same second must not overwrite the first on disk.
+    func testThirdStoreInSameSecondCountsUp() {
+        // File names have one-second resolution; a later capture in the
+        // same second must not overwrite an earlier one on disk.
         let frozen = Date(timeIntervalSince1970: 1_700_000_000)
         let sut = ImageStore(fileManager: mockFileManager, clipboard: mockClipboard, now: { frozen })
 
         let first = sut.store(cgImage: MockScreenCapture.make1x1Image())
         let second = sut.store(cgImage: MockScreenCapture.make1x1Image())
-
-        XCTAssertNotEqual(first.fileURL, second.fileURL)
-        let firstBase = first.fileURL.deletingPathExtension().lastPathComponent
-        XCTAssertEqual(second.fileURL.lastPathComponent, "\(firstBase)-2.png")
-    }
-
-    func testThirdStoreInSameSecondCountsUp() {
-        let frozen = Date(timeIntervalSince1970: 1_700_000_000)
-        let sut = ImageStore(fileManager: mockFileManager, clipboard: mockClipboard, now: { frozen })
-
-        let first = sut.store(cgImage: MockScreenCapture.make1x1Image())
-        _ = sut.store(cgImage: MockScreenCapture.make1x1Image())
         let third = sut.store(cgImage: MockScreenCapture.make1x1Image())
 
         let firstBase = first.fileURL.deletingPathExtension().lastPathComponent
+        XCTAssertEqual(second.fileURL.lastPathComponent, "\(firstBase)-2.png")
         XCTAssertEqual(third.fileURL.lastPathComponent, "\(firstBase)-3.png")
     }
 
@@ -84,12 +74,6 @@ final class ImageStoreTests: XCTestCase {
         let components = DateComponents(year: 2026, month: 2, day: 25, hour: 14, minute: 30, second: 0)
         let date = Calendar.current.date(from: components)!
         XCTAssertEqual(sut.generateCombinedFileName(for: date), "Screenshot_2026-02-25_at_14-30-00_combined.png")
-    }
-
-    func testScreenshotsDirectoryPath() {
-        let dir = sut.screenshotsDirectory()
-        XCTAssertTrue(dir.path.hasSuffix("Screenshots"))
-        XCTAssertTrue(dir.path.hasPrefix(mockFileManager.homeDirectoryForCurrentUser.path))
     }
 
     // MARK: - saveAnnotated()
@@ -120,6 +104,10 @@ final class ImageStoreTests: XCTestCase {
         let combined = result?.image.cgImage(forProposedRect: nil, context: nil, hints: nil)
         XCTAssertEqual(combined?.width, 100)
         XCTAssertEqual(combined?.height, 130)
+        XCTAssertEqual(mockFileManager.writtenFiles.count, 1)
+        let written = NSBitmapImageRep(data: mockFileManager.writtenFiles[0].data)
+        XCTAssertEqual(written?.pixelsWide, 100)
+        XCTAssertEqual(written?.pixelsHigh, 130)
     }
 
     func testRepeatedCombineStaysLinear() {
@@ -147,16 +135,6 @@ final class ImageStoreTests: XCTestCase {
 
         XCTAssertEqual(pixelRGB(in: combined, x: 5, y: 2), [255, 0, 0])
         XCTAssertEqual(pixelRGB(in: combined, x: 5, y: 17), [0, 0, 255])
-    }
-
-    func testStoreCombinedWritesPNGAtPixelDimensions() {
-        _ = sut.storeCombined(top: makeCaptureImage(width: 8, height: 6),
-                              bottom: makeCaptureImage(width: 8, height: 6))
-
-        XCTAssertEqual(mockFileManager.writtenFiles.count, 1)
-        let written = NSBitmapImageRep(data: mockFileManager.writtenFiles[0].data)
-        XCTAssertEqual(written?.pixelsWide, 8)
-        XCTAssertEqual(written?.pixelsHigh, 12)
     }
 
     func testStoreCombinedUsesCombinedFileNameAndCopiesClipboard() {
@@ -231,18 +209,6 @@ final class ImageStoreTests: XCTestCase {
     }
 
     // MARK: - Content hash tracking
-
-    func testDeleteReportsHashOfDeletedFile() {
-        let result = sut.store(cgImage: MockScreenCapture.make1x1Image())
-        let pngData = mockClipboard.lastPngData!
-
-        var reportedHash: String?
-        sut.onDeletedHash = { reportedHash = $0 }
-
-        sut.delete(at: result.fileURL)
-
-        XCTAssertEqual(reportedHash, ContentHash.of(pngData))
-    }
 
     func testStoreRemembersContentHashPerFile() {
         let first = sut.store(cgImage: MockScreenCapture.makeImage(width: 4, height: 4, red: 1, green: 0, blue: 0))

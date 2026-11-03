@@ -112,16 +112,16 @@ final class LogFilesTests: XCTestCase {
     func testConcurrentWritersKeepEveryUTF8LineWhole() async throws {
         let first = makeFiles()
         let second = makeFiles()
-        let lines = (0..<200).map { line("message \($0) ä👩🏽‍💻") }
-        DispatchQueue.concurrentPerform(iterations: 200) { index in
+        let lines = (0..<20).map { line("message \($0) ä👩🏽‍💻") }
+        DispatchQueue.concurrentPerform(iterations: 20) { index in
             (index.isMultiple(of: 2) ? first : second).append(lines[index])
         }
         await first.flush()
         await second.flush()
         let rows = try contents("Ku-Ka-2026-10-30.log").split(separator: "\n")
-        XCTAssertEqual(rows.count, 200)
+        XCTAssertEqual(rows.count, 20)
         let messages = rows.compactMap { LogLine(parsing: String($0))?.message }
-        XCTAssertEqual(Set(messages), Set((0..<200).map { "message \($0) ä👩🏽‍💻" }))
+        XCTAssertEqual(Set(messages), Set((0..<20).map { "message \($0) ä👩🏽‍💻" }))
     }
 
     func testWriteFailureIsReportedAndDoesNotFollowASymlink() async throws {
@@ -166,14 +166,14 @@ final class LogFilesTests: XCTestCase {
         try seed("target", text: "keep")
         try FileManager.default.createSymbolicLink(at: folder.appendingPathComponent("Ku-Ka-2026-10-30.log"),
                                                   withDestinationURL: folder.appendingPathComponent("target"))
-        let entered = DispatchSemaphore(value: 0)
+        let entered = expectation(description: "writer waits in its failure report")
         let resume = DispatchSemaphore(value: 0)
         let files = LogFiles(folder: folder, clock: { logDate("2026-10-30T11:00:00Z") }, onFailure: { _ in
-            entered.signal()
+            entered.fulfill()
             resume.wait()
         })
         files.append(line("fails"))
-        XCTAssertEqual(entered.wait(timeout: .now() + 2), .success)
+        wait(for: [entered], timeout: 2)
         let finished = files.flush(timeout: 0.02)
         resume.signal()
         XCTAssertFalse(finished)

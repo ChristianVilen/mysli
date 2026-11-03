@@ -22,7 +22,8 @@ final class WordReviewWindowTests: XCTestCase {
     private var controller: WordReviewController!
     private var sut: WordReviewWindowController!
 
-    override func setUp() async throws {
+    override func setUpWithError() throws {
+        try super.setUpWithError()
         let base = try makeTemporaryDirectory()
         root = base.appendingPathComponent("Meetings", isDirectory: true)
         listURL = base.appendingPathComponent("known-words.md")
@@ -40,8 +41,9 @@ final class WordReviewWindowTests: XCTestCase {
         sut.bindController()
     }
 
-    override func tearDown() async throws {
+    override func tearDown() {
         sut.close()
+        super.tearDown()
     }
 
     @discardableResult
@@ -212,21 +214,18 @@ final class WordReviewWindowTests: XCTestCase {
         XCTAssertFalse(texts.contains { $0.contains("ordinary words") }, "a name is never ordinary words")
     }
 
-    func testAnErrorShowsItsTextKeepsWhatWasTypedAndGoesAtTheNextAction() throws {
+    func testAnErrorShowsItsTextAndKeepsWhatWasTyped() throws {
         try reviewedMeeting(on: 23, asking: [convio, yuri])
         sut.show(nil)
         try FileManager.default.createDirectory(at: lockURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         let otherKuKa = try FileLock.acquire(at: lockURL)
+        defer { otherKuKa.release() }
 
         type("Konvia")
         click("Save")
 
-        XCTAssertEqual(texts.last, "Another Ku-Ka is saving to the known-words list. Try again.")
+        XCTAssertEqual(texts.last, KnownWordsFileError.busy.localizedDescription)
         XCTAssertEqual(field?.stringValue, "Konvia")
-        otherKuKa.release()
-
-        click("Skip")
-        XCTAssertFalse(texts.contains { $0.hasPrefix("Another Ku-Ka") })
     }
 
     func testTheButtonsAndTheFieldHaveVoiceOverLabels() throws {

@@ -238,6 +238,15 @@ final class RecordingClockTests: XCTestCase {
         XCTAssertEqual(clock.pauses.map(\.duration), [30, 45])
     }
 
+    func testEachPauseHasTheFilePositionWhereItsResumeGapStarts() {
+        var clock = RecordingClock(origin: HostTime(seconds: 100))
+        clock.pause(at: HostTime(seconds: 160))
+        clock.resume(at: HostTime(seconds: 190))
+        clock.pause(at: HostTime(seconds: 200))
+
+        XCTAssertEqual(clock.pauses.map(\.filePosition), [60, 73])
+    }
+
     func testRecordedTimeShowsHoursOnlyWhenNeeded() {
         XCTAssertEqual(RecordedTime.format(0), "0:00")
         XCTAssertEqual(RecordedTime.format(245), "4:05")

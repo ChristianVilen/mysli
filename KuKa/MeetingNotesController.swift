@@ -33,6 +33,7 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
     private let wordsToCheck: (MeetingFolder?) -> Int
     private let notifier: Notifying
     private let openURL: (URL) -> Void
+    private let meterInterval: TimeInterval
 
     private var queue: [Job] = []
     private var current: (job: Job, activity: String, snapshot: String?)?
@@ -72,7 +73,8 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
          wordsToCheck: @escaping (MeetingFolder?) -> Int,
          summaryTool: @escaping () -> SummaryTool,
          notifier: Notifying = SystemNotifier.shared,
-         openURL: @escaping (URL) -> Void = { NSWorkspace.shared.open($0) }) {
+         openURL: @escaping (URL) -> Void = { NSWorkspace.shared.open($0) },
+         meterInterval: TimeInterval = 0.1) {
         self.recorder = recorder
         self.root = root
         self.processor = processor
@@ -80,6 +82,7 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
         self.wordsToCheck = wordsToCheck
         self.notifier = notifier
         self.openURL = openURL
+        self.meterInterval = meterInterval
         statusLineItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
         meterItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
         recordItem = NSMenuItem(title: "", action: #selector(recordClicked), keyEquivalent: "")
@@ -216,6 +219,7 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
     func typedNotes(for meeting: MeetingFolder) throws -> MeetingTypedNotesSession {
         if let session = notesSessions[meeting] { return session }
         let session = try MeetingTypedNotesSession(meeting: meeting)
+        session.noteTime = { [weak self] in self?.recorder.noteTime(for: meeting) ?? .afterRecording }
         notesSessions[meeting] = session
         session.context = { [weak self] in self?.notesContext(for: meeting) ?? (.idle, .idle) }
         session.onSaved = { [weak self] in self?.notesSaved(for: meeting) }
@@ -503,9 +507,10 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
         }
         refreshMeters()
         guard meterTimer == nil else { return }
-        let timer = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in
+        let timer = Timer(timeInterval: meterInterval, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.refreshMeters() }
         }
+        // .common mode: the menu is open, and menu tracking does not fire default-mode timers.
         RunLoop.main.add(timer, forMode: .common)
         meterTimer = timer
     }

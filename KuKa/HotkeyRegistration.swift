@@ -57,6 +57,8 @@ final class CarbonHotkeyRegistrar {
         return issues
     }
 
+    // RegisterEventHotKey succeeds even when an enabled macOS shortcut uses the same keys, so only
+    // this list shows a conflict. A failed lookup blocks registration instead of registering blindly.
     private func systemIssues(for desired: Set<HotkeyShortcut>) -> [HotkeyShortcut: HotkeyRegistrationFailure] {
         guard !desired.isEmpty else { return [:] }
         var array: Unmanaged<CFArray>?

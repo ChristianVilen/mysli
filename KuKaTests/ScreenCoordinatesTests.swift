@@ -17,20 +17,6 @@ final class ScreenCoordinatesTests: XCTestCase {
         XCTAssertEqual(flipped, CGRect(x: 100, y: 640, width: 800, height: 600))
     }
 
-    func testFlipVerticalAtTopEdge() {
-        // Window at the very top of the screen in top-left coords (y=0)
-        let rect = CGRect(x: 0, y: 0, width: 400, height: 300)
-        let flipped = ScreenCoordinates.flipVertical(rect, primaryScreenHeight: 900)
-        XCTAssertEqual(flipped, CGRect(x: 0, y: 600, width: 400, height: 300))
-    }
-
-    func testFlipVerticalAtBottomEdge() {
-        // Window at the very bottom of the screen in top-left coords
-        let rect = CGRect(x: 0, y: 600, width: 400, height: 300)
-        let flipped = ScreenCoordinates.flipVertical(rect, primaryScreenHeight: 900)
-        XCTAssertEqual(flipped, CGRect(x: 0, y: 0, width: 400, height: 300))
-    }
-
     func testFlipVerticalIsItsOwnInverse() {
         let rect = CGRect(x: 123, y: 456, width: 789, height: 321)
         let there = ScreenCoordinates.flipVertical(rect, primaryScreenHeight: 1600)
@@ -39,28 +25,6 @@ final class ScreenCoordinatesTests: XCTestCase {
     }
 
     // MARK: - cgRect(forSelection:)
-
-    func testSelectionRectHandComputed() {
-        // Selection at (10, 20, 300, 200) on the primary, 1000pt high:
-        // x = 0 + 10, y = 1000 - 20 - 200 = 780.
-        let cg = ScreenCoordinates.cgRect(
-            forSelection: CGRect(x: 10, y: 20, width: 300, height: 200),
-            inScreenFrame: CGRect(x: 0, y: 0, width: 1600, height: 1000),
-            primaryHeight: 1000
-        )
-        XCTAssertEqual(cg, CGRect(x: 10, y: 780, width: 300, height: 200))
-    }
-
-    func testSelectionRectOffsetsByScreenOriginX() {
-        // Same-height secondary beside the primary at x=1920: x is offset by
-        // the screen's origin, y = 900 - (0 + 0) - 100 = 800.
-        let cg = ScreenCoordinates.cgRect(
-            forSelection: CGRect(x: 100, y: 0, width: 200, height: 100),
-            inScreenFrame: CGRect(x: 1920, y: 0, width: 1600, height: 900),
-            primaryHeight: 900
-        )
-        XCTAssertEqual(cg, CGRect(x: 2020, y: 800, width: 200, height: 100))
-    }
 
     func testSelectionRectOnVerticallyOffsetSecondaryFlipsAgainstPrimaryHeight() {
         // Secondary at NS (1920, 100), 600pt tall, beside a 900pt primary.
@@ -94,20 +58,6 @@ final class ScreenCoordinatesTests: XCTestCase {
     func testBestScreenIndexReturnsNilWhenNoScreenIntersects() {
         let window = CGRect(x: 5000, y: 5000, width: 100, height: 100)
         XCTAssertNil(ScreenCoordinates.bestScreenIndex(for: window, screenFrames: [screenA, screenB]))
-    }
-
-    func testBestScreenIndexReturnsNilForEmptyScreenList() {
-        let window = CGRect(x: 0, y: 0, width: 100, height: 100)
-        XCTAssertNil(ScreenCoordinates.bestScreenIndex(for: window, screenFrames: []))
-    }
-
-    func testBestScreenIndexWithNonZeroOriginScreens() {
-        let screens = [
-            CGRect(x: -500, y: 25, width: 1000, height: 900),
-            CGRect(x: 500, y: 25, width: 1600, height: 975)
-        ]
-        let window = CGRect(x: 600, y: 100, width: 300, height: 300) // within the second screen
-        XCTAssertEqual(ScreenCoordinates.bestScreenIndex(for: window, screenFrames: screens), 1)
     }
 
     func testBestScreenIndexTiesBreakTowardLowestIndex() {

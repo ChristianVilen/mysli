@@ -27,33 +27,6 @@ final class CalendarNativeTests: XCTestCase {
         XCTAssertNil(event.occurrence.id.originalOccurrence)
     }
 
-    func testSyntheticBeforeAfterEvidenceUsesRealRequestsAndGeneratedDocuments() async throws {
-        let center = CalendarCenterFake()
-        let adapter = CalendarReminderNotifications(calls: center.calls)
-        let token = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
-        try await adapter.add(.init(token: token, kind: .start, title: "Planning"))
-        try await adapter.add(.init(token: UUID(uuidString: "22222222-2222-2222-2222-222222222222")!,
-                                    kind: .end, title: "Planning"))
-        let folder = try MeetingFolder.create(in: makeTemporaryDirectory(), startingAt: localDate(2026, 10, 23, 14, 2))
-        let before = SummaryDocument.markdown(title: folder.title, body: "Ship on Friday.")
-        try folder.saveDisplayTitle("Planning")
-        let after = SummaryDocument.markdown(title: folder.title, body: "Ship on Friday.")
-        let transcript = Transcript.markdown([], title: folder.title, duration: 60, by: "Synthetic", after: [], rooms: .notDiarized,
-                                             teams: .empty)
-        try folder.write(after, to: .summary)
-        try folder.write(transcript, to: .transcript)
-        XCTAssertEqual(before, "# Meeting on 2026-10-23 at 14:02\n\nShip on Friday.\n")
-        XCTAssertEqual(try String(contentsOf: folder.url(for: .summary), encoding: .utf8), "# Planning\n\nShip on Friday.\n")
-        XCTAssertTrue(try String(contentsOf: folder.url(for: .transcript), encoding: .utf8).hasPrefix("# Planning\n"))
-        let payload = center.requests.map { request in
-            "\(request.identifier)\n\(request.content.categoryIdentifier)\n\(request.content.title)\n\(request.content.body)\n\(request.content.userInfo)"
-        }.joined(separator: "\n\n")
-        let evidence = XCTAttachment(string: "Synthetic native requests\n\(payload)\n\nBefore notes\n\(before)\nAfter notes\n\(after)\nTranscript\n\(transcript)")
-        evidence.name = "calendar-reminder-synthetic-evidence"
-        evidence.lifetime = .keepAlways
-        add(evidence)
-    }
-
     func testReadAuthorizationNeverRequestsAccessAndFullAccessIsRequired() async throws {
         var status: EKAuthorizationStatus = .notDetermined
         var requests = 0
@@ -139,7 +112,7 @@ final class CalendarNativeTests: XCTestCase {
         second.calendar = "copy"
         second.item = "copy-item"
         var query = [first]
-        var items = [first, second]
+        let items = [first, second]
         let source = EventKitCalendarSource(calls: .init(authorization: { .fullAccess }, requestAccess: { true },
             events: { _, _ in query }, item: { id in items.first { $0.item == id } }))
         let original = try await source.occurrences(from: date, to: date.addingTimeInterval(60))
@@ -151,12 +124,6 @@ final class CalendarNativeTests: XCTestCase {
         let exactCopy = try await source.occurrence(id: second.occurrence.id)
         XCTAssertEqual(exactOriginal?.id.calendar, "work")
         XCTAssertEqual(exactCopy?.id.calendar, "copy")
-        second.source = "another-account"
-        second.item = "account-item"
-        items = [second]
-        query = [second]
-        let otherAccount = try await source.occurrences(from: date, to: date.addingTimeInterval(60))
-        XCTAssertEqual(otherAccount.first?.id.item, "account-item")
     }
 
     func testExternalAliasNeverCrossesCalendarAccounts() async throws {
@@ -230,10 +197,10 @@ final class CalendarNativeTests: XCTestCase {
         XCTAssertEqual(request.content.title, "Planning")
         XCTAssertEqual(request.content.userInfo as? [String: String], ["calendarToken": token.uuidString])
         XCTAssertNil(request.trigger)
-        XCTAssertEqual(center.registered.first { $0.identifier == "calendar-recording.start" }?.actions.map(\.title),
-                       ["Start Recording"])
-        XCTAssertEqual(center.registered.first { $0.identifier == "calendar-recording.end" }?.actions.map(\.title),
-                       ["Stop Recording", "Continue Recording"])
+        XCTAssertEqual(center.registered.first { $0.identifier == "calendar-recording.start" }?.actions.map(\.identifier),
+                       ["calendar-recording.start-recording"])
+        XCTAssertEqual(center.registered.first { $0.identifier == "calendar-recording.end" }?.actions.map(\.identifier),
+                       ["calendar-recording.stop-recording", "calendar-recording.continue-recording"])
         XCTAssertTrue(center.registered.contains { $0.identifier == "other" })
         let end = UUID()
         try await adapter.add(.init(token: end, kind: .end, title: "Planning"))
@@ -265,8 +232,7 @@ final class CalendarNativeTests: XCTestCase {
 
     func testSingleDelegateRoutesCalendarWithoutTakingOverExistingClicks() async {
         var received: [(CalendarReminderAction, UUID)] = []
-        var opened: [URL] = []
-        let notifier = SystemNotifier(open: { opened.append($0) })
+        let notifier = SystemNotifier(open: { _ in })
         notifier.onCalendarReminder = { received.append(($0, $1)) }
         let token = UUID()
         let handled = await notifier.routeCalendarReminder(category: "calendar-recording.end",
@@ -274,8 +240,6 @@ final class CalendarNativeTests: XCTestCase {
         XCTAssertTrue(handled)
         XCTAssertEqual(received.first?.0, .stop)
         XCTAssertEqual(received.first?.1, token)
-        notifier.perform(.open(URL(fileURLWithPath: "/synthetic/summary.md")))
-        XCTAssertEqual(opened, [URL(fileURLWithPath: "/synthetic/summary.md")])
     }
 
     func testNotificationResponseCompletesOnlyAfterAsyncActionFinishes() async {

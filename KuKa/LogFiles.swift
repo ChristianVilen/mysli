@@ -14,6 +14,7 @@ final class LogFiles: @unchecked Sendable {
     private let folder: URL
     private let clock: @Sendable () -> Date
     private let calendar: Calendar
+    // Must not log through LogOutput.write: a failed write would queue another write that fails.
     private let onFailure: @Sendable (Error) -> Void
     private let queue = DispatchQueue(label: "com.kuka.screenshot.log-files", qos: .utility)
     private var cleanedDay: Date?
@@ -51,9 +52,10 @@ final class LogFiles: @unchecked Sendable {
     }
 
     func flush(timeout: TimeInterval) -> Bool {
-        let finished = DispatchSemaphore(value: 0)
-        queue.async { finished.signal() }
-        return finished.wait(timeout: .now() + timeout) == .success
+        // Unlike a semaphore, waiting on a work item raises the queue to the waiting thread's priority.
+        let marker = DispatchWorkItem {}
+        queue.async(execute: marker)
+        return marker.wait(timeout: .now() + timeout) == .success
     }
 
     func deleteAll() async throws {

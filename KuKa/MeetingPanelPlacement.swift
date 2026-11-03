@@ -10,6 +10,7 @@ enum MeetingPanelPlacement {
     /// visible frame of the screen it is on. With no saved corner, or one on no screen (a
     /// display was unplugged), the top-right of the primary screen's visible frame, `inset` in.
     /// Anchored top-right, so the pill grows to the left when a state makes it wider.
+    /// AppKit keeps only titled windows on screen, so this borderless panel clamps itself.
     static func pillTopRight(saved: CGPoint?, pillSize: CGSize, screens: [ScreenGeometry]) -> CGPoint? {
         if let saved, let screen = screen(of: pillRect(topRight: saved, size: pillSize), in: screens) {
             let visible = screen.visibleFrame
@@ -35,6 +36,28 @@ enum MeetingPanelPlacement {
 
     static func clampedDrawerHeight(_ height: CGFloat) -> CGFloat {
         min(max(height, drawerHeights.lowerBound), drawerHeights.upperBound)
+    }
+
+    static let notesWidths: ClosedRange<CGFloat> = 460...900
+    /// The notes and the transcript share the drawer, so it is never shorter than this with notes.
+    static let minimumNotesDrawerHeight: CGFloat = 380
+
+    static func clampedNotesWidth(_ width: CGFloat) -> CGFloat {
+        min(max(width, notesWidths.lowerBound), notesWidths.upperBound)
+    }
+
+    /// Moves and shrinks a frame with notes into the visible frame of the screen it is on, and
+    /// moves the pill's corner by the same amount, so a drag starts and saves where the pill is.
+    static func fitted(_ frame: CGRect, pillTopRight: CGPoint, drawerAbove: Bool,
+                       screens: [ScreenGeometry]) -> (frame: CGRect, pillTopRight: CGPoint) {
+        guard let visible = screen(of: frame, in: screens)?.visibleFrame else { return (frame, pillTopRight) }
+        let width = min(frame.width, visible.width)
+        let height = min(frame.height, visible.height)
+        let fitted = CGRect(x: min(max(frame.minX, visible.minX), visible.maxX - width),
+                            y: min(max(frame.minY, visible.minY), visible.maxY - height),
+                            width: width, height: height)
+        let pillMoved = drawerAbove ? fitted.minY - frame.minY : fitted.maxY - frame.maxY
+        return (fitted, CGPoint(x: pillTopRight.x + fitted.maxX - frame.maxX, y: pillTopRight.y + pillMoved))
     }
 
     private static func pillRect(topRight: CGPoint, size: CGSize) -> CGRect {

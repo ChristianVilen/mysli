@@ -14,7 +14,7 @@ final class LogWindowController: NSWindowController, NSWindowDelegate {
     let textView = NSTextView()
     private(set) var operationTask: Task<Void, Never>?
     private var refreshTask: Task<Void, Never>?
-    private var timer: Timer?
+    private var stopRepeating: (() -> Void)?
     private var generation = UUID()
     private var isOpen = false
     private var isDeleting = false
@@ -32,7 +32,8 @@ final class LogWindowController: NSWindowController, NSWindowDelegate {
     private let saveText: (NSWindow, String) -> Void
     private let confirmDelete: (NSWindow) async -> Bool
     private let deleteLogs: () async throws -> Void
-    private let refreshInterval: TimeInterval
+    private let repeatRefresh: (@escaping @MainActor () -> Void) -> () -> Void
+    private let rowLimit: Int
 
     init(reader: any LogReading, launchDate: Date, processID: Int32 = ProcessInfo.processInfo.processIdentifier,
          now: @escaping () -> Date = Date.init, calendar: Calendar = .current,
@@ -41,7 +42,9 @@ final class LogWindowController: NSWindowController, NSWindowDelegate {
          copy: @escaping (String) -> Void = { NSPasteboard.general.clearContents(); NSPasteboard.general.setString($0, forType: .string) },
          save: @escaping (NSWindow, String) -> Void = { LogWindowController.save($1, in: $0) },
          confirmDelete: @escaping (NSWindow) async -> Bool = { await LogWindowController.confirmDeletion(in: $0) },
-         deleteLogs: @escaping () async throws -> Void, refreshInterval: TimeInterval = 2) {
+         deleteLogs: @escaping () async throws -> Void,
+         repeatRefresh: @escaping (@escaping @MainActor () -> Void) -> () -> Void = LogWindowController.everyTwoSeconds,
+         rowLimit: Int = LogFilter.defaultRowLimit) {
         self.reader = reader
         // File timestamps have millisecond precision, including the first line after launch.
         self.launchDate = Date(timeIntervalSince1970: floor(launchDate.timeIntervalSince1970 * 1000) / 1000)
@@ -54,7 +57,8 @@ final class LogWindowController: NSWindowController, NSWindowDelegate {
         self.saveText = save
         self.confirmDelete = confirmDelete
         self.deleteLogs = deleteLogs
-        self.refreshInterval = refreshInterval
+        self.repeatRefresh = repeatRefresh
+        self.rowLimit = rowLimit
         let window = LogWindow(contentRect: NSRect(x: 0, y: 0, width: 1000, height: 600),
                                styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
         window.title = "Ku-Ka Log"
@@ -74,15 +78,10 @@ final class LogWindowController: NSWindowController, NSWindowDelegate {
         if !isOpen {
             isOpen = true
             actionError = nil
-            let timer = Timer(timeInterval: refreshInterval, repeats: true) { [weak self] _ in
-                MainActor.assumeIsolated {
-                    guard let self, self.refreshTask == nil else { return }
-                    self.refresh()
-                }
+            stopRepeating = repeatRefresh { [weak self] in
+                guard let self, self.refreshTask == nil else { return }
+                self.refresh()
             }
-            timer.tolerance = min(0.2, refreshInterval / 10)
-            RunLoop.main.add(timer, forMode: .common)
-            self.timer = timer
         }
         activation.open(window)
         present(window)
@@ -98,8 +97,8 @@ final class LogWindowController: NSWindowController, NSWindowDelegate {
         guard isOpen else { return }
         isOpen = false
         generation = UUID()
-        timer?.invalidate()
-        timer = nil
+        stopRepeating?()
+        stopRepeating = nil
         refreshTask?.cancel()
         refreshTask = nil
         if let window { activation.close(window) }
@@ -113,7 +112,7 @@ final class LogWindowController: NSWindowController, NSWindowDelegate {
         generation = token
         let filter = LogFilter(range: LogRange.allCases[range.indexOfSelectedItem],
                                category: category.indexOfSelectedItem == 0 ? nil : category.titleOfSelectedItem,
-                               errorsOnly: level.indexOfSelectedItem == 1)
+                               errorsOnly: level.indexOfSelectedItem == 1, rowLimit: rowLimit)
         let date = now()
         let launch = launchDate
         let pid = processID
@@ -213,6 +212,13 @@ final class LogWindowController: NSWindowController, NSWindowDelegate {
         let item = NSMenuItem()
         item.tag = NSTextFinder.Action.showFindInterface.rawValue
         textView.performFindPanelAction(item)
+    }
+
+    nonisolated private static func everyTwoSeconds(_ tick: @escaping @MainActor () -> Void) -> () -> Void {
+        let timer = Timer(timeInterval: 2, repeats: true) { _ in MainActor.assumeIsolated { tick() } }
+        timer.tolerance = 0.2
+        RunLoop.main.add(timer, forMode: .common)
+        return { timer.invalidate() }
     }
 
     static func deletionAlert() -> NSAlert {

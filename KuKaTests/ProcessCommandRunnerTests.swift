@@ -36,19 +36,19 @@ final class ProcessCommandRunnerTests: XCTestCase {
     func testAChildThatRunsTooLongIsStopped() async throws {
         let started = Date()
 
-        let result = try await shell("sleep 10", timeout: .milliseconds(300))
+        let result = try await shell("sleep 10", timeout: .milliseconds(50))
 
         XCTAssertEqual(result.termination, .timedOut)
         XCTAssertLessThan(Date().timeIntervalSince(started), 5)
     }
 
     func testAChildThatIgnoresTerminateIsKilledAfterTheGracePeriod() async throws {
-        let runner = ProcessCommandRunner(killGrace: .milliseconds(200))
+        let runner = ProcessCommandRunner(killGrace: .milliseconds(20))
         let started = Date()
 
         let result = try await runner.run(executable: URL(fileURLWithPath: "/bin/sh"),
                                           arguments: ["-c", "trap '' TERM; exec sleep 8"], input: nil,
-                                          searchPath: searchPath, timeout: .milliseconds(300))
+                                          searchPath: searchPath, timeout: .milliseconds(50))
 
         XCTAssertEqual(result.termination, .timedOut)
         XCTAssertLessThan(Date().timeIntervalSince(started), 4)
@@ -81,11 +81,11 @@ final class ProcessCommandRunnerTests: XCTestCase {
     }
 
     func testCancellingTheCallerStopsTheChild() async throws {
-        let marker = try makeTemporaryDirectory().appendingPathComponent("finished")
+        let pidFile = try makeTemporaryDirectory().appendingPathComponent("pid")
         let run = Task {
-            try await self.shell("sleep 1; touch '\(marker.path)'", timeout: .seconds(60))
+            try await self.shell("echo $$ > '\(pidFile.path)'; exec sleep 10", timeout: .seconds(60))
         }
-        try await Task.sleep(for: .milliseconds(300))
+        let child = try await startedChild(writingItsIDTo: pidFile)
 
         run.cancel()
 
@@ -95,7 +95,29 @@ final class ProcessCommandRunnerTests: XCTestCase {
         } catch {
             XCTAssertTrue(error is CancellationError, "\(error)")
         }
-        try await Task.sleep(for: .seconds(1.5))
-        XCTAssertFalse(FileManager.default.fileExists(atPath: marker.path), "the child kept running after cancellation")
+        let ended = await processEnds(child)
+        XCTAssertTrue(ended, "the child kept running after cancellation")
+    }
+
+    /// The runner returns after it sends SIGTERM, and the child ends a moment later.
+    private func processEnds(_ pid: pid_t) async -> Bool {
+        let deadline = Date().addingTimeInterval(2)
+        while kill(pid, 0) == 0 {
+            guard Date() < deadline else { return false }
+            try? await Task.sleep(for: .milliseconds(2))
+        }
+        return true
+    }
+
+    private func startedChild(writingItsIDTo file: URL) async throws -> pid_t {
+        let deadline = Date().addingTimeInterval(5)
+        while Date() < deadline {
+            if let text = try? String(contentsOf: file, encoding: .utf8),
+               let pid = pid_t(text.trimmingCharacters(in: .whitespacesAndNewlines)) {
+                return pid
+            }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        throw TestError(errorDescription: "The child did not start.")
     }
 }

@@ -34,12 +34,16 @@ struct TeamsSpeakerHistory {
     }
 
     private var entries: [Entry] = []
-    static let capacity = 36_000
+    let capacity: Int
+
+    init(capacity: Int = 36_000) {
+        self.capacity = capacity
+    }
 
     mutating func append(_ sample: TeamsSpeakerObservation, runID: UUID) -> Bool {
-        guard entries.count < Self.capacity else { return false }
+        guard entries.count < capacity else { return false }
         entries.append(Entry(sample: sample, runID: runID))
-        return entries.count < Self.capacity
+        return entries.count < capacity
     }
 
     func finish(clock: RecordingClock, endingAt stop: HostTime) -> TeamsSpeakerEvidence {

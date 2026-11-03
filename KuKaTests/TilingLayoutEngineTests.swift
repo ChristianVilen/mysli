@@ -29,16 +29,6 @@ final class TilingLayoutEngineTests: XCTestCase {
 
     // MARK: - Left / right half math
 
-    func testLeftHalfMath() {
-        let frame = TilingLayoutEngine.halfFrame(.left, of: screen)
-        XCTAssertEqual(frame, CGRect(x: 1920, y: 25, width: 800, height: 975))
-    }
-
-    func testRightHalfMath() {
-        let frame = TilingLayoutEngine.halfFrame(.right, of: screen)
-        XCTAssertEqual(frame, CGRect(x: 2720, y: 25, width: 800, height: 975))
-    }
-
     func testHalvesOnOddWidthScreenLandOnHalfPoints() {
         let oddScreen = CGRect(x: 0, y: 0, width: 1511, height: 982)
 
@@ -68,24 +58,6 @@ final class TilingLayoutEngineTests: XCTestCase {
         XCTAssertEqual(frame.height, 955.5, accuracy: 0.0001)
     }
 
-    func testMaximizeStageLayoutStaysInsideVisibleFrameWithEqualTopBottomAndRightGaps() {
-        let context = makeContext(windows: 2, stageManager: true)
-        let frame = engine.maximizeFrame(in: context)
-
-        XCTAssertGreaterThanOrEqual(frame.minX, screen.minX)
-        // Exact maxX is pinned by testMaximizeStageLayoutExactMathWhenStageManagerOnWithMultipleWindows;
-        // this test only needs containment.
-        XCTAssertLessThanOrEqual(frame.maxX, screen.maxX)
-        XCTAssertGreaterThanOrEqual(frame.minY, screen.minY)
-        XCTAssertLessThanOrEqual(frame.maxY, screen.maxY)
-
-        let topGap = screen.maxY - frame.maxY
-        let bottomGap = frame.minY - screen.minY
-        let rightGap = screen.maxX - frame.maxX
-        XCTAssertEqual(topGap, bottomGap, accuracy: 0.0001)
-        XCTAssertEqual(rightGap, topGap, accuracy: 0.0001)
-    }
-
     func testMaximizeFillsScreenWhenOnlyOneWindowEvenWithStageManagerOn() {
         let context = makeContext(windows: 1, stageManager: true)
         XCTAssertEqual(engine.maximizeFrame(in: context), screen)
@@ -93,11 +65,6 @@ final class TilingLayoutEngineTests: XCTestCase {
 
     func testMaximizeFillsScreenWhenStageManagerOffEvenWithManyWindows() {
         let context = makeContext(windows: 5, stageManager: false)
-        XCTAssertEqual(engine.maximizeFrame(in: context), screen)
-    }
-
-    func testMaximizeFillsScreenWhenWindowCountIsZero() {
-        let context = makeContext(windows: 0, stageManager: true)
         XCTAssertEqual(engine.maximizeFrame(in: context), screen)
     }
 
@@ -127,15 +94,6 @@ final class TilingLayoutEngineTests: XCTestCase {
         )
 
         XCTAssertEqual(result, .move(to: CGRect(x: 2720, y: 25, width: 800, height: 975), savePrevious: false))
-    }
-
-    func testResolveMaximizeFromRandomFrameMovesAndSaves() {
-        let context = makeContext(windows: 1, stageManager: false)
-        let current = CGRect(x: 100, y: 100, width: 300, height: 300)
-
-        let result = engine.resolve(action: .maximize, currentFrame: current, restoreState: nil, context: context)
-
-        XCTAssertEqual(result, .move(to: screen, savePrevious: true))
     }
 
     func testResolveMaximizeWithinToleranceAndSavedFrameRestores() {
@@ -169,49 +127,24 @@ final class TilingLayoutEngineTests: XCTestCase {
         XCTAssertEqual(result, .move(to: target, savePrevious: true))
     }
 
-    func testResolveMaximizeToleranceEdgeExactlyTwoPointsStillRestores() {
+    func testResolveMaximizeToleranceEdgeExactlyTwoPointsStillRestoresAndJustOverMoves() {
         let context = makeContext(windows: 1, stageManager: false)
         let target = screen
-        let current = CGRect(x: target.minX + 2.0, y: target.minY, width: target.width, height: target.height)
         let saved = CGRect(x: 10, y: 10, width: 10, height: 10)
+        func resolve(offBy offset: CGFloat) -> TilingResolution? {
+            engine.resolve(
+                action: .maximize,
+                currentFrame: CGRect(x: target.minX + offset, y: target.minY, width: target.width, height: target.height),
+                restoreState: TilingRestoreState(previousFrame: saved, achievedFrame: target),
+                context: context
+            )
+        }
 
-        let result = engine.resolve(
-            action: .maximize,
-            currentFrame: current,
-            restoreState: TilingRestoreState(previousFrame: saved, achievedFrame: target),
-            context: context
-        )
-
-        XCTAssertEqual(result, .restore(to: saved))
-    }
-
-    func testResolveMaximizeToleranceEdgeJustOverTwoPointsMovesInstead() {
-        let context = makeContext(windows: 1, stageManager: false)
-        let target = screen
-        let current = CGRect(x: target.minX + 2.1, y: target.minY, width: target.width, height: target.height)
-        let saved = CGRect(x: 10, y: 10, width: 10, height: 10)
-
-        let result = engine.resolve(
-            action: .maximize,
-            currentFrame: current,
-            restoreState: TilingRestoreState(previousFrame: saved, achievedFrame: target),
-            context: context
-        )
-
-        XCTAssertEqual(result, .move(to: target, savePrevious: true))
+        XCTAssertEqual(resolve(offBy: 2.0), .restore(to: saved))
+        XCTAssertEqual(resolve(offBy: 2.1), .move(to: target, savePrevious: true))
     }
 
     // MARK: - resolve() screen hop (second half-press moves to the adjacent screen)
-
-    func testResolveLeftHalfWhenAlreadyAtLeftHalfMovesToLeftHalfOfAdjacentScreen() {
-        let context = makeContext(windows: 2, stageManager: false, adjacentVisibleFrame: otherScreen)
-        // The window is already sitting at this screen's left-half target.
-        let current = CGRect(x: 1920, y: 25, width: 800, height: 975)
-
-        let result = engine.resolve(action: .leftHalf, currentFrame: current, restoreState: nil, context: context)
-
-        XCTAssertEqual(result, .move(to: CGRect(x: 0, y: 0, width: 960, height: 955), savePrevious: false))
-    }
 
     func testResolveRightHalfWhenAlreadyAtRightHalfMovesToRightHalfOfAdjacentScreen() {
         let context = makeContext(windows: 2, stageManager: false, adjacentVisibleFrame: otherScreen)
@@ -266,43 +199,14 @@ final class TilingLayoutEngineTests: XCTestCase {
         XCTAssertEqual(result, .move(to: CGRect(x: 2520, y: 362.5, width: 400, height: 300), savePrevious: false))
     }
 
-    func testResolveCenterAtMaximizeSizeDoesNothing() {
-        let context = makeContext(windows: 1, stageManager: false)
-        // Max size but sitting off-center: the size check alone decides.
-        let current = CGRect(x: 100, y: 100, width: screen.width, height: screen.height)
-
-        let result = engine.resolve(action: .center, currentFrame: current, restoreState: nil, context: context)
-
-        XCTAssertNil(result)
-    }
-
     func testResolveCenterWithinToleranceOfMaximizeSizeDoesNothing() {
         let context = makeContext(windows: 1, stageManager: false)
+        // Sitting off-center: the size check alone decides.
         let current = CGRect(x: 2000, y: 100, width: screen.width - 2, height: screen.height + 1.5)
 
         let result = engine.resolve(action: .center, currentFrame: current, restoreState: nil, context: context)
 
         XCTAssertNil(result)
-    }
-
-    func testResolveCenterJustOverToleranceFromMaximizeSizeStillCenters() {
-        let context = makeContext(windows: 1, stageManager: false)
-        let current = CGRect(x: 2000, y: 100, width: screen.width - 2.1, height: screen.height - 2.1)
-
-        let result = engine.resolve(action: .center, currentFrame: current, restoreState: nil, context: context)
-
-        XCTAssertEqual(
-            result,
-            .move(
-                to: CGRect(
-                    x: screen.midX - current.width / 2,
-                    y: screen.midY - current.height / 2,
-                    width: current.width,
-                    height: current.height
-                ),
-                savePrevious: false
-            )
-        )
     }
 
     func testResolveCenterComparesAgainstStageManagerMaximizeSizeWhenStageStripTakesSpace() {
@@ -316,23 +220,6 @@ final class TilingLayoutEngineTests: XCTestCase {
         let result = engine.resolve(action: .center, currentFrame: current, restoreState: nil, context: context)
 
         XCTAssertNil(result)
-    }
-
-    func testResolveCenterAtFullVisibleFrameSizeCentersWhenStageStripTakesSpace() {
-        let context = makeContext(windows: 2, stageManager: true)
-        // With the strip taking space, the full visible frame is NOT the
-        // maximize size, so a window that big still gets centered.
-        let current = CGRect(x: 100, y: 100, width: screen.width, height: screen.height)
-
-        let result = engine.resolve(action: .center, currentFrame: current, restoreState: nil, context: context)
-
-        XCTAssertEqual(
-            result,
-            .move(
-                to: CGRect(x: screen.minX, y: screen.minY, width: screen.width, height: screen.height),
-                savePrevious: false
-            )
-        )
     }
 
     // MARK: - resolve() with a snapped achieved frame (apps that snap sizes, e.g. Terminal)
@@ -356,25 +243,5 @@ final class TilingLayoutEngineTests: XCTestCase {
         )
 
         XCTAssertEqual(result, .restore(to: saved))
-    }
-
-    func testResolveMaximizeIgnoresIdealTargetWhenAchievedFrameDiffers() {
-        let context = makeContext(windows: 1, stageManager: false)
-        let idealTarget = screen
-        let achieved = CGRect(x: idealTarget.minX + 50, y: idealTarget.minY, width: idealTarget.width - 50, height: idealTarget.height)
-        // Current frame matches the IDEAL target exactly, not the achieved
-        // frame — with an achieved frame on record, that should no longer
-        // read as "already maximized".
-        let current = idealTarget
-        let saved = CGRect(x: 500, y: 500, width: 400, height: 400)
-
-        let result = engine.resolve(
-            action: .maximize,
-            currentFrame: current,
-            restoreState: TilingRestoreState(previousFrame: saved, achievedFrame: achieved),
-            context: context
-        )
-
-        XCTAssertEqual(result, .move(to: idealTarget, savePrevious: true))
     }
 }

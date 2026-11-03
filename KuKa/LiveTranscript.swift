@@ -29,12 +29,11 @@ struct LiveRow: Equatable {
         case pause(duration: TimeInterval?)
     }
 
-    /// Recorded time, the same clock as the pill.
+    /// Audio-file position, the same timeline as the saved transcript and note rows.
     let at: TimeInterval
     let content: Content
 }
 
-/// What the drawer draws. Holds no host time and no file positions.
 struct LivePreview: Equatable {
     let status: LiveTranscript.Status
     let rows: [LiveRow]
@@ -136,24 +135,24 @@ struct LiveTranscript: Equatable {
         finalLines = Transcript.merge(spoken, rooms: .notDiarized, joinGap: nil)
     }
 
-    /// Rows in recorded time through `clock`, with one row per pause of `clock`. Each unsettled
-    /// tail goes after the rows that start at or before it, Them's first, as merge orders a tie.
+    /// Unsettled text stays below committed speech and pause markers until it becomes final.
     func preview(on clock: RecordingClock) -> LivePreview {
-        var rows = finalLines.map { LiveRow(at: clock.recordedTime(atFilePosition: $0.start),
+        var rows = finalLines.map { LiveRow(at: $0.start,
                                             content: .speech($0.speaker, text: $0.text, isFinal: true)) }
+        for pause in clock.pauses {
+            rows.insert(LiveRow(at: pause.filePosition, content: .pause(duration: pause.duration)),
+                        at: rows.firstIndex { $0.at >= pause.filePosition } ?? rows.endIndex)
+        }
+        var drafts: [LiveRow] = []
         for track in [MeetingTrack.system, .microphone] {
             guard let tail = tails[track], !tail.isSettled else { continue }
             for phrase in tail.phrases {
-                let row = LiveRow(at: clock.recordedTime(atFilePosition: phrase.start),
+                let row = LiveRow(at: phrase.start,
                                   content: .speech(track.speaker, text: phrase.text, isFinal: false))
-                rows.insert(row, at: rows.firstIndex { $0.at > row.at } ?? rows.endIndex)
+                drafts.append(row)
             }
         }
-        // Before speech at the same time: speech in the resume gap maps to the pause's time.
-        for pause in clock.pauses {
-            rows.insert(LiveRow(at: pause.at, content: .pause(duration: pause.duration)),
-                        at: rows.firstIndex { $0.at >= pause.at } ?? rows.endIndex)
-        }
+        rows.append(contentsOf: drafts.sorted { $0.at < $1.at })
         return LivePreview(status: status, rows: rows, behind: lag >= Self.behindThreshold ? lag : nil)
     }
 }

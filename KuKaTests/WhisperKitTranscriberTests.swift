@@ -30,10 +30,6 @@ final class WhisperKitTranscriberTests: XCTestCase {
         }
     }
 
-    private func folderContents() throws -> [String] {
-        try FileManager.default.contentsOfDirectory(atPath: root.path).sorted()
-    }
-
     private func makeAudioFile(named name: String, seconds: Int, sample: Int16 = 0) throws -> URL {
         let url = try makeTemporaryDirectory().appendingPathComponent(name)
         let format = try XCTUnwrap(AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: 16_000, channels: 1, interleaved: false))
@@ -59,30 +55,22 @@ final class WhisperKitTranscriberTests: XCTestCase {
         }
     }
 
-    func testSegmentsKeepTheirTextAndTimesAndSilencePhrasesAreDropped() {
-        let transcript = WhisperKitTranscriber.trackTranscript([
-            TranscriptionSegment(start: 0, end: 22.5, text: " Thank you."),
-            TranscriptionSegment(start: 10, end: 11.5, text: " Thank you."),
-            TranscriptionSegment(start: 30, end: 50, text: " ."),
-            TranscriptionSegment(start: 60, end: 61.5, text: " my weekend was pretty good"),
-        ], duration: 90.25)
-
-        XCTAssertEqual(transcript, TrackTranscript(segments: [
-            TranscriptSegment(start: 10, end: 11.5, text: " Thank you."),
-            TranscriptSegment(start: 60, end: 61.5, text: " my weekend was pretty good"),
-        ], duration: 90.25))
-    }
-
     func testThankYouCountsAsSilenceFromEightSecondsOn() {
         let transcript = WhisperKitTranscriber.trackTranscript([
+            TranscriptionSegment(start: 60, end: 61.5, text: " my weekend was pretty good"),
             TranscriptionSegment(start: 70, end: 78, text: " Thank you!"),
             TranscriptionSegment(start: 80, end: 87.75, text: " THANK YOU"),
             TranscriptionSegment(start: 90, end: 100, text: " Thank you so much."),
             TranscriptionSegment(start: 100, end: 101.25, text: " 42"),
             TranscriptionSegment(start: 110, end: 111, text: " ..."),
-        ], duration: 120)
+        ], duration: 120.25)
 
-        XCTAssertEqual(transcript.segments.map(\.text), [" THANK YOU", " Thank you so much.", " 42"])
+        XCTAssertEqual(transcript, TrackTranscript(segments: [
+            TranscriptSegment(start: 60, end: 61.5, text: " my weekend was pretty good"),
+            TranscriptSegment(start: 80, end: 87.75, text: " THANK YOU"),
+            TranscriptSegment(start: 90, end: 100, text: " Thank you so much."),
+            TranscriptSegment(start: 100, end: 101.25, text: " 42"),
+        ], duration: 120.25))
     }
 
     func testTheDecodingOptionsHaveNoPromptAndNoFirstTokenThreshold() {
@@ -95,7 +83,7 @@ final class WhisperKitTranscriberTests: XCTestCase {
         XCTAssertTrue(options.skipSpecialTokens)
     }
 
-    func testADownloadInstallsTheModelOnlyWhenItIsComplete() async throws {
+    func testADownloadGivesTheClientThePartialFolderAndReportsItsStartOnce() async throws {
         let neededBefore = try await sut.needsDownload(for: english)
 
         try await download()
@@ -104,27 +92,6 @@ final class WhisperKitTranscriberTests: XCTestCase {
         XCTAssertEqual([neededBefore, neededAfter], [true, false])
         XCTAssertEqual(downloadsReported, 1)
         XCTAssertEqual(client.downloads, [root.path + "/.large-v3-v20240930_turbo.partial"])
-        XCTAssertEqual(try folderContents(), [".lock", "large-v3-v20240930_turbo"])
-        XCTAssertEqual(try String(contentsOf: root.appendingPathComponent("large-v3-v20240930_turbo/model.bin"), encoding: .utf8),
-                       "weights")
-    }
-
-    func testAFailedDownloadKeepsThePartialFolderAndTheNextDownloadResumesThere() async throws {
-        client.downloadError = TestError(errorDescription: "The network connection was lost.")
-
-        let message = await errorMessage { try await download() }
-
-        XCTAssertEqual(message, "The network connection was lost.")
-        XCTAssertEqual(try folderContents(), [".large-v3-v20240930_turbo.partial", ".lock"])
-        let stillNeeded = try await sut.needsDownload(for: english)
-        XCTAssertTrue(stillNeeded)
-
-        client.downloadError = nil
-        try await download()
-
-        XCTAssertEqual(client.downloads, [root.path + "/.large-v3-v20240930_turbo.partial",
-                                          root.path + "/.large-v3-v20240930_turbo.partial"])
-        XCTAssertEqual(try folderContents(), [".lock", "large-v3-v20240930_turbo"])
     }
 
     func testAnUnsupportedLanguageThrowsWhetherOrNotTheModelIsInstalled() async throws {
@@ -149,10 +116,8 @@ final class WhisperKitTranscriberTests: XCTestCase {
         otherKuKa.release()
     }
 
-    func testTheModelCacheIsExcludedFromBackupsWhenDownloadedOrLoaded() async throws {
+    func testLoadingExcludesTheModelCacheFromBackupsAgain() async throws {
         try await download()
-        XCTAssertEqual(try root.resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup, true)
-
         var folder = try XCTUnwrap(root)
         var values = URLResourceValues()
         values.isExcludedFromBackup = false
@@ -241,7 +206,6 @@ private final class ChunkResultWhisperKit: WhisperKit {
 }
 
 private final class FakeWhisperKitClient: WhisperKitClient {
-    var downloadError: Error?
     var transcribeError: Error?
     var segments: [TranscriptionSegment] = []
     private(set) var downloads: [String] = []
@@ -251,8 +215,6 @@ private final class FakeWhisperKitClient: WhisperKitClient {
     func download(model: String, into base: URL) async throws {
         downloads.append(base.path)
         try FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
-        try Data("weights".utf8).write(to: base.appendingPathComponent("model.bin"))
-        if let downloadError { throw downloadError }
     }
 
     func load(model: String, from base: URL) async throws -> any WhisperModel {

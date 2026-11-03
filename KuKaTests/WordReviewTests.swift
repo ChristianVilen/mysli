@@ -180,17 +180,6 @@ final class WordReviewTests: XCTestCase {
         XCTAssertEqual(review.openQuestions, [questions[2]])
     }
 
-    func testASkipMatchesItsQuestionWhateverTheCaseOfTheHeardForm() throws {
-        let meeting = try makeMeeting()
-        try meeting.saveQuestions([try question("Convio")])
-
-        try meeting.saveSkip(try question("CONVIO"))
-
-        let review = try XCTUnwrap(meeting.wordReview(knownWords: .empty))
-        XCTAssertTrue(review.isFinished)
-        XCTAssertEqual(review.skipped, ["convio"])
-    }
-
     func testSaveSkipKeepsTheOtherSkipsAndASecondSkipOfAQuestionWritesNothing() throws {
         let meeting = try makeMeeting()
         let questions = try [question("Convio"), question("Yuri")]

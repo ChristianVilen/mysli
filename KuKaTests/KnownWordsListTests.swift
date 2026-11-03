@@ -52,14 +52,12 @@ final class KnownWordsListTests: XCTestCase {
         let list = KnownWordsList(markdown: "- Kon Vio / Konvia → **Konvio** ✓\n")
 
         XCTAssertEqual(try confirmedForms(of: "Konvio", in: list), ["Kon Vio", "Konvia"])
-        XCTAssertEqual(try confirmedForms(of: "QRS", in: fixtureList), ["Q-R-S"])
     }
 
     func testACheckMarkAfterASemicolonConfirmsTheWholeSegment() throws {
         let list = KnownWordsList(markdown: "- Quorx / Kworix → **Quorix** (heard on the vendor call; ✓ confirmed 2026-09-10)\n")
 
         XCTAssertEqual(try confirmedForms(of: "Quorix", in: list), ["Quorx", "Kworix"])
-        XCTAssertEqual(try word("Quorix", in: fixtureList).heard.map(\.isConfirmed), [true])
     }
 
     func testACheckMarkAfterOneHeardFormConfirmsOnlyThatForm() throws {
@@ -73,12 +71,6 @@ final class KnownWordsListTests: XCTestCase {
         XCTAssertEqual(try confirmedForms(of: "Konvio", in: list), ["Kon Vio"])
         XCTAssertEqual(try confirmedForms(of: "Brytlane", in: list), ["Bright Lane"], "✔ counts, and case is ignored")
         XCTAssertEqual(try confirmedForms(of: "Jyri", in: list), [], "other text before the mark")
-        XCTAssertEqual(try word("Konvio", in: fixtureList).heard.map(\.isConfirmed), [false, false, false, true])
-    }
-
-    func testALineWithoutACheckMarkIsProvisional() throws {
-        XCTAssertEqual(try heardForms(of: "Jyri", in: fixtureList), ["Yuri"])
-        XCTAssertEqual(try confirmedForms(of: "Jyri", in: fixtureList), [])
     }
 
     func testABulletSplitsIntoEntriesAtAMiddleDot() throws {

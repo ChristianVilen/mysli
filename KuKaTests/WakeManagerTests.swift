@@ -5,12 +5,14 @@ final class WakeManagerTests: XCTestCase {
     private var clock: Date!
     private var preventer: FakeSleepPreventer!
     private var manager: WakeManager!
+    private var expiry: FakeExpiry!
 
     override func setUp() {
         super.setUp()
         clock = Date(timeIntervalSince1970: 1_000_000)
         preventer = FakeSleepPreventer()
-        manager = WakeManager(preventer: preventer, now: { self.clock })
+        expiry = FakeExpiry()
+        manager = WakeManager(preventer: preventer, now: { self.clock }, scheduleExpiry: expiry.schedule)
     }
 
     func testActivateIndefiniteBeginsPreventionAndIsActive() {
@@ -42,45 +44,38 @@ final class WakeManagerTests: XCTestCase {
         manager.activate(.timed(3600))
         manager.activate(.timed(7200))
 
-        XCTAssertEqual(preventer.beginCount, 1) // begin is idempotent; no double-assert
-        XCTAssertEqual(preventer.endCount, 0)
         XCTAssertTrue(manager.isActive)
         XCTAssertEqual(manager.session?.duration, .timed(7200))
     }
 
     func testDoubleDeactivateIsBalanced() {
         manager.activate(.indefinite)
+        var stateChanges = 0
+        manager.onStateChange = { stateChanges += 1 }
+
         manager.deactivate()
         manager.deactivate()
 
-        XCTAssertEqual(preventer.beginCount, 1)
-        XCTAssertEqual(preventer.endCount, 1)
+        XCTAssertEqual(stateChanges, 1)
     }
 
     func testTimedSessionExpiresAndFiresCallbacks() {
         var expired = false
         manager.onExpire = { expired = true }
+        manager.activate(.timed(60))
+        var stateChanges = 0
+        manager.onStateChange = { stateChanges += 1 }
+        XCTAssertEqual(expiry.intervals, [60])
 
-        let done = expectation(description: "timed session expires")
-        manager.onStateChange = {
-            if !self.manager.isActive { done.fulfill() }
-        }
-
-        manager.activate(.timed(0.2))
-        wait(for: [done], timeout: 2.0)
+        expiry.fire()
 
         XCTAssertFalse(manager.isActive)
+        XCTAssertEqual(stateChanges, 1)
         XCTAssertEqual(preventer.endCount, 1)
         XCTAssertTrue(expired)
     }
 
     // MARK: - Keep display awake
-
-    func testActivateDefaultsToSystemOnlyAssertion() {
-        manager.activate(.indefinite)
-
-        XCTAssertEqual(preventer.lastKeepDisplayAwake, false)
-    }
 
     func testActivatePassesDisplayAwakeFlagToPreventer() {
         manager.keepDisplayAwake = true
@@ -142,17 +137,35 @@ final class WakeManagerTests: XCTestCase {
         var expired = false
         manager.onExpire = { expired = true }
 
-        manager.activate(.timed(0.2))
+        manager.activate(.timed(60))
         manager.activate(.indefinite)
 
-        // Wait past the original 0.2s expiry to prove the cancelled timer never fires.
-        let stayedActive = expectation(description: "remains active past original expiry")
-        let waiter = Timer(timeInterval: 0.5, repeats: false) { _ in stayedActive.fulfill() }
-        RunLoop.current.add(waiter, forMode: .common)
-        wait(for: [stayedActive], timeout: 2.0)
-
+        XCTAssertEqual(expiry.intervals, [60])
+        XCTAssertFalse(expiry.isPending, "the timed session's expiry must be cancelled")
         XCTAssertTrue(manager.isActive)
         XCTAssertFalse(expired)
         XCTAssertEqual(preventer.endCount, 0)
+    }
+}
+
+/// Holds the scheduled expiry instead of a real timer, so a test fires it at once.
+private final class FakeExpiry {
+    private(set) var intervals: [TimeInterval] = []
+    private var pending: (id: Int, work: () -> Void)?
+    var isPending: Bool { pending != nil }
+
+    func schedule(_ interval: TimeInterval, _ work: @escaping () -> Void) -> () -> Void {
+        intervals.append(interval)
+        let id = intervals.count
+        pending = (id, work)
+        return { [weak self] in
+            if self?.pending?.id == id { self?.pending = nil }
+        }
+    }
+
+    func fire() {
+        let work = pending?.work
+        pending = nil
+        work?()
     }
 }

@@ -80,11 +80,8 @@ final class SettingsTests: XCTestCase {
         XCTAssertFalse(Settings(defaults: defaults, loginItem: loginItem).windowTilingEnabled)
     }
 
-    func testClipboardHistoryEnabledDefaultsToTrue() {
+    func testClipboardHistoryEnabledDefaultsToTrueAndRoundTrips() {
         XCTAssertTrue(sut.clipboardHistoryEnabled)
-    }
-
-    func testClipboardHistoryEnabledPersists() {
         sut.clipboardHistoryEnabled = false
         XCTAssertFalse(sut.clipboardHistoryEnabled)
         XCTAssertFalse(Settings(defaults: defaults, loginItem: loginItem).clipboardHistoryEnabled)
@@ -94,16 +91,11 @@ final class SettingsTests: XCTestCase {
         XCTAssertEqual(sut.meetingsFolder.path, NSHomeDirectory() + "/Meetings")
     }
 
-    func testChosenMeetingsFolderPersistsAndTheDefaultKnownWordsPathFollows() {
+    func testChosenMeetingsFolderPersists() {
         let chosen = URL(fileURLWithPath: "/Users/test/Meeting notes", isDirectory: true)
         sut.meetingsFolder = chosen
         XCTAssertEqual(defaults.string(forKey: "meetingsFolder"), chosen.path)
-        let reopened = Settings(defaults: defaults, loginItem: loginItem)
-        XCTAssertEqual(reopened.meetingsFolder, chosen)
-        XCTAssertEqual(reopened.knownWordsFile, chosen.appendingPathComponent("known-words.md"))
-        defaults.set("~/terms.md", forKey: "knownWordsFile")
-        sut.meetingsFolder = URL(fileURLWithPath: "/Users/test/Other notes")
-        XCTAssertEqual(reopened.knownWordsFile.path, NSHomeDirectory() + "/terms.md")
+        XCTAssertEqual(Settings(defaults: defaults, loginItem: loginItem).meetingsFolder, chosen)
     }
 
     func testMeetingsFolderReadsThePathSetWithDefaultsWrite() {
@@ -162,21 +154,21 @@ final class SettingsTests: XCTestCase {
         XCTAssertEqual(Settings(defaults: defaults, loginItem: loginItem).meetingTranscriptHeight, 360)
     }
 
-    func testLaunchAtLoginReflectsAndDrivesTheLoginItem() {
-        XCTAssertFalse(sut.launchAtLogin)
+    func testSetLaunchAtLoginReturnsAMessageWhenTheChangeDidNotApply() {
+        XCTAssertNil(sut.setLaunchAtLogin(true))
 
-        sut.setLaunchAtLogin(true)
+        loginItem.errorToThrow = NSError(domain: "test", code: 1,
+                                         userInfo: [NSLocalizedDescriptionKey: "Registration refused"])
+        XCTAssertEqual(sut.setLaunchAtLogin(false), "Registration refused")
 
-        XCTAssertEqual(loginItem.setCalls, [true])
-        XCTAssertTrue(sut.launchAtLogin)
+        let pending = Settings(defaults: defaults, loginItem: PendingLoginItem())
+        let message = pending.setLaunchAtLogin(true)
+        XCTAssertTrue(message?.contains("Login Items & Extensions") ?? false, message ?? "no message")
     }
+}
 
-    func testSetLaunchAtLoginSwallowsRegistrationFailure() {
-        loginItem.errorToThrow = NSError(domain: "test", code: 1)
-
-        sut.setLaunchAtLogin(true)
-
-        XCTAssertTrue(loginItem.setCalls.isEmpty)
-        XCTAssertFalse(sut.launchAtLogin)
-    }
+/// Accepts every request but stays off, as macOS does while a login item waits for approval.
+private struct PendingLoginItem: LoginItemManaging {
+    var isEnabled: Bool { false }
+    func setEnabled(_ enabled: Bool) throws {}
 }

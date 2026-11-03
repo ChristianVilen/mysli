@@ -71,13 +71,11 @@ final class LogFilterTests: XCTestCase {
         XCTAssertEqual(messages(rows, filter: LogFilter(range: .everything)), ["earlier", "raw", "later"])
     }
 
-    func testKeepsNewestFiveThousandMatchingRowsAfterFiltering() {
-        let rows = (0..<5002).map { row("error \($0)", level: .error) }
-            + (0..<10).map { row("info \($0)") }
-        let result = messages(rows, filter: LogFilter(range: .everything, errorsOnly: true))
-        XCTAssertEqual(result.count, 5000)
-        XCTAssertEqual(result.first, "error 2")
-        XCTAssertEqual(result.last, "error 5001")
+    func testKeepsNewestMatchingRowsUpToTheLimitAfterFiltering() {
+        let rows = (0..<4).map { row("error \($0)", level: .error) }
+            + (0..<3).map { row("info \($0)") }
+        XCTAssertEqual(messages(rows, filter: LogFilter(range: .everything, errorsOnly: true, rowLimit: 2)),
+                       ["error 2", "error 3"])
         XCTAssertEqual(messages([], filter: LogFilter(range: .everything)), [])
     }
 

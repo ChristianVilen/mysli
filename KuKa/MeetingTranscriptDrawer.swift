@@ -5,12 +5,9 @@ final class MeetingTranscriptDrawer: NSView {
     private typealias Layout = MeetingControlsPanel.Layout
     private typealias Colors = MeetingControlsPanel.Colors
 
-    private static let speechCell = NSUserInterfaceItemIdentifier("MeetingSpeechCell")
-    private static let pauseCell = NSUserInterfaceItemIdentifier("MeetingPauseCell")
-
     private let reduceMotion: () -> Bool
     private var follow = TranscriptFollow()
-    private var rows: [LiveRow] = []
+    private var transcript = TranscriptText()
     /// True while the panel or the drawer itself scrolls or resizes the transcript, so only a
     /// scroll by the user changes `follow`.
     private var isMovingTranscript = false
@@ -24,7 +21,7 @@ final class MeetingTranscriptDrawer: NSView {
     private let messageTitle = NSTextField.makeLabel(size: 13, weight: .semibold)
     private let messageBody = NSTextField.makeWrappingLabel(size: 12.5, color: .secondaryLabelColor)
     private let messageStack = NSStackView()
-    private let tableView = NSTableView()
+    private let transcriptView = NSTextView()
     private let scrollView = NSScrollView()
     private let transcriptFade = MeetingTranscriptFade()
     private lazy var returnToLiveButton = MeetingPanelButton(fill: Colors.solid, floats: true, target: self,
@@ -56,6 +53,8 @@ final class MeetingTranscriptDrawer: NSView {
         build()
         NotificationCenter.default.addObserver(self, selector: #selector(transcriptScrolled),
                                                name: NSView.boundsDidChangeNotification, object: scrollView.contentView)
+        NotificationCenter.default.addObserver(self, selector: #selector(selectionChanged),
+                                               name: NSTextView.didChangeSelectionNotification, object: transcriptView)
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
@@ -84,27 +83,56 @@ final class MeetingTranscriptDrawer: NSView {
         if let chip, chip != behindLabel.stringValue { behindLabel.stringValue = chip }
     }
 
-    /// Replaces only the rows after the unchanged start, so new text measures only new rows.
-    func showRows(_ newRows: [LiveRow]) {
-        guard newRows != rows else { return }
-        let old = rows
-        let kept = zip(old, newRows).prefix { $0 == $1 }.count
-        rows = newRows
+    /// `keepScrollPosition` holds the transcript still while the user writes notes below it.
+    func showRows(_ newRows: [LiveRow], keepScrollPosition: Bool = false) {
+        guard newRows != transcript.rows else { return }
+        let oldCount = transcript.rows.count
+        let shown = transcriptView.string
+        let replacement = transcript.update(to: newRows, shown: shown)
+        let selection = transcriptView.selectedRange()
+        let scrollOrigin = scrollView.contentView.bounds.origin
         ignoringScroll {
-            tableView.beginUpdates()
-            if old.count > kept { tableView.removeRows(at: IndexSet(kept..<old.count), withAnimation: []) }
-            if newRows.count > kept { tableView.insertRows(at: IndexSet(kept..<newRows.count), withAnimation: []) }
-            tableView.endUpdates()
-            follow.rowsChanged(from: old.count, to: newRows.count)
-            if follow.isFollowing { scrollToEnd(animated: false) }
+            transcriptView.textStorage?.replaceCharacters(
+                in: NSRange(location: replacement.location, length: (shown as NSString).length - replacement.location),
+                with: replacement.text)
+            transcriptView.setSelectedRange(TranscriptText.selection(selection, keptBefore: replacement.location))
+            sizeTranscript()
+            if selection.length > 0 { follow.scrolled(lastRowVisible: false) }
+            follow.rowsChanged(from: oldCount, to: newRows.count)
+            if follow.isFollowing && !keepScrollPosition {
+                scrollToEnd(animated: false)
+            } else {
+                scrollView.contentView.scroll(to: scrollOrigin)
+                scrollView.reflectScrolledClipView(scrollView.contentView)
+            }
         }
         renderReturnToLive()
+    }
+
+    override func layout() {
+        super.layout()
+        sizeTranscript()
+    }
+
+    private func sizeTranscript() {
+        guard let container = transcriptView.textContainer, let manager = transcriptView.layoutManager else { return }
+        let width = max(1, scrollView.contentSize.width)
+        transcriptView.setFrameSize(NSSize(width: width, height: transcriptView.frame.height))
+        container.containerSize = NSSize(width: max(1, width - 2 * transcriptView.textContainerInset.width),
+                                         height: CGFloat.greatestFiniteMagnitude)
+        manager.ensureLayout(for: container)
+        let height = max(scrollView.contentSize.height, ceil(manager.usedRect(for: container).height) + 2 * transcriptView.textContainerInset.height)
+        transcriptView.setFrameSize(NSSize(width: width, height: height))
     }
 
     func opened() {
         follow.returnToLive()
         scrollToEnd(animated: false)
         renderReturnToLive()
+        guard !reduceMotion() else {
+            alphaValue = 1
+            return
+        }
         alphaValue = 0
         NSAnimationContext.runAnimationGroup { context in
             context.duration = Layout.fadeDuration
@@ -113,6 +141,7 @@ final class MeetingTranscriptDrawer: NSView {
     }
 
     func returnToLive() {
+        transcriptView.setSelectedRange(NSRange(location: (transcriptView.string as NSString).length, length: 0))
         follow.returnToLive()
         scrollToEnd(animated: !reduceMotion())
         renderReturnToLive()
@@ -127,11 +156,12 @@ final class MeetingTranscriptDrawer: NSView {
     }
 
     private func scrollToEnd(animated: Bool) {
-        guard !rows.isEmpty else { return }
+        guard !transcript.rows.isEmpty else { return }
         // The panel's root view sets this view's frame, so the layout starts there.
         superview?.layoutSubtreeIfNeeded()
         let clip = scrollView.contentView
-        let end = clip.constrainBoundsRect(NSRect(origin: NSPoint(x: 0, y: tableView.bounds.maxY),
+        sizeTranscript()
+        let end = clip.constrainBoundsRect(NSRect(origin: NSPoint(x: 0, y: transcriptView.bounds.maxY),
                                                   size: clip.bounds.size)).origin
         guard animated else {
             ignoringScroll {
@@ -153,8 +183,15 @@ final class MeetingTranscriptDrawer: NSView {
     }
 
     @objc private func transcriptScrolled() {
-        guard !isMovingTranscript, !rows.isEmpty else { return }
-        follow.scrolled(lastRowVisible: tableView.rect(ofRow: rows.count - 1).intersects(tableView.visibleRect))
+        guard !isMovingTranscript, !transcript.rows.isEmpty else { return }
+        follow.scrolled(lastRowVisible: transcriptView.selectedRange().length == 0 &&
+                        scrollView.contentView.bounds.maxY >= transcriptView.bounds.maxY - 4)
+        renderReturnToLive()
+    }
+
+    @objc private func selectionChanged() {
+        guard !isMovingTranscript, transcriptView.selectedRange().length > 0 else { return }
+        follow.scrolled(lastRowVisible: false)
         renderReturnToLive()
     }
 
@@ -208,23 +245,19 @@ final class MeetingTranscriptDrawer: NSView {
         messageStack.spacing = 6
         messageBody.preferredMaxLayoutWidth = Layout.openWidth - 2 * Layout.messageInset
 
-        let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("MeetingTranscriptColumn"))
-        column.resizingMask = .autoresizingMask
-        tableView.addTableColumn(column)
-        tableView.headerView = nil
-        tableView.style = .plain
-        tableView.rowSizeStyle = .custom
-        tableView.intercellSpacing = .zero
-        tableView.gridStyleMask = []
-        tableView.selectionHighlightStyle = .none
-        tableView.backgroundColor = .clear
-        tableView.columnAutoresizingStyle = .uniformColumnAutoresizingStyle
-        tableView.dataSource = self
-        tableView.delegate = self
-        // A list the user reads, not a live region: rows are never announced.
-        tableView.setAccessibilityLabel(MeetingPanelCopy.transcriptLabel)
+        transcriptView.isEditable = false
+        transcriptView.isSelectable = true
+        transcriptView.isRichText = true
+        transcriptView.drawsBackground = false
+        transcriptView.isVerticallyResizable = true
+        transcriptView.isHorizontallyResizable = false
+        transcriptView.autoresizingMask = [.width]
+        transcriptView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        transcriptView.textContainerInset = NSSize(width: Layout.rowInset, height: 10)
+        transcriptView.textContainer?.widthTracksTextView = true
+        transcriptView.setAccessibilityLabel(MeetingPanelCopy.transcriptLabel)
 
-        scrollView.documentView = tableView
+        scrollView.documentView = transcriptView
         scrollView.hasVerticalScroller = true
         scrollView.autohidesScrollers = true
         scrollView.scrollerStyle = .overlay
@@ -294,45 +327,5 @@ final class MeetingTranscriptDrawer: NSView {
         ]
         NSLayoutConstraint.activate(belowPillConstraints + [scrollAtBodyTop])
         isHidden = true
-    }
-}
-
-extension MeetingTranscriptDrawer: NSTableViewDataSource, NSTableViewDelegate {
-    func numberOfRows(in tableView: NSTableView) -> Int { rows.count }
-
-    func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
-        switch rows[row].content {
-        case .pause:
-            return Layout.pauseRowHeight
-        case .speech(_, let text, let isFinal):
-            return TranscriptSpeechCell.height(text: text, isFinal: isFinal, isContinuation: isContinuation(row))
-        }
-    }
-
-    func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
-        let item = rows[row]
-        switch item.content {
-        case .pause(let duration):
-            let cell = tableView.makeView(withIdentifier: Self.pauseCell, owner: self) as? TranscriptPauseCell
-                ?? TranscriptPauseCell()
-            cell.identifier = Self.pauseCell
-            cell.configure(at: item.at, duration: duration)
-            return cell
-        case .speech(let speaker, let text, let isFinal):
-            let cell = tableView.makeView(withIdentifier: Self.speechCell, owner: self) as? TranscriptSpeechCell
-                ?? TranscriptSpeechCell()
-            cell.identifier = Self.speechCell
-            cell.configure(speaker: speaker, at: item.at, text: text, isFinal: isFinal, isContinuation: isContinuation(row))
-            return cell
-        }
-    }
-
-    func tableView(_ tableView: NSTableView, shouldSelectRow row: Int) -> Bool { false }
-
-    /// The same speaker as the row before: the label and time are not repeated.
-    private func isContinuation(_ row: Int) -> Bool {
-        guard row > 0, case .speech(let speaker, _, _) = rows[row].content,
-              case .speech(let previous, _, _) = rows[row - 1].content else { return false }
-        return speaker == previous
     }
 }

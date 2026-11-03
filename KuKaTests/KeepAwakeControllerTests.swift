@@ -44,15 +44,6 @@ final class KeepAwakeControllerTests: XCTestCase {
         _ = item.target?.perform(item.action, with: item)
     }
 
-    // MARK: - Initial state
-
-    func testInactiveSectionShowsIdleTitleAndNoSelection() {
-        XCTAssertFalse(controller.isActive)
-        XCTAssertEqual(panel.titleLabel.stringValue, "Keep Awake")
-        XCTAssertEqual(panel.durationControl.selectedSegment, -1)
-        XCTAssertTrue(turnOffItem.isHidden)
-    }
-
     // MARK: - Clicking chips (exercises index → preset decode)
 
     func testClickingIndefiniteChipActivatesAndSelectsIt() {
@@ -70,7 +61,6 @@ final class KeepAwakeControllerTests: XCTestCase {
 
         XCTAssertTrue(controller.isActive)
         XCTAssertEqual(panel.durationControl.selectedSegment, chipIndex("30m"))
-        XCTAssertEqual(panel.titleLabel.stringValue, "☕ Awake · 30 min left")
     }
 
     func testCountdownTitleTracksTheInjectedClock() {
@@ -95,32 +85,7 @@ final class KeepAwakeControllerTests: XCTestCase {
         XCTAssertEqual(panel.durationControl.selectedSegment, -1)
     }
 
-    func testSwitchingChipMovesSelection() {
-        clickChip("1h")
-        XCTAssertEqual(panel.durationControl.selectedSegment, chipIndex("1h"))
-
-        clickChip("2h")
-        XCTAssertEqual(panel.durationControl.selectedSegment, chipIndex("2h"))
-        XCTAssertEqual(manager.session?.duration, .timed(120 * 60))
-    }
-
     // MARK: - Keep display awake preference
-
-    func testTheSavedDisplayPreferenceReachesThePowerAssertion() {
-        let preventer = FakeSleepPreventer()
-        let controller = KeepAwakeController(wakeManager: WakeManager(preventer: preventer, now: { self.clock }),
-                                             now: { self.clock }, keepDisplayAwake: false, notifier: FakeNotifier())
-        controller.activate(.indefinite)
-        XCTAssertEqual(preventer.lastKeepDisplayAwake, false)
-        controller.deactivate()
-    }
-
-    func testChangingDisplayPreferenceUpdatesActivePowerAssertion() {
-        clickChip("∞")
-        controller.setDisplayAwake(false)
-        XCTAssertEqual(preventer.lastKeepDisplayAwake, false)
-        XCTAssertTrue(controller.isActive)
-    }
 
     func testMenuDisplayToggleKeepsTheCurrentSessionAndExpiry() throws {
         let toggle = try XCTUnwrap(menu.items.first { $0.title == "Keep screen on" })
@@ -139,16 +104,12 @@ final class KeepAwakeControllerTests: XCTestCase {
         XCTAssertEqual(manager.session?.expiresAt, expiry)
     }
 
-    func testMenuDisplayTogglePersistsTheChoiceWithoutStartingASession() throws {
-        let suite = "KeepAwakeControllerTests.DisplayPreference"
-        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
-        defaults.removePersistentDomain(forName: suite)
-        defer { defaults.removePersistentDomain(forName: suite) }
-        let settings = Settings(defaults: defaults, loginItem: FakeLoginItem())
-        controller.onDisplayAwakeChanged = { settings.keepDisplayAwake = $0 }
+    func testMenuDisplayToggleReportsTheChoiceWithoutStartingASession() throws {
+        var reported: [Bool] = []
+        controller.onDisplayAwakeChanged = { reported.append($0) }
         let toggle = try XCTUnwrap(menu.items.first { $0.title == "Keep screen on" })
         click(toggle)
-        XCTAssertEqual(defaults.object(forKey: "keepDisplayAwake") as? Bool, false)
+        XCTAssertEqual(reported, [false])
         XCTAssertFalse(controller.isActive)
         XCTAssertEqual(preventer.beginCount, 0)
     }

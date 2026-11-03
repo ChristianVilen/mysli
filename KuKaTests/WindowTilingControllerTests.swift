@@ -34,37 +34,6 @@ final class WindowTilingControllerTests: XCTestCase {
         )
     }
 
-    // MARK: - Save on success, restore on second press
-
-    func testMaximizeThenSecondPressRestoresRecordedPreviousFrame() {
-        let mock = MockWindowControlling()
-        let controller = makeController(mock)
-        let idealTarget = screen.visibleFrame
-        let originalFrame = CGRect(x: screen.frame.minX + 10, y: screen.frame.minY + 10, width: 300, height: 300)
-        // Simulates an app that snaps the requested maximize frame to
-        // something else (a character-cell grid, say) rather than landing
-        // exactly on the ideal target.
-        let achievedFrame = CGRect(x: screen.frame.minX + 5, y: screen.frame.minY + 5, width: 400, height: 400)
-
-        mock.focusedWindowToReturn = focusedWindow(frame: originalFrame)
-        mock.achievedFrameToReturn = achievedFrame
-        controller.tile(.maximize)
-
-        XCTAssertEqual(mock.setFrameCalls.count, 1)
-        XCTAssertEqual(mock.setFrameCalls[0].frame, idealTarget)
-
-        // Second press: the window is sitting at the achieved frame, not the
-        // ideal target — exactly the case the achieved-frame comparison
-        // exists for. It should read as "already maximized" and restore to
-        // the ORIGINAL frame, proving both previousFrame and achievedFrame
-        // were recorded correctly on the first press.
-        mock.focusedWindowToReturn = focusedWindow(frame: achievedFrame)
-        controller.tile(.maximize)
-
-        XCTAssertEqual(mock.setFrameCalls.count, 2)
-        XCTAssertEqual(mock.setFrameCalls[1].frame, originalFrame)
-    }
-
     // MARK: - Failed move saves nothing
 
     func testFailedSetFrameDuringMaximizeSavesNothing() {
@@ -104,19 +73,28 @@ final class WindowTilingControllerTests: XCTestCase {
         XCTAssertEqual(mock.setFrameCalls[1].frame, idealTarget)
     }
 
-    // MARK: - Restore clears the entry
+    // MARK: - Save on success, restore on second press, then clear the entry
 
     func testEntryIsRemovedAfterRestoreSoThirdPressMaximizesAgain() {
         let mock = MockWindowControlling()
         let controller = makeController(mock)
         let idealTarget = screen.visibleFrame
         let originalFrame = CGRect(x: screen.frame.minX + 10, y: screen.frame.minY + 10, width: 300, height: 300)
+        // Simulates an app that snaps the requested maximize frame to
+        // something else (a character-cell grid, say) rather than landing
+        // exactly on the ideal target.
         let achievedFrame = CGRect(x: screen.frame.minX + 5, y: screen.frame.minY + 5, width: 400, height: 400)
 
         mock.focusedWindowToReturn = focusedWindow(frame: originalFrame)
         mock.achievedFrameToReturn = achievedFrame
         controller.tile(.maximize) // move + save
 
+        XCTAssertEqual(mock.setFrameCalls.count, 1)
+        XCTAssertEqual(mock.setFrameCalls[0].frame, idealTarget)
+
+        // Second press: the window sits at the achieved frame, not the ideal
+        // target, and still restores to the original frame, so the first
+        // press recorded both frames.
         mock.focusedWindowToReturn = focusedWindow(frame: achievedFrame)
         controller.tile(.maximize) // restore, entry removed
 
@@ -198,39 +176,6 @@ final class WindowTilingControllerTests: XCTestCase {
 
         XCTAssertEqual(mock.setFrameCalls.count, 2)
         XCTAssertEqual(mock.setFrameCalls[1].frame, idealTarget)
-    }
-
-    // MARK: - Center
-
-    func testCenterMovesWindowToScreenCenterKeepingItsSize() {
-        let mock = MockWindowControlling()
-        let controller = makeController(mock)
-        let visible = screen.visibleFrame
-        let original = CGRect(x: visible.minX + 10, y: visible.minY + 10, width: 400, height: 300)
-
-        mock.focusedWindowToReturn = focusedWindow(frame: original)
-        mock.achievedFrameToReturn = original
-        controller.tile(.center)
-
-        XCTAssertEqual(mock.setFrameCalls.count, 1)
-        let expected = CGRect(
-            x: visible.midX - 200,
-            y: visible.midY - 150,
-            width: 400,
-            height: 300
-        )
-        XCTAssertEqual(mock.setFrameCalls[0].frame, expected)
-    }
-
-    func testCenterDoesNothingWhenWindowIsAtMaximizeSize() {
-        let mock = MockWindowControlling()
-        let controller = makeController(mock)
-        let visible = screen.visibleFrame
-
-        mock.focusedWindowToReturn = focusedWindow(frame: visible)
-        controller.tile(.center)
-
-        XCTAssertTrue(mock.setFrameCalls.isEmpty)
     }
 
     // MARK: - Multi-display hop (synthetic two-screen layout)

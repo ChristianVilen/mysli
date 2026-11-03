@@ -29,7 +29,6 @@ final class AppLaunchModeTests: XCTestCase {
         XCTAssertTrue(NSApp.sendAction(try XCTUnwrap(menuItem.action), to: menuItem.target, from: menuItem))
         XCTAssertEqual(presented.count, 1)
         XCTAssertTrue(presented.first === host.settingsWindow.window)
-        XCTAssertTrue(defaults.persistentDomain(forName: suite)?.isEmpty ?? true, "opening Settings writes nothing")
         let popup = host.settingsWindow.summaryTool
         popup.selectItem(withTitle: SummaryTool.claude.title)
         _ = popup.sendAction(popup.action, to: popup.target)

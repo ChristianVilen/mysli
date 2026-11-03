@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 enum LogLevel: String, CaseIterable, Sendable {
     case info, notice, error
@@ -25,7 +26,8 @@ struct LogLine: Sendable {
     }
 
     var formatted: String {
-        "\(Self.formatter(timeZone: timeZone).string(from: date)) [\(processID)] \(level.rawValue) \(category): \(message)"
+        let timestamp = Self.withFormatter(timeZone: timeZone) { $0.string(from: date) }
+        return "\(timestamp) [\(processID)] \(level.rawValue) \(category): \(message)"
     }
 
     init?(parsing text: String) {
@@ -37,10 +39,10 @@ struct LogLine: Sendable {
               let timeZone = TimeZone(secondsFromGMT: (hours * 3600 + minutes * 60) * (match.2 == "-" ? -1 : 1)),
               let processID = Int32(match.5), processID > 0,
               let level = LogLevel(rawValue: String(match.6)) else { return nil }
-        let formatter = Self.formatter(timeZone: timeZone)
         let timestamp = String(match.1)
-        guard let date = formatter.date(from: timestamp),
-              formatter.string(from: date) == timestamp else { return nil }
+        guard let date = Self.withFormatter(timeZone: timeZone, { formatter in
+            formatter.date(from: timestamp).flatMap { formatter.string(from: $0) == timestamp ? $0 : nil }
+        }) else { return nil }
         self.date = date
         self.processID = processID
         self.level = level
@@ -49,13 +51,20 @@ struct LogLine: Sendable {
         self.timeZone = timeZone
     }
 
-    private static func formatter(timeZone: TimeZone) -> DateFormatter {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.timeZone = timeZone
-        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS Z"
-        formatter.isLenient = false
-        return formatter
+    // Parsed offsets are whole minutes under 24 hours, so the cache stays small.
+    private static let formatters = OSAllocatedUnfairLock(uncheckedState: [TimeZone: DateFormatter]())
+
+    private static func withFormatter<Result>(timeZone: TimeZone, _ body: (DateFormatter) -> Result) -> Result {
+        formatters.withLockUnchecked { cache in
+            if let formatter = cache[timeZone] { return body(formatter) }
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.calendar = Calendar(identifier: .gregorian)
+            formatter.timeZone = timeZone
+            formatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS Z"
+            formatter.isLenient = false
+            cache[timeZone] = formatter
+            return body(formatter)
+        }
     }
 }

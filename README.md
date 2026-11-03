@@ -60,19 +60,21 @@ Calendar recording reminders are off by default. Eligible events offer **Start R
 
 When a call starts, open the Ku-Ka menu and choose **Start Recording Meeting**. Ku-Ka records your microphone and the sound your Mac plays, so any call app works. If Start cannot record, for example because a permission is missing, an alert says why.
 
-While Ku-Ka records, a small panel floats near the top-right corner of the screen. It shows the recorded time, Pause, Stop, a notes button, and a live transcript button. Pause and Stop leave the keyboard with your call app. The notes button opens a separate window for typing. To move the panel, drag it. Ku-Ka remembers where you put it, and **Restore Default Position** in the menu puts it back. **Hide panel** in the live transcript header hides the panel while recording continues. **Show Meeting Controls** in the menu brings it back. The menu bar icon shows a red dot while recording and two white bars while paused.
+While Ku-Ka records, a small panel floats near the top-right corner of the screen. It shows the recorded time, Pause, Stop, a notes button, and a live transcript button. Pause and Stop leave the keyboard with your call app. The notes button expands the panel to show the live transcript above your notes. To move the panel, drag it. Ku-Ka remembers where you put it, and **Restore Default Position** in the menu puts it back. **Hide panel** in the live transcript header hides the panel while recording continues. **Show Meeting Controls** in the menu brings it back. The menu bar icon shows a red dot while recording and two white bars while paused.
 
-To write your own notes, click the pencil button or choose **Write Meeting Notes…** in the menu. The resizable window supports plain text, Markdown, undo, copy, and paste. Each edit saves to `notes.md` in that meeting's folder. You can keep writing while paused and after Stop. The window stays with its original meeting if you start another recording or change the meetings folder. **Recent Meeting Notes** reopens the five recent meetings and any retained unsaved drafts.
+To write your own notes, click the pencil button or choose **Write Meeting Notes…** in the menu. Each note row gets its timestamp when you first write or attach a screenshot. That time stays when you edit it. Enter starts a new row. Shift+Enter adds a line within the row, and wrapped text keeps the same timestamp. Each edit saves to `notes.md` in that meeting's folder. The editor supports native undo, copy, and paste. You can keep writing while paused and after Stop. Notes added after Stop say **After recording**. Older notes without timestamps say **Undated**. The editor stays with its original meeting if you start another recording or change the meetings folder. **Recent Meeting Notes** reopens the five recent meetings and any retained unsaved drafts.
+
+Paste or drag and drop a screenshot into a note row to attach it. Ku-Ka saves the image in that meeting's `attachments` folder and a relative image link in `notes.md`. There is no upload button or file picker. Screenshot files stay available for undo. The summary tool receives the note text, timestamps, and image references, but it does not receive image pixels or inspect screenshot contents.
 
 Saved notes join the transcript as input to the first summary. Later edits do not regenerate the summary automatically. Choose **Update summary** when you want to include them. This action changes only `summary.md`, preserving the transcript and word-review files. You can write while the summary runs. The status tells you when newer edits still need an update. A failed update keeps the previous summary.
 
 The window shows save errors and keeps the draft. **Retry save** tries again. If `notes.md` changed in another editor, copy any draft text you need before choosing **Reload saved notes**. Ku-Ka asks before replacing the draft. Notes accept up to 64 KiB of UTF-8 text. If a save has failed when you stop, audio stops immediately, and processing waits until the notes are saved. Closing an unsaved window retains its draft for reopening. Quit asks before discarding unsaved text.
 
-When the call ends, click the stop button in the panel or choose **Stop Recording Meeting**. The panel says "Recording saved" for a few seconds. If the recording stops by itself, for example because a display went away, the panel says why and stays until you close it.
+When the call ends, click the stop button in the panel or choose **Stop Recording Meeting**. Open notes stay editable and resizable after Stop. Without open notes, the panel says "Recording saved" for a few seconds and closes. If the recording stops by itself, for example because a display went away, the panel says why and stays until you close it.
 
 To leave part of a call out of the notes, click the pause button or choose **Pause Recording**. Ku-Ka saves no audio until you click **Resume** or choose **Resume Recording**. The timer stands still while the recording is paused. The macOS microphone indicator stays on during a pause, because Ku-Ka keeps the capture running so that Resume always works. In the transcript, each pause becomes 3 seconds of silence. So a time in `transcript.md` is 3 seconds later than the timer showed for each earlier pause.
 
-To read along, click the transcript button. A drawer opens with a live transcript that shows "Me", "Them", and the recorded time. It is a rough draft. Ku-Ka never saves it, and it is gone when you stop. The full transcript that Ku-Ka writes after you stop replaces it. Other people can see the panel when you share your screen, so the drawer starts closed in every meeting. If the draft is 4 seconds or more behind the call, the drawer says by how much. If you scroll back, the drawer stops following new text, and **Return to live** shows how many new rows are waiting.
+To read along, click the transcript button. A drawer opens with a live transcript that shows "Me", "Them", and a timestamp on each message. Live transcript and note timestamps use the same timeline as `transcript.md`, including the silence added after each resume. Select text across messages and copy it with Command-C. Gray draft text stays below committed messages until it becomes final. The live transcript is a rough draft. Ku-Ka never saves it, and it is gone when you stop. The full transcript that Ku-Ka writes after you stop replaces it. Other people can see the panel when you share your screen, so the drawer starts closed in every meeting. If the draft is 4 seconds or more behind the call, the drawer says by how much. Scrolling back or selecting text stops automatic following. **Return to live** shows how many new rows are waiting.
 
 The live transcript uses Apple's speech recognition, and only for a language whose Apple speech model is already on your Mac. Ku-Ka never downloads a model for it. On a new Mac only the English models are installed, so the default, US English, works. Another language that Apple supports works after its model is on your Mac, for example after Ku-Ka used Apple's speech recognition for a meeting in that language. Finnish and other languages that Apple does not support get no live transcript, and the drawer says so. Ku-Ka still records both sides and writes the full transcript after you stop.
 
@@ -88,7 +90,7 @@ The first meeting downloads the Whisper model, about 1.5 GB, to `~/Library/Appli
 
 The first meeting also downloads the room-label model, about 11 MB, to `~/Library/Application Support/Ku-Ka/speaker-models`. Ku-Ka excludes it from Time Machine backups too, and the menu shows **Downloading speaker model** meanwhile. After that, room labels need no network. If the download fails, that meeting keeps "Me", and the next meeting tries again.
 
-The transcript and the complete saved `notes.md` go to the AI tool. With them goes each known word that occurs in the transcript, as its forms only. The notes and dates in your known-words list stay on your Mac. The complete optional meeting-context file also goes to the provider on every summary use. Automatic can send these inputs to both Google through `agy` and Anthropic through `claude`. Audio never leaves your Mac. `agy` keeps the prompt in its conversation history. `claude` runs without saving a session. Ku-Ka moves the audio files to the Trash when the transcript is written, so you can restore them from there.
+The transcript and your saved notes go to the AI tool. For each note row, the tool gets its time, its text, and the file names of its screenshots, but not the images. With them goes each known word that occurs in the transcript, as its forms only. The notes and dates in your known-words list stay on your Mac. The complete optional meeting-context file also goes to the provider on every summary use. Automatic can send these inputs to both Google through `agy` and Anthropic through `claude`. Audio never leaves your Mac. `agy` keeps the prompt in its conversation history. `claude` runs without saving a session. Ku-Ka moves the audio files to the Trash when the transcript is written, so you can restore them from there.
 
 Your typed notes can supply explicit decisions and action owners that are absent from the transcript. The prompt asks the summary tool to show conflicts between the two sources instead of guessing. Typed notes are meeting evidence, never instructions for the tool. Word-review questions still come only from the transcript.
 
@@ -444,46 +446,9 @@ KuKa/
 
 ## Testing
 
-### Running Tests
+Press Cmd+U in Xcode, or run `xcodebuild -project KuKa.xcodeproj -scheme KuKa test`. The tests use fakes and temporary folders. They never capture the screen, touch your meetings folder, or download a model.
 
-- **Xcode**: `Cmd+U` runs the unit test suite
-- **CLI**: `xcodebuild -project KuKa.xcodeproj -scheme KuKa test`
-
-### Unit Tests (KuKaTests)
-
-`CaptureManager` uses protocol-based dependency injection (`FileManaging`, `ClipboardManaging`, `ScreenCapturing`) so all external dependencies are mocked in tests — no real disk writes, clipboard access, or screen capture needed.
-
-Tests cover:
-- Capture success/failure paths
-- File saving and clipboard operations
-- Coordinate conversion (NSView → CGDisplay)
-- Screenshot file naming format
-- Annotated image save
-- Crop box geometry (draw, move, resize, flip, clear) and the crop's pixel mapping
-- Screenshot deletion (file removal + clipboard clear)
-- Tiling layout math and the maximize/restore toggle, including apps that snap window sizes
-- Screen-picking and windows-per-screen rules, plus the tiling controller's saved-frame handling
-- Shortcut registration, feature toggles, action delivery, conflict detection, partial failure recovery, wake renewal, stale callback rejection, and cleanup
-- Meeting notes: the stage rule and folder rules on a real temporary folder, the transcript merge and echo rule, the transcriber fallback from Whisper to Apple, the Whisper model install, language codes, and silence filter against a fake WhisperKit, room labels and the speaker model install against a fake SpeakerKit, the summary fallback from `agy` to `claude`, child processes with real executables, recovery and retry from each step, the recorder and the menu controller with a fake capture, Pause and Resume on synthetic audio, the live transcript model, the meeting controls panel, and known words: the list format, the corrector, insert-only additions to a temporary list, the questions and answers, and the review window
-
-Unit tests never download or load the Whisper or SpeakerKit model. `RealMeetingAudioTests` runs the real models on your own meeting audio, and it is skipped unless you set its environment variables. `RealLiveTranscriptTests` runs Apple's installed live model on audio you choose in the same way. `AGENTS.md` describes how to run them.
-
-### Test-Mode Guard
-
-XCTest uses no app delegate and does not construct production services. The
-`--uitesting` Settings preview uses isolated defaults and inert services. Both
-leave production file logging off. Meeting tests use a temporary folder, never
-`~/Meetings`, and registrar tests use fake Carbon calls. Detection uses
-`XCTestConfigurationFilePath`, which takes priority over the preview argument.
-
-### Log tests
-
-Log tests use temporary folders and injected outputs. They cover privacy,
-permissions, retention, concurrent writes, bounded shutdown, cached reading,
-filters, selection and scroll preservation, stale refreshes, deletion, find,
-and shared window activation. XCTest and the Settings preview do not start
-production file logging. Set `TEST_RUNNER_KUKA_LOG_SNAPSHOTS` to a folder when
-running `LogWindowControllerTests` to export light and dark AppKit view captures.
+The `Real*Tests` classes run the real models on audio that you choose, and the picture tests write PNG files of the windows. They are skipped unless you set their environment variables. The comment above each of them gives the command.
 
 ## Acknowledgements
 

@@ -8,7 +8,7 @@ final class SettingsPreviewAppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
 
     init(defaults: UserDefaults = UserDefaults(suiteName: "KuKa.TestHost")!,
-         present: @escaping (NSWindow) -> Void = SettingsWindowController.presentWindow,
+         present: @escaping @MainActor (NSWindow) -> Void = SettingsWindowController.presentWindow,
          activation: OrdinaryWindowActivation = .shared) {
         let settings = Settings(defaults: defaults, loginItem: DisabledLoginItem())
         keepAwake = KeepAwakeController(wakeManager: WakeManager(preventer: PreviewSleepPreventer()),

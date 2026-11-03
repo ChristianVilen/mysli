@@ -20,7 +20,17 @@ struct ClipboardHistory {
     /// is always enough to fall back under it.
     static let maxItemBytes = 50_000_000
 
+    private let maxImageBytes: Int
+    private let maxItemBytes: Int
+
     private(set) var items: [ClipboardItem] = []
+
+    init(maxImageBytes: Int = Self.maxImageBytes, maxItemBytes: Int = Self.maxItemBytes) {
+        assert(maxItemBytes < maxImageBytes,
+               "a single accepted item must never alone exceed the image byte budget")
+        self.maxImageBytes = maxImageBytes
+        self.maxItemBytes = maxItemBytes
+    }
 
     /// Inserts at the front. When an item's hash already matches one
     /// already in the history, the existing entry is *replaced* by the new
@@ -36,9 +46,7 @@ struct ClipboardHistory {
     /// while the total image-byte budget is still exceeded — text items are
     /// never evicted by the byte budget, no matter how old they are.
     mutating func add(_ item: ClipboardItem) {
-        assert(Self.maxItemBytes < Self.maxImageBytes,
-               "a single accepted item must never alone exceed the image byte budget")
-        guard item.byteCost <= Self.maxItemBytes else { return }
+        guard item.byteCost <= maxItemBytes else { return }
 
         if let existingIndex = items.firstIndex(where: { $0.contentHash == item.contentHash }) {
             items.remove(at: existingIndex)
@@ -49,7 +57,7 @@ struct ClipboardHistory {
             items.removeLast()
         }
 
-        while totalImageBytes > Self.maxImageBytes {
+        while totalImageBytes > maxImageBytes {
             // items is newest-first, so the *last* index with byteCost > 0
             // is the oldest image in the list. Text items (byteCost == 0)
             // are skipped no matter their age.

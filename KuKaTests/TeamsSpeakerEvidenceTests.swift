@@ -161,18 +161,13 @@ final class TeamsSpeakerEvidenceTests: XCTestCase {
     }
 
     func testCapStopsCollectionAndRetainsEarlierEvidence() {
-        var history = TeamsSpeakerHistory()
-        for index in 0..<36_000 {
-            let start = 100 + Double(index) * 0.3
-            XCTAssertEqual(history.append(sample(start, start + 0.01, index), runID: run), index < 35_999)
+        var history = TeamsSpeakerHistory(capacity: 4)
+        for (index, sample) in matching.enumerated() {
+            XCTAssertEqual(history.append(sample, runID: run), index < 3)
         }
-        XCTAssertFalse(history.append(sample(10_900, 10_900.01, 36_000), runID: run))
-        let result = history.finish(clock: clock, endingAt: HostTime(seconds: 11_000))
+        XCTAssertFalse(history.append(sample(101.2, 101.21, 4), runID: run))
+        let result = history.finish(clock: clock, endingAt: HostTime(seconds: 120))
         XCTAssertEqual(name(result), "Aino")
-        XCTAssertNil(name(result, 10_800, 10_800.1))
-        for index in stride(from: 0, to: 35_000, by: 7) {
-            let start = Double(index) * 0.3
-            XCTAssertEqual(name(result, start + 0.02, start + 0.29), "Aino")
-        }
+        XCTAssertNil(name(result, 0.92, 1.19))
     }
 }

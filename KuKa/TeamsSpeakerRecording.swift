@@ -9,15 +9,17 @@ struct RecordedMeeting {
 final class TeamsSpeakerRecording {
     private let observer: any TeamsSpeakerObserving
     private let log: (LogMessage) -> Void
-    private var history = TeamsSpeakerHistory()
+    private var history: TeamsSpeakerHistory
     private var tally = TeamsScanTally()
     private var task: Task<Void, Never>?
     private var runID: UUID?
     private var ended = false
 
-    init(observer: any TeamsSpeakerObserving, log: @escaping (LogMessage) -> Void = { Log.teams.notice($0) }) {
+    init(observer: any TeamsSpeakerObserving, log: @escaping (LogMessage) -> Void = { Log.teams.notice($0) },
+         history: TeamsSpeakerHistory = TeamsSpeakerHistory()) {
         self.observer = observer
         self.log = log
+        self.history = history
     }
 
     static func startLine(enabled: Bool, accessibilityGranted: Bool) -> LogMessage {
@@ -40,7 +42,7 @@ final class TeamsSpeakerRecording {
                 guard sample.began >= lowerBound else { continue }
                 if let line = self.tally.line(for: sample) { self.log(line) }
                 if !self.history.append(sample, runID: id) {
-                    self.log("Teams speaker names: collection stopped at the cap of \(TeamsSpeakerHistory.capacity) scans.")
+                    self.log("Teams speaker names: collection stopped at the cap of \(self.history.capacity) scans.")
                     self.ended = true
                     self.pause()
                     break
