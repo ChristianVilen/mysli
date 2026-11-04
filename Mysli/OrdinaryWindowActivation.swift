@@ -11,7 +11,7 @@ final class OrdinaryWindowActivation {
     private let nextTurn: (@escaping @MainActor () -> Void) -> Void
 
     init(setPolicy: @escaping (NSApplication.ActivationPolicy) -> Void = { NSApp.setActivationPolicy($0) },
-         activateApp: @escaping () -> Void = { NSApp.activate() },
+         activateApp: @escaping () -> Void = { NSApp.activate(ignoringOtherApps: true) },
          nextTurn: @escaping (@escaping @MainActor () -> Void) -> Void = { work in Task { @MainActor in work() } }) {
         self.setPolicy = setPolicy
         self.activateApp = activateApp
@@ -26,6 +26,8 @@ final class OrdinaryWindowActivation {
         setPolicy(.regular)
         // macOS can refuse an activation that comes in the same turn as the policy change. The
         // window then opens behind the active app, and Stage Manager puts it in the side strip.
+        // The plain `activate()` is also refused at launch, which has no user action in Mysli,
+        // so `activateApp` forces it.
         nextTurn { [weak self] in self?.activateApp() }
     }
 
