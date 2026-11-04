@@ -21,7 +21,9 @@ final class KeepAwakePanelView: NSView {
         durationControl.controlSize = .small
         durationControl.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
 
-        let stack = NSStackView(views: [titleLabel, durationControl])
+        let title = NSStackView(views: [ToolMenuHeaderView.iconView(.keepAwake), titleLabel])
+        title.spacing = 6
+        let stack = NSStackView(views: [title, durationControl])
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 6

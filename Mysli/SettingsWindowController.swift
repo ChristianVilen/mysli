@@ -145,7 +145,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         return true
     }
 
-    private func refresh() {
+    /// Shows the saved preferences, also after the menu changed one while the window is open.
+    func refresh() {
         launchAtLogin.state = settings.launchAtLogin ? .on : .off
         screenshotShortcuts.state = settings.screenshotShortcutsEnabled ? .on : .off
         windowTiling.state = settings.windowTilingEnabled ? .on : .off

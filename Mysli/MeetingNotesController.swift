@@ -119,9 +119,7 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
     }
 
     func buildMenuSection(into menu: NSMenu) {
-        let header = NSMenuItem(title: "Meeting Notes", action: nil, keyEquivalent: "")
-        header.isEnabled = false
-        menu.addItem(header)
+        menu.addItem(.toolHeader(.meetings, title: "Meeting Notes"))
         for item in [statusLineItem, meterItem, recordItem, pauseItem, writeNotesItem, showControlsItem, restorePositionItem, progressItem,
                      waitingItem, checkWordsItem, retryItem, recentNotesItem, openFolderItem] {
             menu.addItem(item)

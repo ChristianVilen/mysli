@@ -144,7 +144,7 @@ final class MeetingNotesControllerTests: MeetingNotesTestCase {
         await recorder.toggleRecording()
         try XCTUnwrap(capture.recordings.last).levels = RecordingAudioLevels(microphone: 1, system: 0.5)
         sut.menuWillOpen()
-        let meterItem = try XCTUnwrap(menu.items.first { $0.view != nil })
+        let meterItem = try XCTUnwrap(menu.items.first { $0.view is RecordingAudioMeterView })
         XCTAssertEqual(levelIndicators(in: try XCTUnwrap(meterItem.view)).map(\.doubleValue), [1, 0.5])
 
         await recorder.toggleRecording()
@@ -167,7 +167,7 @@ final class MeetingNotesControllerTests: MeetingNotesTestCase {
         let statusMenu = StatusMenu(sections: [sut])
         statusMenu.menuWillOpen(statusMenu.menu)
         defer { statusMenu.menuDidClose(statusMenu.menu) }
-        let meterItem = try XCTUnwrap(statusMenu.menu.items.first { $0.view != nil })
+        let meterItem = try XCTUnwrap(statusMenu.menu.items.first { $0.view is RecordingAudioMeterView })
         let indicators = levelIndicators(in: try XCTUnwrap(meterItem.view))
         XCTAssertEqual(indicators.map(\.doubleValue), [0.2, 0.8])
 

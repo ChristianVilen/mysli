@@ -228,7 +228,7 @@ class MeetingNotesTestCase: XCTestCase {
     }
 
     var visibleTitles: [String] {
-        menu.items.filter { !$0.isHidden && $0.view == nil }.map(\.title)
+        menu.items.filter { !$0.isHidden && ($0.view == nil || $0.view is ToolMenuHeaderView) }.map(\.title)
     }
 
     func item(titled title: String) -> NSMenuItem? {

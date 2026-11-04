@@ -42,7 +42,7 @@ If you use Stage Manager (the macOS feature that shows recent apps as small thum
 
 With more than one display, the window is tiled on the screen it overlaps the most. This differs from the screenshot features, which follow the cursor.
 
-The whole feature can be turned on and off with the **Enable window tiling** checkbox in **Mysli… > Settings**; the choice is remembered across restarts. While it's off, the hotkeys pass through to other apps. The keys themselves aren't configurable.
+The whole feature can be turned on and off with the **Enable window tiling** checkbox in **Settings…**; the choice is remembered across restarts. While it's off, the hotkeys pass through to other apps. The keys themselves aren't configurable.
 
 ## Clipboard History
 
@@ -54,7 +54,7 @@ Text and images both get recorded, including screenshots Mysli itself saves to y
 
 The history lives in memory only — nothing is written to disk, so it's empty again after a restart. It holds at most 100 items; images are capped at about 100 MB in total, with the oldest images dropped first. A single item over 50 MB is not recorded. Copies that your password manager marks as sensitive are never recorded.
 
-The whole feature can be turned on and off with the **Record clipboard history** checkbox in **Mysli… > Settings**; the choice is remembered across restarts. While it's off, Mysli stops recording, clears the history it collected, and gives `Shift+Command+C` back to other apps. With the feature on, Mysli takes that shortcut from Chrome and Arc (Inspect Element), Xcode (Activate Console), VS Code (Open External Terminal), and Finder (Computer window).
+The whole feature can be turned on and off with the **Record clipboard history** checkbox in **Settings…**; the choice is remembered across restarts. While it's off, Mysli stops recording, clears the history it collected, and gives `Shift+Command+C` back to other apps. With the feature on, Mysli takes that shortcut from Chrome and Arc (Inspect Element), Xcode (Activate Console), VS Code (Open External Terminal), and Finder (Computer window).
 
 ## Meeting Notes
 
@@ -84,7 +84,7 @@ While recording, open the menu to check the **Microphone** and **Mac audio** met
 
 Claude Code summaries use Sonnet with medium effort. Mysli sets both options explicitly, including when Automatic falls back to Claude Code. The Sonnet version depends on the installed Claude Code version.
 
-Mysli then transcribes the call on your Mac with Whisper (the `large-v3-v20240930_turbo` model, through WhisperKit) and asks an AI command-line tool for a summary. The default summary choice, Automatic, tries Antigravity (`agy`) first and Claude Code (`claude`) if that fails. In **Mysli… > Settings**, you can select either tool to use only that provider. Install at least one of them in `/opt/homebrew/bin`, `/usr/local/bin`, or `~/.local/bin`, and log in to it once in Terminal. A notification tells you when the notes are ready; click it to open the summary, or the review window when there are words to check (see below). Mysli asks for notification permission the first time you start a recording. Each meeting gets its own folder, for example `~/Meetings/2026-10-23_14-02/`, with `transcript.md` and `summary.md`.
+Mysli then transcribes the call on your Mac with Whisper (the `large-v3-v20240930_turbo` model, through WhisperKit) and asks an AI command-line tool for a summary. The default summary choice, Automatic, tries Antigravity (`agy`) first and Claude Code (`claude`) if that fails. In **Settings…**, you can select either tool to use only that provider. Install at least one of them in `/opt/homebrew/bin`, `/usr/local/bin`, or `~/.local/bin`, and log in to it once in Terminal. A notification tells you when the notes are ready; click it to open the summary, or the review window when there are words to check (see below). Mysli asks for notification permission the first time you start a recording. Each meeting gets its own folder, for example `~/Meetings/2026-10-23_14-02/`, with `transcript.md` and `summary.md`.
 
 By default, "Them" is everyone else on the call, from the sound your Mac plays. The optional Teams speaker-name feature below can name supported remote lines after Stop. Your Mac's microphone hears you and anyone in the same room. Mysli tells those voices apart on your Mac and labels them "Room 1", "Room 2", and so on, in the order they first speak. Mysli never guesses which voice is you. Two people with similar voices can share a label, and one person can get two. A voice with fewer than 5 words gets no label of its own: its lines take the label of the voice that spoke nearest in time. When Mysli finds only one voice, the microphone lines say "Me". If Mysli cannot tell the voices apart, the microphone lines also say "Me", and the top of the transcript says why. Mysli does not try on a microphone track longer than 3 hours. In the summary, an action item has a person's name only when the transcript or your typed notes explicitly say who will do it. Otherwise its owner is "Unclear". Headphones give the cleanest transcript. On speakers, your microphone also hears the other people. Mysli removes those repeated lines from the microphone lines when it finds them. It also removes the lines of a microphone voice that speaks almost only while the other people speak and mostly repeats their words, because that voice is their echo.
 
@@ -98,7 +98,7 @@ Your typed notes can supply explicit decisions and action owners that are absent
 
 If nobody spoke and the typed notes are empty, Mysli records that no speech was found and keeps the audio. Nonempty typed notes still produce a summary for a silent recording. If a step fails, the meeting folder gets an `error.md` with the reason, and the menu shows **Retry Failed Meeting**. Retry continues from the failed step. If Mysli quits or crashes during a meeting, it finishes processing the saved audio and notes when it next starts. If it crashed while it told the voices apart, that meeting gets no room labels, and the transcript says why. To give up on a meeting, delete its folder. **Open Meetings Folder** opens the folder that holds them.
 
-To keep new meetings in another folder, open **Mysli… > Settings** and click **Choose…** beside **Meetings folder**. Select a folder or create one, then click **Choose**. The new folder applies immediately, including **Open Meetings Folder**. Cancel leaves the setting unchanged. Mysli does not move existing meetings. A recording or a meeting already waiting for notes finishes in its original folder.
+To keep new meetings in another folder, open **Settings…** and click **Choose…** beside **Meetings folder**. Select a folder or create one, then click **Choose**. The new folder applies immediately, including **Open Meetings Folder**. Cancel leaves the setting unchanged. Mysli does not move existing meetings. A recording or a meeting already waiting for notes finishes in its original folder.
 
 You can also set the path in Terminal:
 
@@ -189,7 +189,7 @@ You can give the summary background about project terms, vendors, and people. Cr
 - Aino and Jyri work on the portal.
 ```
 
-In **Mysli… > Settings**, click **Choose…** beside **Background file**. You can also set the path in Terminal:
+In **Settings…**, click **Choose…** beside **Background file**. You can also set the path in Terminal:
 
 ```bash
 defaults write io.github.christianvilen.mysli meetingContextFile "$HOME/meeting-context.md"
@@ -213,7 +213,7 @@ This leaves your file in place. It does not remove context already sent to a pro
 
 ## Logs
 
-Choose **Show Log…** in the menu, immediately after **Permissions…**. The window
+Choose **Show Log…** in the menu, immediately after **Settings…**. The window
 starts with logs from this launch. You can select Today, Last 7 days, or Everything
 kept, then filter by app area or show errors only. It shows the newest 5,000 matching
 lines and refreshes every two seconds while open. Scroll up to read older text
@@ -303,7 +303,7 @@ Mysli keeps `Shift+Command+3` and `Shift+Command+4`. If macOS already uses them,
 - **Save picture of screen as a file** — `Shift+Command+3`
 - **Save picture of selected area as a file** — `Shift+Command+4`
 
-Mysli retries within a few seconds. The menu warnings disappear when the shortcuts are ready. It does not change system settings for you. You can return to the instructions through **Permissions…** in the menu.
+Mysli retries within a few seconds. The menu warnings disappear when the shortcuts are ready. It does not change system settings for you. You can return to the instructions through **Settings…** in the menu, on the **Permissions** page.
 
 To keep the macOS screenshot tool instead, turn off **Use Mysli for screenshots** in Settings. Mysli then releases both shortcuts and shows no conflict for them.
 
@@ -346,19 +346,24 @@ The folder is created automatically if it doesn't exist.
 
 ## Menu Bar Options
 
-- **Mysli…** opens the shared window. Command-comma opens its Settings page while Mysli is active, and Command-W closes it. Changes save immediately.
+The menu has one group for each tool, with the tool's colored icon.
+
+- **Screenshots**: **Capture Area** and **Capture Screen** work even when **Use Mysli for screenshots** is off. They show their shortcuts only while Mysli owns them.
+- **Clipboard**: **Show Clipboard History** opens the history panel. It is disabled while clipboard history is off.
+- **Windows**: **Window Tiling** turns the tiling shortcuts on and off. It saves the same preference as the switch in Settings.
 - **Keep Awake** keeps the Mac awake for 30 minutes, 1, 2, or 4 hours, or until turned off. **Keep screen on** controls whether the display stays awake too. **Turn Off** ends the session.
-- **Permissions…** opens the permission checks and screenshot shortcut setup in the same window.
 - **Start Recording Meeting** and **Stop Recording Meeting** start and stop a meeting recording. While Mysli records, a line above them shows the recorded time, and "Paused" while the recording is paused. While Mysli makes notes, a line shows the step and how many meetings wait.
 - **Pause Recording** or **Resume Recording**, **Show Meeting Controls**, and **Restore Default Position** appear while a meeting records or is paused.
 - **Check Words** appears when meetings have words to check, with their number. It opens the review window on the oldest of those meetings.
 - **Retry Failed Meeting** appears when a meeting's transcription or summary failed.
 - **Open Meetings Folder** opens the folder that holds the meeting notes.
+- **Settings…** opens the shared window. Command-comma opens it too while Mysli is active, and Command-W closes it. Changes save immediately. The permission checks and the screenshot shortcut setup are on its **Permissions** page.
+- **Show Log…** opens the log window.
 - **Quit Mysli** — Exit the app
 
 ## Settings
 
-Open **Mysli…** in the menu to change preferences and find setup or help. The sidebar has four pages:
+Open **Settings…** in the menu to change preferences and find setup or help. The sidebar has four pages:
 
 - **Settings** has General, Screenshots, and Meeting Notes groups.
 - **Features & instructions** lists keyboard shortcuts and explains each feature.

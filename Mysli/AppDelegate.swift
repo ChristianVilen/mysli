@@ -58,7 +58,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         requestUpdate: { [weak self] in self?.meetingNotes.updateNotes($0) }
     )
     private lazy var wordReviewWindow = WordReviewWindowController(controller: wordReview)
-    private lazy var statusMenu = StatusMenu(sections: [keepAwake, meetingNotes])
+    private lazy var toolActions = ToolActionsMenuSection(
+        screenshotsOn: { [unowned self] in settings.screenshotShortcutsEnabled },
+        clipboardOn: { [unowned self] in settings.clipboardHistoryEnabled },
+        tilingOn: { [unowned self] in settings.windowTilingEnabled })
+    private lazy var statusMenu = StatusMenu(sections: [toolActions, keepAwake, meetingNotes])
     private lazy var settingsWindow = SettingsWindowController(settings: settings, permissionActions: .init(
         accessibility: { [weak self] in self?.permissions.requestAccessibility() },
         screenRecording: { [weak self] in self?.permissions.requestScreenRecording() },
@@ -193,11 +197,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self?.settingsWindow.show()
             Task { await self?.calendarReminders?.refresh() }
         }
-        statusMenu.onShowMysli = statusMenu.onShowSettings
         statusItem.menu = statusMenu.menu
         NSApp.mainMenu = statusMenu.applicationMenu()
         settingsWindow.onTilingChanged = { [weak self] enabled in
             self?.hotkeyManager.tilingEnabled = enabled
+        }
+        toolActions.onCaptureArea = { [weak self] in self?.startCapture(.interactive) }
+        toolActions.onCaptureScreen = { [weak self] in self?.startCapture(.fullScreen) }
+        toolActions.onShowClipboardHistory = { [weak self] in self?.toggleClipboardPanel() }
+        toolActions.onWindowTilingChanged = { [weak self] enabled in
+            guard let self else { return }
+            settings.windowTilingEnabled = enabled
+            hotkeyManager.tilingEnabled = enabled
+            settingsWindow.refresh()
         }
         settingsWindow.onCalendarRemindersChanged = { [weak self] enabled in
             Task { await self?.calendarReminders?.setEnabled(enabled) }
@@ -214,7 +226,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         settingsWindow.onMeetingsFolderChanged = { [weak self] _ in self?.meetingNotes.meetingsFolderChanged() }
         settingsWindow.onScreenshotsChanged = { [weak self] enabled in self?.hotkeyManager.screenshotsEnabled = enabled }
-        statusMenu.onShowPermissions = { [weak self] in self?.settingsWindow.show(.permissions) }
         statusMenu.onShowLog = { [weak self] in self?.logWindow.show() }
         statusMenu.onOpenKeyboardSettings = { [weak self] in self?.permissions.openSettings(.keyboardShortcuts) }
     }

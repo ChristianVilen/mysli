@@ -36,9 +36,9 @@ final class StatusMenuTests: XCTestCase {
         _ = (item.target as? NSObject)?.perform(item.action, with: item)
     }
 
-    func testShowLogFollowsPermissionsAndCallsItsAction() throws {
-        let permissions = try XCTUnwrap(menuItems.firstIndex { $0.title == "Permissions…" })
-        XCTAssertEqual(menuItems[permissions + 1].title, "Show Log…")
+    func testShowLogFollowsSettingsAndCallsItsAction() throws {
+        let settings = try XCTUnwrap(menuItems.firstIndex { $0.title == "Settings…" })
+        XCTAssertEqual(menuItems[settings + 1].title, "Show Log…")
         var shown = 0
         sut.onShowLog = { shown += 1 }
         click(try XCTUnwrap(item(titled: "Show Log…")))
@@ -82,14 +82,15 @@ final class StatusMenuTests: XCTestCase {
         XCTAssertFalse(menuItems.contains { $0.title.contains("blocked by") || $0.title.contains("unlock") })
     }
 
-    func testMenuContainsMysliAndOperationalItemsOnly() throws {
-        for title in ["Start Recording Meeting", "Open Meetings Folder", "Permissions…", "Quit Mysli"] {
-            XCTAssertNotNil(item(titled: title))
-        }
-        let settingsItem = try XCTUnwrap(item(titled: "Mysli…"))
+    func testMenuEndsWithSettingsLogAndQuitAfterTheTools() throws {
+        XCTAssertEqual(menuItems.suffix(4).map { $0.isSeparatorItem ? "-" : $0.title },
+                       ["Settings…", "Show Log…", "-", "Quit Mysli"])
+        XCTAssertNil(item(titled: "Mysli…"))
+        XCTAssertNil(item(titled: "Permissions…"))
+        XCTAssertNotNil(item(titled: "Start Recording Meeting"))
         var shown = 0
-        sut.onShowMysli = { shown += 1 }
-        click(settingsItem)
+        sut.onShowSettings = { shown += 1 }
+        click(try XCTUnwrap(item(titled: "Settings…")))
         XCTAssertEqual(shown, 1)
     }
 
@@ -106,10 +107,10 @@ final class StatusMenuTests: XCTestCase {
     func testMeetingNotesSectionFollowsKeepAwake() throws {
         let keepAwake = try XCTUnwrap(menuItems.firstIndex { $0.view is KeepAwakePanelView })
         let meetingNotes = try XCTUnwrap(menuItems.firstIndex { $0.title == "Meeting Notes" })
-        let permissions = try XCTUnwrap(menuItems.firstIndex { $0.title == "Permissions…" })
+        let settings = try XCTUnwrap(menuItems.firstIndex { $0.title == "Settings…" })
 
         XCTAssertLessThan(keepAwake, meetingNotes)
-        XCTAssertLessThan(meetingNotes, permissions)
+        XCTAssertLessThan(meetingNotes, settings)
     }
 
     func testIconDiffersWhenKeepAwakeIsActive() {

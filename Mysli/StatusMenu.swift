@@ -29,8 +29,6 @@ extension MenuSection {
 final class StatusMenu: NSObject, NSMenuDelegate {
     let menu = NSMenu()
     var onShowSettings: (() -> Void)?
-    var onShowMysli: (() -> Void)?
-    var onShowPermissions: (() -> Void)?
     var onShowLog: (() -> Void)?
     var onOpenKeyboardSettings: (() -> Void)?
     /// Fired every time the menu opens, before it is shown.
@@ -120,7 +118,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         }
         if health.accessibilityMissing {
             addLine("⚠️ Window tiling and paste need Accessibility permission")
-            addLine("Grant it under Permissions… below", indented: true)
+            addLine("Grant it in Settings…, on the Permissions page", indented: true)
         }
         for issue in health.issues {
             switch issue.failure {
@@ -190,18 +188,11 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     }
 
     private func build() {
-        let mysli = NSMenuItem(title: "Mysli…", action: #selector(showMysli), keyEquivalent: "")
-        mysli.target = self
-        menu.addItem(mysli)
-        menu.addItem(.separator())
-
         for section in sections {
             section.buildMenuSection(into: menu)
         }
 
-        let permissionsItem = NSMenuItem(title: "Permissions…", action: #selector(showPermissions), keyEquivalent: "")
-        permissionsItem.target = self
-        menu.addItem(permissionsItem)
+        menu.addItem(settingsItem())
 
         let logItem = NSMenuItem(title: "Show Log…", action: #selector(showLog), keyEquivalent: "")
         logItem.target = self
@@ -216,12 +207,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     }
 
     @objc private func showSettings() { onShowSettings?() }
-    @objc private func showMysli() { onShowMysli?() }
     @objc private func showLog() { onShowLog?() }
-
-    @objc private func showPermissions() {
-        onShowPermissions?()
-    }
 
     func menuWillOpen(_ menu: NSMenu) {
         onMenuWillOpen?()

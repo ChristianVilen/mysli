@@ -117,9 +117,9 @@ final class KeepAwakeController: NSObject {
 
         if let session {
             if let remaining = session.remaining(now: now()) {
-                panelView.titleLabel.stringValue = "☕ Awake · \(Self.formatRemaining(remaining))"
+                panelView.titleLabel.stringValue = "Awake · \(Self.formatRemaining(remaining))"
             } else {
-                panelView.titleLabel.stringValue = "☕ Awake · On"
+                panelView.titleLabel.stringValue = "Awake · On"
             }
         } else {
             panelView.titleLabel.stringValue = "Keep Awake"
