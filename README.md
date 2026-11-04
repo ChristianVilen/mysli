@@ -363,14 +363,16 @@ The menu has one group for each tool, with the tool's colored icon.
 
 ## Settings
 
-Open **Settings…** in the menu to change preferences and find setup or help. The sidebar has four pages:
+Open **Settings…** in the menu to change preferences and find setup or help. The sidebar has a page for General, one page for each tool, then Permissions and Help:
 
-- **Settings** has General, Screenshots, and Meeting Notes groups.
-- **Features & instructions** lists keyboard shortcuts and explains each feature.
+- **General** has Launch at login.
+- **Screenshots**, **Clipboard**, **Windows**, **Keep Awake**, and **Meetings** each hold the tool's switch and settings, its keyboard shortcuts, and a guide that you can open.
 - **Permissions** shows live access checks, Grant buttons, and screenshot shortcut setup. Mysli opens this page when required access is missing at launch.
-- **Help & feedback** opens GitHub to report a bug or send feedback. You review the message before sending it.
+- **Help** opens GitHub to report a bug or send feedback. You review the message before sending it.
 
-Command-comma always selects Settings. Opening a page does not change preferences.
+**Keep screen on** on the Keep Awake page and in the menu is one preference. A change in one place shows in the other.
+
+Command-comma always opens the General page. Opening a page does not change preferences.
 
 | Preference | Default and choices |
 |---|---|

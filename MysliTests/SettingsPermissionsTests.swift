@@ -50,7 +50,7 @@ final class SettingsPermissionsTests: XCTestCase {
         XCTAssertEqual(visibility, [true, false, true, false])
         XCTAssertTrue(controller.window === window)
         controller.show()
-        XCTAssertEqual(controller.selectedPage, .settings)
+        XCTAssertEqual(controller.selectedPage, .general)
     }
 
     func testMinimizeHideAndRestoreUpdatePermissionVisibilityWithoutDuplicatingStarts() {
@@ -99,11 +99,11 @@ final class SettingsPermissionsTests: XCTestCase {
         ]))
         XCTAssertEqual(controller.selectedPage, .permissions)
         XCTAssertTrue(settings.didShowScreenshotShortcutSetup)
-        controller.show(.settings)
+        controller.show(.general)
         XCTAssertFalse(controller.showScreenshotSetupIfNeeded(issues: [
             .init(shortcut: .captureFullScreen, failure: .systemConflict)
         ]))
-        XCTAssertEqual(controller.selectedPage, .settings)
+        XCTAssertEqual(controller.selectedPage, .general)
         controller.show(.permissions)
         XCTAssertFalse(controller.permissionsPage.keyboardSettings.isHidden)
     }

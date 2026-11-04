@@ -13,7 +13,7 @@ final class SettingsHelpView: NSStackView {
         orientation = .vertical
         alignment = .leading
         spacing = 16
-        SettingsLayout.add(SettingsLayout.page(title: "Help & feedback", subtitle: "Report a problem or suggest a way to improve Mysli."), to: self)
+        SettingsLayout.add(SettingsLayout.page(title: "Help", subtitle: "Report a problem or suggest a way to improve Mysli."), to: self)
         for button in [reportBug, sendFeedback] {
             button.bezelStyle = .rounded
             button.target = self

@@ -300,7 +300,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func setupKeepAwake() {
         keepAwake.onStateChange = { [weak self] in self?.updateStatus() }
-        keepAwake.onDisplayAwakeChanged = { [weak self] in self?.settings.keepDisplayAwake = $0 }
+        keepAwake.onDisplayAwakeChanged = { [weak self] enabled in
+            self?.settings.keepDisplayAwake = enabled
+            self?.settingsWindow.refresh()
+        }
+        settingsWindow.onKeepScreenOnChanged = { [weak self] in self?.keepAwake.setDisplayAwake($0) }
     }
 
     private func setupMeetingNotes() {

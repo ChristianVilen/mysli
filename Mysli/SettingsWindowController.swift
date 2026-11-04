@@ -10,6 +10,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     let screenshotShortcuts = NSSwitch()
     let windowTiling = NSSwitch()
     let clipboardHistory = NSSwitch()
+    let keepScreenOn = NSSwitch()
     let calendarReminders = NSSwitch()
     let teamsSpeakerNames = NSSwitch()
     let thumbnailDuration = NSPopUpButton()
@@ -29,9 +30,9 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private let isWindowVisible: (NSWindow) -> Bool
     private var permissionsVisible = false
     private var visibilityObservers: [NSObjectProtocol] = []
-    private(set) var selectedPage: SettingsPage = .settings
+    private(set) var selectedPage: SettingsPage = .general
     let pageButtons = SettingsPage.allCases.map { page in
-        let button = NSButton(title: page.title, image: NSImage(systemSymbolName: page.symbol, accessibilityDescription: nil)!, target: nil, action: nil)
+        let button = NSButton(title: page.title, image: page.icon(size: 20), target: nil, action: nil)
         button.tag = page.rawValue
         button.setButtonType(.pushOnPushOff)
         button.bezelStyle = .glass
@@ -40,14 +41,15 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         button.setAccessibilityLabel(page.title)
         return button
     }
-    private var pages: [SettingsPage: NSScrollView] = [:]
-    let instructions = SettingsInstructionsView()
+    private(set) var pages: [SettingsPage: NSScrollView] = [:]
+    private(set) var guides: [SettingsPage: SettingsGuides] = [:]
     let permissionsPage: SettingsPermissionsView
     let helpPage: SettingsHelpView
     private var displayObserver: NSObjectProtocol?
     var onScreenshotsChanged: ((Bool) -> Void)?
     var onTilingChanged: ((Bool) -> Void)?
     var onClipboardChanged: ((Bool) -> Void)?
+    var onKeepScreenOnChanged: ((Bool) -> Void)?
     var onPermissionsVisibilityChanged: ((Bool) -> Void)?
     var onMeetingsFolderChanged: ((URL) -> Void)?
     var onCalendarRemindersChanged: ((Bool) -> Void)?
@@ -101,7 +103,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         window.makeKeyAndOrderFront(nil)
     }
 
-    func show(_ page: SettingsPage = .settings) {
+    func show(_ page: SettingsPage = .general) {
         loginError.stringValue = ""
         loginError.isHidden = true
         refresh()
@@ -151,6 +153,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         screenshotShortcuts.state = settings.screenshotShortcutsEnabled ? .on : .off
         windowTiling.state = settings.windowTilingEnabled ? .on : .off
         clipboardHistory.state = settings.clipboardHistoryEnabled ? .on : .off
+        keepScreenOn.state = settings.keepDisplayAwake ? .on : .off
         calendarReminders.state = settings.calendarRecordingRemindersEnabled ? .on : .off
         teamsSpeakerNames.state = settings.teamsSpeakerNamesEnabled ? .on : .off
         let duration = settings.thumbnailDuration
@@ -180,7 +183,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         for (control, action) in [
             (launchAtLogin, #selector(loginChanged)), (screenshotShortcuts, #selector(screenshotsChanged)),
             (windowTiling, #selector(tilingChanged)), (clipboardHistory, #selector(clipboardChanged)),
-            (calendarReminders, #selector(calendarChanged)), (teamsSpeakerNames, #selector(teamsChanged)),
+            (keepScreenOn, #selector(keepScreenOnChanged)), (calendarReminders, #selector(calendarChanged)), (teamsSpeakerNames, #selector(teamsChanged)),
             (chooseMeetingsFolder, #selector(folderClicked)), (chooseBackground, #selector(contextClicked)),
             (clearBackground, #selector(clearClicked)), (thumbnailDuration, #selector(durationChanged)),
             (summaryTool, #selector(toolChanged))
@@ -193,6 +196,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         screenshotShortcuts.setAccessibilityLabel("Use Mysli for screenshots")
         windowTiling.setAccessibilityLabel("Enable window tiling")
         clipboardHistory.setAccessibilityLabel("Record clipboard history")
+        keepScreenOn.setAccessibilityLabel("Keep screen on")
         calendarReminders.setAccessibilityLabel("Calendar recording reminders")
         teamsSpeakerNames.setAccessibilityLabel("Teams speaker names")
         summaryTool.setAccessibilityLabel("Summary tool")
@@ -205,8 +209,6 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             summaryTool.addItem(withTitle: tool.title)
             summaryTool.lastItem?.representedObject = tool
         }
-        let content = SettingsLayout.page(title: "Settings", subtitle: "Make Mysli work your way.")
-        func add(_ view: NSView) { SettingsLayout.add(view, to: content) }
         func column(_ views: [NSView]) -> NSView {
             let column = SettingsLayout.stack(spacing: 6)
             for view in views { SettingsLayout.add(view, to: column) }
@@ -215,56 +217,91 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         func pathRow(_ title: String, path: NSTextField, buttons: [NSView]) -> NSView {
             column([SettingsLayout.row(title, control: NSStackView(views: buttons)), path])
         }
-        add(SettingsLayout.heading("General", symbol: "gearshape.fill", color: .systemBlue))
-        add(SettingsLayout.group([
-            column([SettingsLayout.row("Launch at login", control: launchAtLogin), loginError]),
-            SettingsLayout.row("Window tiling", detail: "Move windows with Control + Option.", control: windowTiling),
-            SettingsLayout.row("Clipboard history", detail: "Keep recent copies until you quit Mysli.", control: clipboardHistory)
-        ]))
+        func note(_ text: String) -> NSView { SettingsLayout.label(text, size: 11, secondary: true) }
         loginError.textColor = .systemRed
         loginError.isHidden = true
-        add(SettingsLayout.heading("Screenshots", symbol: "camera.fill", color: .systemPurple))
-        add(SettingsLayout.group([
-            SettingsLayout.row("Use Mysli for screenshots", detail: "When off, Shift + Command + 3 and 4 go back to macOS.",
-                               control: screenshotShortcuts),
-            SettingsLayout.row("Show thumbnail for", control: thumbnailDuration)
-        ]))
-        add(SettingsLayout.heading("Meeting notes", symbol: "waveform", color: .systemOrange))
-        add(SettingsLayout.group([
-            pathRow("Meetings folder", path: folderPath, buttons: [chooseMeetingsFolder]),
-            SettingsLayout.row("Summary tool", control: summaryTool)
-        ]))
-        add(SettingsLayout.label("Automatic tries Antigravity, then Claude Code. An explicit choice uses only that tool. Changes apply when the next job starts.", size: 11, secondary: true))
-        add(SettingsLayout.group([pathRow("Background file", path: backgroundPath, buttons: [chooseBackground, clearBackground])]))
-        add(SettingsLayout.label("The complete background file goes with the transcript. Automatic may send it to both providers on fallback. Clear keeps the file.", size: 11, secondary: true))
-        add(SettingsLayout.group([
-            column([SettingsLayout.row("Calendar reminders", detail: "Calendar events offer recording reminders. Mysli never starts or stops recording automatically.",
-                                       control: calendarReminders), calendarStatus]),
-            SettingsLayout.row("Teams speaker names", detail: "Experimental. After Stop, names remote speakers from the Teams app. Applies from the next recording.",
-                               control: teamsSpeakerNames)
-        ]))
         calendarStatus.isHidden = true
-        add(SettingsLayout.label("Changes save automatically", size: 11, secondary: true))
         for label in [folderPath, backgroundPath] {
             label.lineBreakMode = .byTruncatingMiddle
             label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
             label.setContentHuggingPriority(.defaultLow, for: .horizontal)
         }
+        for page in SettingsPage.allCases where !page.guides.isEmpty {
+            guides[page] = SettingsGuides(page.guides)
+        }
+        func toolPage(_ page: SettingsPage, _ views: [NSView]) -> NSView {
+            let content = SettingsLayout.page(title: page.title, subtitle: page.subtitle)
+            for view in views { SettingsLayout.add(view, to: content) }
+            if !page.shortcuts.isEmpty {
+                SettingsLayout.add(SettingsLayout.sectionTitle("Shortcuts"), to: content)
+                SettingsLayout.add(SettingsShortcuts.group(page.shortcuts), to: content)
+            }
+            if let guide = guides[page] {
+                SettingsLayout.add(SettingsLayout.sectionTitle("Guide"), to: content)
+                SettingsLayout.add(guide.view, to: content)
+            }
+            return content
+        }
+        let permissions = SettingsLayout.stack(spacing: 14)
+        SettingsLayout.add(permissionsPage, to: permissions)
+        if let guide = guides[.permissions] {
+            SettingsLayout.add(SettingsLayout.sectionTitle("Guide"), to: permissions)
+            SettingsLayout.add(guide.view, to: permissions)
+        }
+        let contents: [SettingsPage: NSView] = [
+            .general: toolPage(.general, [
+                SettingsLayout.group([column([SettingsLayout.row("Launch at login", control: launchAtLogin), loginError])])
+            ]),
+            .screenshots: toolPage(.screenshots, [SettingsLayout.group([
+                SettingsLayout.row("Use Mysli for screenshots", detail: "When off, Shift + Command + 3 and 4 go back to macOS.",
+                                   control: screenshotShortcuts),
+                SettingsLayout.row("Show thumbnail for", control: thumbnailDuration)
+            ])]),
+            .clipboard: toolPage(.clipboard, [SettingsLayout.group([
+                SettingsLayout.row("Clipboard history", detail: "Keep recent copies until you quit Mysli.", control: clipboardHistory)
+            ])]),
+            .windows: toolPage(.windows, [SettingsLayout.group([
+                SettingsLayout.row("Window tiling", detail: "Move windows with Control + Option.", control: windowTiling)
+            ])]),
+            .keepAwake: toolPage(.keepAwake, [
+                SettingsLayout.group([SettingsLayout.row("Keep screen on", detail: "The display stays awake too while a session runs.",
+                                                         control: keepScreenOn)]),
+                note("Start a session from the Mysli menu.")
+            ]),
+            .meetings: toolPage(.meetings, [
+                SettingsLayout.group([
+                    pathRow("Meetings folder", path: folderPath, buttons: [chooseMeetingsFolder]),
+                    SettingsLayout.row("Summary tool", control: summaryTool)
+                ]),
+                note("Automatic tries Antigravity, then Claude Code. An explicit choice uses only that tool. Changes apply when the next job starts."),
+                SettingsLayout.group([pathRow("Background file", path: backgroundPath, buttons: [chooseBackground, clearBackground])]),
+                note("The complete background file goes with the transcript. Automatic may send it to both providers on fallback. Clear keeps the file."),
+                SettingsLayout.group([
+                    column([SettingsLayout.row("Calendar reminders", detail: "Calendar events offer recording reminders. Mysli never starts or stops recording automatically.",
+                                               control: calendarReminders), calendarStatus]),
+                    SettingsLayout.row("Teams speaker names", detail: "Experimental. After Stop, names remote speakers from the Teams app. Applies from the next recording.",
+                                       control: teamsSpeakerNames)
+                ])
+            ]),
+            .permissions: permissions,
+            .help: helpPage
+        ]
         let root = SettingsBackground()
         window?.contentView = root
         let sidebar = SettingsGlass(radius: 16)
         sidebar.translatesAutoresizingMaskIntoConstraints = false
         root.addSubview(sidebar)
-        let brand = SettingsLayout.heading("Mysli", symbol: "viewfinder", color: .systemBlue)
-        let navigation = SettingsLayout.stack(spacing: 8)
+        let brand = Self.brandHeader()
+        let navigation = SettingsLayout.stack(spacing: 4)
         SettingsLayout.add(brand, to: navigation)
-        navigation.setCustomSpacing(24, after: brand)
+        navigation.setCustomSpacing(20, after: brand)
         for button in pageButtons {
             button.target = self
             button.action = #selector(pageClicked(_:))
-            button.heightAnchor.constraint(equalToConstant: 36).isActive = true
+            button.heightAnchor.constraint(equalToConstant: 32).isActive = true
             SettingsLayout.add(button, to: navigation)
         }
+        navigation.setCustomSpacing(16, after: pageButtons[SettingsPage.meetings.rawValue])
         navigation.translatesAutoresizingMaskIntoConstraints = false
         sidebar.content.addSubview(navigation)
         NSLayoutConstraint.activate([
@@ -276,8 +313,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             navigation.trailingAnchor.constraint(equalTo: sidebar.content.trailingAnchor, constant: -12),
             navigation.topAnchor.constraint(equalTo: sidebar.content.topAnchor, constant: 24)
         ])
-        pages = [.settings: SettingsLayout.scroll(content), .instructions: SettingsLayout.scroll(instructions),
-                 .permissions: SettingsLayout.scroll(permissionsPage), .help: SettingsLayout.scroll(helpPage)]
+        pages = contents.mapValues(SettingsLayout.scroll)
         for scroll in pages.values {
             scroll.translatesAutoresizingMaskIntoConstraints = false
             root.addSubview(scroll)
@@ -289,8 +325,22 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             ])
         }
         window?.initialFirstResponder = launchAtLogin
-        selectPage(.settings)
+        selectPage(.general)
         applyDisplayOptions(.current)
+    }
+
+    /// The app icon, the name, and the tagline at the top of the sidebar.
+    private static func brandHeader() -> NSView {
+        let icon = NSImageView(image: NSApp.applicationIconImage)
+        icon.setAccessibilityElement(false)
+        icon.widthAnchor.constraint(equalToConstant: 36).isActive = true
+        icon.heightAnchor.constraint(equalToConstant: 36).isActive = true
+        let name = SettingsLayout.label("Mysli")
+        name.font = .systemFont(ofSize: 15, weight: .semibold)
+        let words = SettingsLayout.stack([name, SettingsLayout.label("A daily mix of Mac tools", size: 11, secondary: true)], spacing: 1)
+        let header = NSStackView(views: [icon, words])
+        header.spacing = 8
+        return header
     }
 
     @objc private func pageClicked(_ sender: NSButton) {
@@ -307,20 +357,17 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             button.isBordered = selected
             button.contentTintColor = selected ? .controlAccentColor : .labelColor
         }
-        let controls: [NSView]
-        switch page {
-        case .settings:
-            controls = [launchAtLogin, windowTiling, clipboardHistory, screenshotShortcuts, thumbnailDuration,
-                        chooseMeetingsFolder, summaryTool, chooseBackground, clearBackground, calendarReminders,
-                        teamsSpeakerNames]
-        case .instructions:
-            controls = instructions.guideButtons
-        case .permissions:
-            controls = permissionsPage.controls
-        case .help:
-            controls = helpPage.controls
+        let controls: [NSView] = switch page {
+        case .general: [launchAtLogin]
+        case .screenshots: [screenshotShortcuts, thumbnailDuration]
+        case .clipboard: [clipboardHistory]
+        case .windows: [windowTiling]
+        case .keepAwake: [keepScreenOn]
+        case .meetings: [chooseMeetingsFolder, summaryTool, chooseBackground, clearBackground, calendarReminders, teamsSpeakerNames]
+        case .permissions: permissionsPage.controls
+        case .help: helpPage.controls
         }
-        let keyViews: [NSView] = pageButtons + controls
+        let keyViews: [NSView] = pageButtons + controls + (guides[page]?.buttons ?? [])
         for (control, next) in zip(keyViews, keyViews.dropFirst() + [pageButtons[0]]) { control.nextKeyView = next }
         window?.makeFirstResponder(pageButtons[page.rawValue])
         refreshPermissionsVisibility()
@@ -346,6 +393,11 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     @objc private func screenshotsChanged() {
         settings.screenshotShortcutsEnabled = screenshotShortcuts.state == .on
         onScreenshotsChanged?(settings.screenshotShortcutsEnabled)
+    }
+
+    @objc private func keepScreenOnChanged() {
+        settings.keepDisplayAwake = keepScreenOn.state == .on
+        onKeepScreenOnChanged?(settings.keepDisplayAwake)
     }
 
     @objc private func tilingChanged() {

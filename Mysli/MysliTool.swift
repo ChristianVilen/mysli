@@ -44,6 +44,16 @@ enum MysliTool: CaseIterable {
 
     /// A rounded square in the tool's colour with its symbol on top.
     func icon(size: CGFloat) -> NSImage {
+        Self.square(symbolName: symbolName, colors: colors, size: size, description: title)
+    }
+
+    /// The same square in a neutral brown, for the pages that are not a tool.
+    static func neutralIcon(symbolName: String, size: CGFloat, description: String) -> NSImage {
+        square(symbolName: symbolName, colors: (rgb(0x6F5B47), .white), size: size, description: description)
+    }
+
+    private static func square(symbolName: String, colors: (square: NSColor, symbol: NSColor), size: CGFloat,
+                               description: String) -> NSImage {
         let (square, symbol) = colors
         let image = NSImage(size: NSSize(width: size, height: size), flipped: false) { rect in
             square.setFill()
@@ -56,7 +66,7 @@ enum MysliTool: CaseIterable {
                                   width: glyph.size.width, height: glyph.size.height))
             return true
         }
-        image.accessibilityDescription = title
+        image.accessibilityDescription = description
         return image
     }
 }

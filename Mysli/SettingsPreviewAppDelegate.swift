@@ -20,6 +20,7 @@ final class SettingsPreviewAppDelegate: NSObject, NSApplicationDelegate {
         super.init()
         statusMenu.onShowSettings = { [weak self] in self?.settingsWindow.show() }
         keepAwake.onDisplayAwakeChanged = { settings.keepDisplayAwake = $0 }
+        settingsWindow.onKeepScreenOnChanged = { [keepAwake] in keepAwake.setDisplayAwake($0) }
         settingsWindow.renderPermissions(.init(accessibility: true, screenRecording: false, microphone: .notDetermined))
     }
 

@@ -1,23 +1,82 @@
 import Cocoa
 
+/// The pages of the Mysli window: General, one page for each tool, then Permissions and Help.
 enum SettingsPage: Int, CaseIterable {
-    case settings, instructions, permissions, help
+    case general, screenshots, clipboard, windows, keepAwake, meetings, permissions, help
 
-    var title: String {
+    var tool: MysliTool? {
         switch self {
-        case .settings: "Settings"
-        case .instructions: "Features & instructions"
-        case .permissions: "Permissions"
-        case .help: "Help & feedback"
+        case .screenshots: .screenshots
+        case .clipboard: .clipboard
+        case .windows: .windows
+        case .keepAwake: .keepAwake
+        case .meetings: .meetings
+        case .general, .permissions, .help: nil
         }
     }
 
-    var symbol: String {
+    var title: String {
         switch self {
-        case .settings: "gearshape"
-        case .instructions: "book.closed"
-        case .permissions: "checkmark.shield"
-        case .help: "questionmark.bubble"
+        case .general: "General"
+        case .permissions: "Permissions"
+        case .help: "Help"
+        default: tool?.title ?? ""
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .general: "Start Mysli with your Mac. Changes save automatically."
+        case .screenshots: "Capture an area or the screen, then draw, crop, or combine."
+        case .clipboard: "Find and paste what you copied before."
+        case .windows: "Move the active window with the keyboard."
+        case .keepAwake: "Keep your Mac awake while a long task runs."
+        case .meetings: "Record a call. Mysli writes a transcript and a summary on this Mac."
+        case .permissions, .help: ""
+        }
+    }
+
+    func icon(size: CGFloat) -> NSImage {
+        if let tool { return tool.icon(size: size) }
+        let symbol = switch self {
+        case .permissions: "lock.fill"
+        case .help: "questionmark"
+        default: "gearshape.fill"
+        }
+        return MysliTool.neutralIcon(symbolName: symbol, size: size, description: title)
+    }
+
+    var shortcuts: [(title: String, shortcuts: [HotkeyShortcut])] {
+        switch self {
+        case .screenshots: [("Capture an area", [.captureArea]), ("Capture the screen under the pointer", [.captureFullScreen])]
+        case .clipboard: [("Open clipboard history", [.clipboardHistory])]
+        case .windows: [("Tile left or right", [.tileLeft, .tileRight]), ("Maximize or restore", [.maximize]), ("Center window", [.center])]
+        default: []
+        }
+    }
+
+    var guides: [(title: String, text: String)] {
+        switch self {
+        case .screenshots: [
+            ("Screenshots and annotation", "Capture an area with Shift + Command + 4. Press Space before clicking to capture a window, or Escape to cancel. Shift + Command + 3 captures the screen under the pointer. Screenshots go to ~/Screenshots and the clipboard. Click a thumbnail to draw in red. Use Undo to remove a stroke. Click Crop and drag a box; move it or resize it with its handles. Click Crop again to return to drawing. Done saves the drawing and crop. The trash button removes the saved screenshot and clears its clipboard entry."),
+            ("Combining screenshots", "Take two or more screenshots while their thumbnails are visible. Click Combine between two adjacent thumbnails to join those screenshots. Up to five thumbnails stay in the stack. A single thumbnail follows the duration above.")
+        ]
+        case .windows: [
+            ("Window tiling", "Use Control + Option + Left or Right Arrow to fill half a display. Repeat the same shortcut to move to the next display, with wrapping. Control + Option + Return maximizes the window; press it again to restore its previous frame. Control + Option + C centers the window without changing its size. A maximized window stays in place. Turn Window tiling off above to release these shortcuts.")
+        ]
+        case .clipboard: [
+            ("Clipboard history", "Press Shift + Command + C. Type to filter recent copies, use the arrow keys to select an item, and press Return to paste. For rich text, choose whether to keep formatting; paste without formatting is selected first. Escape goes back or closes the panel. History stays in memory until you quit. Turning Clipboard history off above clears it and releases its shortcut. Password-manager items marked as concealed or transient are not recorded.")
+        ]
+        case .keepAwake: [
+            ("Keep Awake", "Open the Mysli menu and choose 30m, 1h, 2h, or 4h. Choose ∞ to keep the session on until you turn it off. Choose Turn Off to end the session. Keep screen on, here or in the menu, prevents the display from sleeping while the session runs. Closing the lid still sleeps your Mac.")
+        ]
+        case .meetings: [
+            ("Meeting notes", "Choose Start Recording Meeting in the menu. Allow Microphone and Screen Recording access when asked. The microphone records Me; Mac audio records Them. Use Pause, Resume, and Stop on the floating controls. The live draft stays in memory. The pencil button opens a separate notes window. Typed notes save to notes.md and remain editable while paused and after Stop. Recent Meeting Notes reopens them. Update summary includes later edits without changing the transcript or word review. Save errors keep your draft; Retry save tries again. After Stop, Mysli transcribes on this Mac and sends the transcript and saved typed notes to the summary tool. The complete optional background file goes too; Automatic may use both providers. Find transcript.md and summary.md in the dated meeting folder. Audio goes to the Trash after transcription. Check Words lets you correct suspect words; Update Notes rebuilds the transcript and summary from the heard copy and replaces transcript edits. With Calendar reminders on, a calendar event offers to start and stop recording; Mysli never records on its own. Teams speaker names is experimental and can name remote speakers after Stop.")
+        ]
+        case .permissions: [
+            ("Permissions and shortcut setup", "Accessibility allows window tiling and paste; Screen Recording allows screenshots and Mac audio. Microphone is needed only for meetings. Grant access in System Settings. If macOS already uses the screenshot shortcuts, follow Mysli's shortcut setup instructions to turn those system shortcuts off. Registration warnings appear in the Mysli menu. You can use this window without these permissions.")
+        ]
+        case .general, .help: []
         }
     }
 }
@@ -185,6 +244,12 @@ enum SettingsLayout {
         let row = NSStackView(views: [icon, title])
         row.spacing = 9
         return row
+    }
+
+    static func sectionTitle(_ text: String) -> NSTextField {
+        let title = label(text, secondary: true)
+        title.font = .systemFont(ofSize: 13, weight: .semibold)
+        return title
     }
 
     static func page(title: String, subtitle: String) -> NSStackView {

@@ -35,7 +35,7 @@ final class SettingsWindowControllerTests: XCTestCase {
         super.tearDown()
     }
 
-    func testFourPagesUseOneMysliWindowWithoutChangingPreferences() {
+    func testEveryPageUsesOneMysliWindowWithoutChangingPreferences() {
         let before = defaults.persistentDomain(forName: "SettingsWindowControllerTests")! as NSDictionary
         let window = sut.window
         sut.show()
@@ -52,19 +52,20 @@ final class SettingsWindowControllerTests: XCTestCase {
         sut.onScreenshotsChanged = { effects.append($0) }
         sut.onTilingChanged = { effects.append($0) }
         sut.onClipboardChanged = { effects.append($0) }
+        sut.onKeepScreenOnChanged = { effects.append($0) }
         sut.onCalendarRemindersChanged = { calendar.append($0) }
         sut.show()
         for control in [sut.launchAtLogin, sut.screenshotShortcuts, sut.windowTiling, sut.clipboardHistory,
-                        sut.calendarReminders, sut.teamsSpeakerNames] {
+                        sut.keepScreenOn, sut.calendarReminders, sut.teamsSpeakerNames] {
             control.performClick(nil)
         }
         XCTAssertTrue(settings.launchAtLogin)
         XCTAssertFalse(settings.screenshotShortcutsEnabled)
         XCTAssertFalse(settings.windowTilingEnabled)
         XCTAssertFalse(settings.clipboardHistoryEnabled)
-        XCTAssertTrue(settings.keepDisplayAwake)
+        XCTAssertFalse(settings.keepDisplayAwake)
         XCTAssertTrue(settings.teamsSpeakerNamesEnabled)
-        XCTAssertEqual(effects, [false, false, false])
+        XCTAssertEqual(effects, [false, false, false, false])
         XCTAssertEqual(calendar, [true])
         XCTAssertNil(defaults.object(forKey: "calendarRecordingRemindersEnabled"),
                      "only CalendarReminderController.setEnabled saves the calendar choice")
@@ -166,7 +167,7 @@ final class SettingsWindowControllerTests: XCTestCase {
         let path = "/Users/example/" + String(repeating: "a long folder name/", count: 12) + "background.md"
         settings.meetingsFolder = URL(fileURLWithPath: path).deletingLastPathComponent()
         settings.meetingContextFile = URL(fileURLWithPath: path)
-        sut.show()
+        sut.show(.meetings)
         let scroll = try XCTUnwrap(descendants(try XCTUnwrap(sut.window?.contentView)).compactMap { $0 as? NSScrollView }.first { !$0.isHidden })
         scroll.layoutSubtreeIfNeeded()
         XCTAssertEqual(sut.window?.contentView?.bounds.width, 760)
@@ -190,34 +191,41 @@ final class SettingsWindowControllerTests: XCTestCase {
         XCTAssertEqual(policies, [.regular, .accessory])
     }
 
-    func testPageButtonsSwitchPagesAndShowReturnsToSettings() {
+    func testPageButtonsSwitchPagesAndShowReturnsToGeneral() {
         sut.show()
-        sut.pageButtons[SettingsPage.instructions.rawValue].performClick(nil)
-        XCTAssertEqual(sut.selectedPage, .instructions)
-        XCTAssertEqual(sut.instructions.enclosingScrollView?.isHidden, false)
-        XCTAssertEqual(sut.pageButtons.map(\.state), [.off, .on, .off, .off])
+        sut.pageButtons[SettingsPage.meetings.rawValue].performClick(nil)
+        XCTAssertEqual(sut.selectedPage, .meetings)
+        XCTAssertEqual(sut.pages[.meetings]?.isHidden, false)
+        XCTAssertEqual(sut.pages[.general]?.isHidden, true)
+        XCTAssertEqual(sut.pageButtons.map(\.state), SettingsPage.allCases.map { $0 == .meetings ? .on : .off })
         sut.close()
         sut.show()
-        XCTAssertEqual(sut.selectedPage, .settings)
-        XCTAssertEqual(sut.instructions.enclosingScrollView?.isHidden, true)
-        XCTAssertEqual(sut.pageButtons.map(\.state), [.on, .off, .off, .off])
+        XCTAssertEqual(sut.selectedPage, .general)
+        XCTAssertEqual(sut.pages[.meetings]?.isHidden, true)
+        XCTAssertEqual(sut.pageButtons.map(\.state), SettingsPage.allCases.map { $0 == .general ? .on : .off })
     }
 
-    func testEachPageCyclesTheKeyboardThroughNavigationAndItsLabelledControls() {
-        sut.show()
-        let settingsControls: [NSView] = [sut.launchAtLogin, sut.windowTiling, sut.clipboardHistory,
-            sut.screenshotShortcuts, sut.thumbnailDuration, sut.chooseMeetingsFolder, sut.summaryTool, sut.chooseBackground, sut.clearBackground,
-            sut.calendarReminders, sut.teamsSpeakerNames]
-        assertKeyViewCycle(sut.pageButtons + settingsControls)
-        for control in settingsControls {
-            XCTAssertFalse(control.accessibilityLabel()?.isEmpty ?? true, "\(control) has no VoiceOver label")
+    func testEachPageCyclesTheKeyboardThroughNavigationAndItsLabelledControls() throws {
+        let guides = { [unowned self] (page: SettingsPage) in sut.guides[page]?.buttons ?? [] }
+        let expected: [SettingsPage: [NSView]] = [
+            .general: [sut.launchAtLogin],
+            .screenshots: [sut.screenshotShortcuts, sut.thumbnailDuration] + guides(.screenshots),
+            .clipboard: [sut.clipboardHistory] + guides(.clipboard),
+            .windows: [sut.windowTiling] + guides(.windows),
+            .keepAwake: [sut.keepScreenOn] + guides(.keepAwake),
+            .meetings: [sut.chooseMeetingsFolder, sut.summaryTool, sut.chooseBackground, sut.clearBackground,
+                        sut.calendarReminders, sut.teamsSpeakerNames] + guides(.meetings),
+            .permissions: sut.permissionsPage.controls + guides(.permissions),
+            .help: sut.helpPage.controls
+        ]
+        for page in SettingsPage.allCases {
+            sut.show(page)
+            let controls = try XCTUnwrap(expected[page])
+            assertKeyViewCycle(sut.pageButtons + controls)
+            for control in controls {
+                XCTAssertFalse(control.accessibilityLabel()?.isEmpty ?? true, "\(page): \(control) has no VoiceOver label")
+            }
         }
-        sut.pageButtons[SettingsPage.instructions.rawValue].performClick(nil)
-        assertKeyViewCycle(sut.pageButtons + sut.instructions.guideButtons)
-        sut.show(.permissions)
-        assertKeyViewCycle(sut.pageButtons + sut.permissionsPage.controls)
-        sut.show(.help)
-        assertKeyViewCycle(sut.pageButtons + sut.helpPage.controls)
     }
 
     func testEveryPageKeepsItsControlsInsideTheCompactViewport() throws {
@@ -238,8 +246,9 @@ final class SettingsWindowControllerTests: XCTestCase {
     }
 
     func testGuidesExpandAndCollapseWithTheirVoiceOverState() {
-        XCTAssertEqual(sut.instructions.guides.count, 7)
-        for (button, body) in sut.instructions.guides {
+        let all = SettingsPage.allCases.flatMap { sut.guides[$0]?.guides ?? [] }
+        XCTAssertEqual(all.count, 7)
+        for (button, body) in all {
             XCTAssertTrue(body.isHidden)
             button.performClick(nil)
             XCTAssertFalse(body.isHidden, button.title)
@@ -250,10 +259,13 @@ final class SettingsWindowControllerTests: XCTestCase {
         }
     }
 
-    func testInstructionsShowEveryRegisteredShortcutWithSpokenKeyNames() {
-        XCTAssertEqual(Set(SettingsInstructionsView.shortcuts.flatMap(\.shortcuts)), Set(HotkeyShortcut.allCases))
-        let keys = descendants(sut.instructions).filter { $0.isAccessibilityElement() && $0.accessibilityRole() == .group }
-        XCTAssertEqual(keys.count, SettingsInstructionsView.shortcuts.count)
+    func testToolPagesShowEveryRegisteredShortcutWithSpokenKeyNames() {
+        let rows = SettingsPage.allCases.flatMap(\.shortcuts)
+        XCTAssertEqual(Set(rows.flatMap(\.shortcuts)), Set(HotkeyShortcut.allCases))
+        let keys = SettingsPage.allCases.flatMap { page in
+            descendants(sut.pages[page]!).filter { $0.isAccessibilityElement() && $0.accessibilityRole() == .group }
+        }
+        XCTAssertEqual(keys.count, rows.count)
         XCTAssertTrue(keys.allSatisfy { !($0.accessibilityLabel() ?? "").isEmpty }, "every keycap row has a spoken name")
     }
 
@@ -268,7 +280,7 @@ final class SettingsWindowControllerTests: XCTestCase {
             XCTAssertEqual(group.layer?.borderWidth, 1.5)
             XCTAssertTrue(group.content.superview === group, "the content leaves the hidden glass")
         }
-        XCTAssertEqual(sut.pageButtons.map(\.bezelStyle), [.push, .push, .push, .push])
+        XCTAssertTrue(sut.pageButtons.allSatisfy { $0.bezelStyle == .push })
         sut.applyDisplayOptions(SettingsDisplayOptions(reduceTransparency: false, increaseContrast: false))
         XCTAssertNil(root.layer?.backgroundColor)
         for group in groups {
@@ -276,7 +288,7 @@ final class SettingsWindowControllerTests: XCTestCase {
             XCTAssertEqual(group.layer?.borderWidth, 0.5)
             XCTAssertFalse(group.content.superview === group)
         }
-        XCTAssertEqual(sut.pageButtons.map(\.bezelStyle), [.glass, .glass, .glass, .glass])
+        XCTAssertTrue(sut.pageButtons.allSatisfy { $0.bezelStyle == .glass })
     }
 
     private func assertKeyViewCycle(_ views: [NSView], file: StaticString = #filePath, line: UInt = #line) {
