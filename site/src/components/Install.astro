@@ -1,5 +1,5 @@
 ---
-const brewCommands = "brew tap ChristianVilen/mysli\nbrew install --cask mysli";
+const brewCommands = "brew tap ChristianVilen/mysli\nbrew trust --cask christianvilen/mysli/mysli\nbrew install --cask mysli";
 const quarantineCommand = "sudo xattr -d com.apple.quarantine /Applications/Mysli.app";
 ---
 <section id="install" class="dark-band bg-graphite px-6 py-28 text-graphite-ink">
@@ -14,6 +14,7 @@ const quarantineCommand = "sudo xattr -d com.apple.quarantine /Applications/Mysl
         <button type="button" class="btn-copy" data-copy={brewCommands}>Copy</button>
       </div>
       <pre class="overflow-x-auto px-4 py-4 font-mono text-sm leading-relaxed"><code><span class="text-accent-bright">$</span> brew tap ChristianVilen/mysli
+<span class="text-accent-bright">$</span> brew trust --cask christianvilen/mysli/mysli
 <span class="text-accent-bright">$</span> brew install --cask mysli</code></pre>
     </div>
 

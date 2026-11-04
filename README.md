@@ -254,6 +254,9 @@ To view live messages through macOS logging, run:
 # Tap the repository
 brew tap ChristianVilen/mysli
 
+# Homebrew 7 and later load casks only from taps you trust
+brew trust --cask christianvilen/mysli/mysli
+
 # Install the app
 brew install --cask mysli
 ```
