@@ -7,6 +7,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     ]
     typealias Picker = @MainActor (NSWindow, URL?, @escaping (URL?) -> Void) -> Void
     let launchAtLogin = NSSwitch()
+    let screenshotShortcuts = NSSwitch()
     let windowTiling = NSSwitch()
     let clipboardHistory = NSSwitch()
     let calendarReminders = NSSwitch()
@@ -44,6 +45,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     let permissionsPage: SettingsPermissionsView
     let helpPage: SettingsHelpView
     private var displayObserver: NSObjectProtocol?
+    var onScreenshotsChanged: ((Bool) -> Void)?
     var onTilingChanged: ((Bool) -> Void)?
     var onClipboardChanged: ((Bool) -> Void)?
     var onPermissionsVisibilityChanged: ((Bool) -> Void)?
@@ -145,6 +147,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
     private func refresh() {
         launchAtLogin.state = settings.launchAtLogin ? .on : .off
+        screenshotShortcuts.state = settings.screenshotShortcutsEnabled ? .on : .off
         windowTiling.state = settings.windowTilingEnabled ? .on : .off
         clipboardHistory.state = settings.clipboardHistoryEnabled ? .on : .off
         calendarReminders.state = settings.calendarRecordingRemindersEnabled ? .on : .off
@@ -174,8 +177,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
     private func buildForm() {
         for (control, action) in [
-            (launchAtLogin, #selector(loginChanged)), (windowTiling, #selector(tilingChanged)),
-            (clipboardHistory, #selector(clipboardChanged)),
+            (launchAtLogin, #selector(loginChanged)), (screenshotShortcuts, #selector(screenshotsChanged)),
+            (windowTiling, #selector(tilingChanged)), (clipboardHistory, #selector(clipboardChanged)),
             (calendarReminders, #selector(calendarChanged)), (teamsSpeakerNames, #selector(teamsChanged)),
             (chooseMeetingsFolder, #selector(folderClicked)), (chooseBackground, #selector(contextClicked)),
             (clearBackground, #selector(clearClicked)), (thumbnailDuration, #selector(durationChanged)),
@@ -186,6 +189,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         }
         thumbnailDuration.setAccessibilityLabel("Show thumbnail for")
         launchAtLogin.setAccessibilityLabel("Launch at login")
+        screenshotShortcuts.setAccessibilityLabel("Use Mysli for screenshots")
         windowTiling.setAccessibilityLabel("Enable window tiling")
         clipboardHistory.setAccessibilityLabel("Record clipboard history")
         calendarReminders.setAccessibilityLabel("Calendar recording reminders")
@@ -219,7 +223,11 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         loginError.textColor = .systemRed
         loginError.isHidden = true
         add(SettingsLayout.heading("Screenshots", symbol: "camera.fill", color: .systemPurple))
-        add(SettingsLayout.group([SettingsLayout.row("Show thumbnail for", control: thumbnailDuration)]))
+        add(SettingsLayout.group([
+            SettingsLayout.row("Use Mysli for screenshots", detail: "When off, Shift + Command + 3 and 4 go back to macOS.",
+                               control: screenshotShortcuts),
+            SettingsLayout.row("Show thumbnail for", control: thumbnailDuration)
+        ]))
         add(SettingsLayout.heading("Meeting notes", symbol: "waveform", color: .systemOrange))
         add(SettingsLayout.group([
             pathRow("Meetings folder", path: folderPath, buttons: [chooseMeetingsFolder]),
@@ -301,7 +309,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         let controls: [NSView]
         switch page {
         case .settings:
-            controls = [launchAtLogin, windowTiling, clipboardHistory, thumbnailDuration,
+            controls = [launchAtLogin, windowTiling, clipboardHistory, screenshotShortcuts, thumbnailDuration,
                         chooseMeetingsFolder, summaryTool, chooseBackground, clearBackground, calendarReminders,
                         teamsSpeakerNames]
         case .instructions:
@@ -332,6 +340,11 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         loginError.stringValue = failure.map { "Could not change launch at login. \($0)" } ?? ""
         loginError.isHidden = failure == nil
         launchAtLogin.state = settings.launchAtLogin ? .on : .off
+    }
+
+    @objc private func screenshotsChanged() {
+        settings.screenshotShortcutsEnabled = screenshotShortcuts.state == .on
+        onScreenshotsChanged?(settings.screenshotShortcutsEnabled)
     }
 
     @objc private func tilingChanged() {

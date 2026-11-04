@@ -17,6 +17,7 @@ final class HotkeyManager {
     private(set) var isRunning = false
     private(set) var issues: [HotkeyRegistrationIssue] = []
     var onChange: (() -> Void)?
+    var screenshotsEnabled = true { didSet { refresh() } }
     var tilingEnabled = true { didSet { refresh() } }
     var clipboardHistoryEnabled = false { didSet { refresh() } }
     var onAction: ((HotkeyAction) -> Void)? {
@@ -57,7 +58,9 @@ final class HotkeyManager {
     func refresh() {
         guard isRunning else { return }
         let desired = Set(HotkeyShortcut.allCases.filter {
-            $0.isTiling ? tilingEnabled : $0 != .clipboardHistory || clipboardHistoryEnabled
+            if $0.isTiling { return tilingEnabled }
+            if $0.isScreenshot { return screenshotsEnabled }
+            return clipboardHistoryEnabled
         })
         setIssues(registrar.reconcile(desired: desired))
     }

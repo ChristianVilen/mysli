@@ -49,20 +49,22 @@ final class SettingsWindowControllerTests: XCTestCase {
     func testSwitchesSavePreferencesAndApplyTypedEffects() {
         var effects: [Bool] = []
         var calendar: [Bool] = []
+        sut.onScreenshotsChanged = { effects.append($0) }
         sut.onTilingChanged = { effects.append($0) }
         sut.onClipboardChanged = { effects.append($0) }
         sut.onCalendarRemindersChanged = { calendar.append($0) }
         sut.show()
-        for control in [sut.launchAtLogin, sut.windowTiling, sut.clipboardHistory,
+        for control in [sut.launchAtLogin, sut.screenshotShortcuts, sut.windowTiling, sut.clipboardHistory,
                         sut.calendarReminders, sut.teamsSpeakerNames] {
             control.performClick(nil)
         }
         XCTAssertTrue(settings.launchAtLogin)
+        XCTAssertFalse(settings.screenshotShortcutsEnabled)
         XCTAssertFalse(settings.windowTilingEnabled)
         XCTAssertFalse(settings.clipboardHistoryEnabled)
         XCTAssertTrue(settings.keepDisplayAwake)
         XCTAssertTrue(settings.teamsSpeakerNamesEnabled)
-        XCTAssertEqual(effects, [false, false])
+        XCTAssertEqual(effects, [false, false, false])
         XCTAssertEqual(calendar, [true])
         XCTAssertNil(defaults.object(forKey: "calendarRecordingRemindersEnabled"),
                      "only CalendarReminderController.setEnabled saves the calendar choice")
@@ -204,7 +206,7 @@ final class SettingsWindowControllerTests: XCTestCase {
     func testEachPageCyclesTheKeyboardThroughNavigationAndItsLabelledControls() {
         sut.show()
         let settingsControls: [NSView] = [sut.launchAtLogin, sut.windowTiling, sut.clipboardHistory,
-            sut.thumbnailDuration, sut.chooseMeetingsFolder, sut.summaryTool, sut.chooseBackground, sut.clearBackground,
+            sut.screenshotShortcuts, sut.thumbnailDuration, sut.chooseMeetingsFolder, sut.summaryTool, sut.chooseBackground, sut.clearBackground,
             sut.calendarReminders, sut.teamsSpeakerNames]
         assertKeyViewCycle(sut.pageButtons + settingsControls)
         for control in settingsControls {

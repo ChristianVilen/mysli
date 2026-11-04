@@ -224,6 +224,20 @@ final class HotkeyManagerTests: XCTestCase {
         manager.tilingEnabled = true
         XCTAssertEqual(Set(system.callbacks.keys), [.captureFullScreen, .captureArea, .tileLeft, .tileRight, .maximize, .center])
     }
+
+    func testScreenshotSwitchGivesBothCaptureKeysBackToMacOS() {
+        let system = FakeHotkeySystem()
+        let manager = HotkeyManager(registrar: CarbonHotkeyRegistrar(api: system.api))
+        defer { manager.stop() }
+        manager.tilingEnabled = false
+        manager.clipboardHistoryEnabled = true
+        manager.start()
+        manager.screenshotsEnabled = false
+        XCTAssertEqual(Set(system.callbacks.keys), [.clipboardHistory])
+
+        manager.screenshotsEnabled = true
+        XCTAssertEqual(Set(system.callbacks.keys), [.captureFullScreen, .captureArea, .clipboardHistory])
+    }
 }
 
 @MainActor

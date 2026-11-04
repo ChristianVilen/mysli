@@ -8,7 +8,7 @@ Mysli is Finnish for muesli: a mix of good things.
 
 ## Features
 
-- Intercepts `Shift+Command+3` and `Shift+Command+4` globally to replace the system screenshot tools
+- Intercepts `Shift+Command+3` and `Shift+Command+4` globally to replace the system screenshot tools. Turn off **Use Mysli for screenshots** in Settings to give both shortcuts back to macOS.
 - Full screen capture with `Shift+Command+3` — captures the screen where the cursor is, with flash animation
 - Multi-monitor support — dims all screens, captures from the screen where the cursor is
 - macOS-style selection overlay with dimmed background and real-time dimensions display
@@ -305,6 +305,8 @@ Mysli keeps `Shift+Command+3` and `Shift+Command+4`. If macOS already uses them,
 
 Mysli retries within a few seconds. The menu warnings disappear when the shortcuts are ready. It does not change system settings for you. You can return to the instructions through **Permissions…** in the menu.
 
+To keep the macOS screenshot tool instead, turn off **Use Mysli for screenshots** in Settings. Mysli then releases both shortcuts and shows no conflict for them.
+
 All Mysli shortcuts use registered macOS hotkeys instead of a keyboard event tap. The menu lists registration failures for each shortcut; other registered shortcuts remain available. If a shortcut cannot be released, Mysli reports it and retries while running. Opening clipboard history and pasting are separate operations, so automatic paste can still fail in protected fields.
 
 ### Screen Recording (required)
@@ -368,6 +370,7 @@ Command-comma always selects Settings. Opening a page does not change preference
 | Preference | Default and choices |
 |---|---|
 | Launch at login | Current macOS login-item state. A failed change shows the error and the actual state. |
+| Use Mysli for screenshots | On. Off releases `Shift+Command+3` and `Shift+Command+4` to macOS. |
 | Enable window tiling | On |
 | Record clipboard history | On |
 | Show thumbnail for | 5 seconds. Choices are 3, 5, 15 seconds, and Forever. Existing custom values stay intact until changed. |

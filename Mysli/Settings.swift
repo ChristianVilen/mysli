@@ -38,6 +38,11 @@ final class Settings {
         set { defaults.set(newValue, forKey: "calendarRecordingRemindersEnabled") }
     }
 
+    var screenshotShortcutsEnabled: Bool {
+        get { defaults.object(forKey: "screenshotShortcutsEnabled") as? Bool ?? true }
+        set { defaults.set(newValue, forKey: "screenshotShortcutsEnabled") }
+    }
+
     var windowTilingEnabled: Bool {
         get { defaults.object(forKey: "windowTilingEnabled") as? Bool ?? true }
         set { defaults.set(newValue, forKey: "windowTilingEnabled") }

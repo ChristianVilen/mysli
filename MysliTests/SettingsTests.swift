@@ -80,6 +80,13 @@ final class SettingsTests: XCTestCase {
         XCTAssertFalse(Settings(defaults: defaults, loginItem: loginItem).windowTilingEnabled)
     }
 
+    func testScreenshotShortcutsDefaultToOnAndRoundTrip() {
+        XCTAssertTrue(sut.screenshotShortcutsEnabled)
+        sut.screenshotShortcutsEnabled = false
+        XCTAssertEqual(defaults.object(forKey: "screenshotShortcutsEnabled") as? Bool, false)
+        XCTAssertFalse(Settings(defaults: defaults, loginItem: loginItem).screenshotShortcutsEnabled)
+    }
+
     func testClipboardHistoryEnabledDefaultsToTrueAndRoundTrips() {
         XCTAssertTrue(sut.clipboardHistoryEnabled)
         sut.clipboardHistoryEnabled = false

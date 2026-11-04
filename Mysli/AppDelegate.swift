@@ -213,6 +213,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         settingsWindow.onMeetingsFolderChanged = { [weak self] _ in self?.meetingNotes.meetingsFolderChanged() }
+        settingsWindow.onScreenshotsChanged = { [weak self] enabled in self?.hotkeyManager.screenshotsEnabled = enabled }
         statusMenu.onShowPermissions = { [weak self] in self?.settingsWindow.show(.permissions) }
         statusMenu.onShowLog = { [weak self] in self?.logWindow.show() }
         statusMenu.onOpenKeyboardSettings = { [weak self] in self?.permissions.openSettings(.keyboardShortcuts) }
@@ -250,6 +251,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             case .showClipboardHistory: self.toggleClipboardPanel()
             }
         }
+        hotkeyManager.screenshotsEnabled = settings.screenshotShortcutsEnabled
         hotkeyManager.tilingEnabled = settings.windowTilingEnabled
         hotkeyManager.clipboardHistoryEnabled = settings.clipboardHistoryEnabled
         hotkeyManager.start()
