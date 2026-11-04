@@ -65,8 +65,9 @@ The `aa-docs-meeting` skill in the AA knowledge base changes in the same step. I
 
 ## Look and feel
 
-- **Icon.** A bowl with a mix of pieces. Each piece has a different shape and stands for one tool. The menu bar icon is the bowl outline, which leaves room for the status marks. Three SVG concepts come first. The chosen one becomes a layered Icon Composer `.icon` and a menu bar template image.
-- **Palette.** One warm palette for the app and the website: oat and cream paper, dark-roast text, and one berry accent. It replaces the "Cobalt" theme.
+- **Icon.** A dark bowl heaped with five pieces, one for each tool: a crisp with crop corners (Screenshots), two oat flakes (Clipboard history), a square split in two (Window tiling), a coffee bean (Keep Awake), and a lingonberry (Meeting notes). The user chose this concept, "A", from three on 2026-11-04. `Mysli/AppIcon.icon` holds it as SVG layers in three groups, so Liquid Glass and the dark and tinted modes work. One design serves every size, so the pieces are large and have no fine strokes.
+- **Menu bar icon.** A template image of the bowl, the split square, and the berry. The berry sits where the recording mark appears, so the mark covers it while Mysli records. The Keep Awake dot is fixed system blue, because the lingonberry accent would look like the recording mark.
+- **Palette.** One warm palette for the app and the website. Light: oat `#F6F0E4`, cream `#EFE6D3`, rule `#E2D5BC`, toast `#6F5B47`, roast `#2E2118`, lingonberry `#B4233C`. Dark: `#1E1712`, `#2A211A`, `#3D3027`, `#B9A58E`, `#F3EADB`, lingonberry `#E5566B`. It replaces the "Cobalt" theme. The lingonberry is the app's accent color.
 - **Window.** One sidebar page for each tool: General, Screenshots, Clipboard, Windows, Keep Awake, and Meetings, then Permissions and Help. Each tool page holds its switch, settings, shortcuts, and guide. The "Features & instructions" page goes away.
 - **Menu.** The dropdown stays an `NSMenu`, grouped by tool, with section headers and tool icons.
 - **Website.** The hero gets the tagline. Features gets one block for each tool. The comparison table becomes "One app instead of five": one row for each tool, the separate app that people install for it today, and an honest note where Mysli does less.

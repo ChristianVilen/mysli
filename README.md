@@ -26,7 +26,7 @@ Mysli is Finnish for muesli: a mix of good things.
 
 ## Keep Awake
 
-Choose a duration in the menu's **Keep Awake** section. The choices are 30 minutes, 1, 2, or 4 hours, and until turned off. A colored dot on the menu-bar icon marks an active session, and the menu shows how much time is left.
+Choose a duration in the menu's **Keep Awake** section. The choices are 30 minutes, 1, 2, or 4 hours, and until turned off. A blue dot in the lower-right corner of the menu-bar icon marks an active session, and the menu shows how much time is left.
 
 **Keep screen on** is on by default in the Keep Awake menu. Turn it off to let the display sleep and lock on its normal schedule. Changing this choice also updates an active session without restarting its timer. Closing a laptop's lid still sleeps the Mac unless it is plugged in with an external display attached. Keep the lid open or run it docked.
 

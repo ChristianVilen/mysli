@@ -48,7 +48,8 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     }
 
     /// Separate corners let all three marks show at once. Recording and pause also have
-    /// different shapes, so the state does not rely on colour alone.
+    /// different shapes, so the state does not rely on colour alone. The recording mark covers
+    /// the berry in `MenuBarIcon.svg`, so keep the berry inside the mark's rectangle.
     func icon(keepAwakeActive: Bool, recording: RecordingMark?, warning: StatusWarning?) -> NSImage {
         guard let base = NSImage(named: "MenuBarIcon") else {
             return NSImage(systemSymbolName: "camera.viewfinder", accessibilityDescription: "Mysli") ?? NSImage()
@@ -58,12 +59,16 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         guard keepAwakeActive || recording != nil || warning != nil else {
             let icon = (base.copy() as? NSImage) ?? base
             icon.size = size
-            icon.isTemplate = false
+            icon.isTemplate = true
             return icon
         }
 
         let badged = NSImage(size: size, flipped: false) { rect in
+            // The marks keep their colours, so this image is no template, and a template drawn
+            // into it stays black. Paint the bowl in the menu bar's text colour instead.
             base.draw(in: rect)
+            NSColor.labelColor.set()
+            rect.fill(using: .sourceAtop)
             func drawDot(_ dot: NSRect, color: NSColor) {
                 let ring = dot.insetBy(dx: -1.5, dy: -1.5)
                 NSColor.white.setFill()
@@ -72,7 +77,8 @@ final class StatusMenu: NSObject, NSMenuDelegate {
                 NSBezierPath(ovalIn: dot).fill()
             }
             if keepAwakeActive {
-                drawDot(NSRect(x: rect.maxX - 8, y: rect.minY + 1, width: 7, height: 7), color: .controlAccentColor)
+                // Not the accent colour: the lingonberry accent would look like the recording mark.
+                drawDot(NSRect(x: rect.maxX - 8, y: rect.minY + 1, width: 7, height: 7), color: .systemBlue)
             }
             if let recording {
                 let mark = NSRect(x: rect.maxX - 8, y: rect.maxY - 8, width: 7, height: 7)

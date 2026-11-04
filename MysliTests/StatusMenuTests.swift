@@ -136,4 +136,35 @@ final class StatusMenuTests: XCTestCase {
         XCTAssertNotEqual(paused.tiffRepresentation, recording.tiffRepresentation)
         XCTAssertNotEqual(paused.tiffRepresentation, plain.tiffRepresentation)
     }
+
+    func testIconWithoutMarksIsATemplateSoMacOSColorsIt() {
+        XCTAssertTrue(sut.icon(keepAwakeActive: false, recording: nil, warning: nil).isTemplate)
+    }
+
+    func testMarkedIconPaintsTheBowlInTheMenuBarTextColor() throws {
+        let icon = sut.icon(keepAwakeActive: true, recording: nil, warning: nil)
+        // (5, 12) in the 18-point icon is inside the bowl and outside every mark.
+        let onDark = try XCTUnwrap(pixel(of: icon, atX: 5, y: 12, in: .darkAqua))
+        let onLight = try XCTUnwrap(pixel(of: icon, atX: 5, y: 12, in: .aqua))
+        XCTAssertGreaterThan(onDark.alphaComponent, 0.5)
+        XCTAssertGreaterThan(onDark.brightnessComponent, 0.7)
+        XCTAssertGreaterThan(onLight.alphaComponent, 0.5)
+        XCTAssertLessThan(onLight.brightnessComponent, 0.3)
+    }
+
+    /// Draws `image` at 1 pixel per point under `appearance`; `y` counts down from the top edge.
+    private func pixel(of image: NSImage, atX x: Int, y: Int, in appearance: NSAppearance.Name) -> NSColor? {
+        guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 18, pixelsHigh: 18, bitsPerSample: 8,
+                                         samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                                         colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0),
+              let context = NSGraphicsContext(bitmapImageRep: rep),
+              let named = NSAppearance(named: appearance) else { return nil }
+        named.performAsCurrentDrawingAppearance {
+            NSGraphicsContext.saveGraphicsState()
+            NSGraphicsContext.current = context
+            image.draw(in: NSRect(x: 0, y: 0, width: 18, height: 18))
+            NSGraphicsContext.restoreGraphicsState()
+        }
+        return rep.colorAt(x: x, y: y)
+    }
 }
