@@ -35,6 +35,22 @@ final class OrdinaryWindowActivationTests: XCTestCase {
         XCTAssertEqual(policies, [.regular, .accessory])
     }
 
+    func testTheFirstWindowActivatesTheAppOnlyAfterThePolicyChangeHasTakenEffect() {
+        var nextTurn: [() -> Void] = []
+        sut = OrdinaryWindowActivation(setPolicy: { [unowned self] in policies.append($0) },
+                                       activateApp: { [unowned self] in activations += 1 },
+                                       nextTurn: { nextTurn.append($0) })
+        let window = NSWindow()
+        sut.open(window)
+        XCTAssertEqual(policies, [.regular])
+        XCTAssertEqual(activations, 0)
+        nextTurn.forEach { $0() }
+        XCTAssertEqual(activations, 1)
+
+        sut.open(window)
+        XCTAssertEqual(activations, 2, "An app that is already regular activates at once")
+    }
+
     func testClosingAWindowThatIsNotOpenChangesNothing() {
         let open = NSWindow()
         sut.close(open)

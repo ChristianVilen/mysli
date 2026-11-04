@@ -41,7 +41,7 @@ final class LogWindowControllerTests: XCTestCase {
     func testRepeatedShowReusesWindowAndClosingKeepsAnotherWindowActive() async {
         var policies: [NSApplication.ActivationPolicy] = []
         var activations = 0
-        let activation = OrdinaryWindowActivation(setPolicy: { policies.append($0) }, activateApp: { activations += 1 })
+        let activation = OrdinaryWindowActivation.fake(setPolicy: { policies.append($0) }, activateApp: { activations += 1 })
         let other = NSWindow()
         activation.open(other)
         sut = makeWindow(WindowLogReader([]), activation: activation)
