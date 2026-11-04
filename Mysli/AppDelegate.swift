@@ -72,11 +72,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         screenRecording: { [weak self] in self?.permissions.requestScreenRecording() },
         microphone: { [weak self] in Task { _ = await self?.permissions.requestMicrophone() } },
         calendar: { [weak self] in Task { await self?.permissions.requestCalendar() } },
+        notifications: { [weak self] in Task { await self?.permissions.requestNotifications() } },
         keyboardSettings: { [weak self] in self?.permissions.openSettings(.keyboardShortcuts) }))
     private lazy var calendarSource = EventKitCalendarSource()
     private lazy var permissions = PermissionsManager(
         calendarAccess: { [unowned self] in calendarSource.authorization },
-        requestCalendarAccess: { [unowned self] in await calendarSource.requestAccess() })
+        requestCalendarAccess: { [unowned self] in await calendarSource.requestAccess() },
+        notificationAccess: {
+            NotificationAccess(await UNUserNotificationCenter.current().notificationSettings().authorizationStatus)
+        },
+        requestNotificationAccess: {
+            (try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert])) == true
+        })
     // False until setupPermissions() reads the grants. Hotkey setup calls updateStatus() before that,
     // and grants that were not read yet must not show warnings or open screenshot setup.
     private var permissionHandlingEnabled = false
@@ -149,6 +156,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         controller.onStatusChange = { [weak self, weak controller] in
             guard let controller else { return }
             self?.settingsWindow.showCalendarStatus(controller.status)
+            self?.permissions.refresh()
+            Task { await self?.permissions.refreshNotifications() }
         }
         calendarReminderStartup = Task { [weak self] in
             guard !Task.isCancelled, let self else { return }
@@ -167,22 +176,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Settings would leave the warning badge stale until Permissions opens.
         statusMenu.onMenuWillOpen = { [weak self] in
             self?.permissions.refresh()
+            Task { await self?.permissions.refreshNotifications() }
             self?.hotkeyManager.refresh()
             self?.updateStatus()
         }
         permissions.refresh()
         permissionsChanged()
-        if !permissions.allGranted {
-            settingsWindow.show(.permissions)
+        Task {
+            await permissions.refreshNotifications()
+            if !settings.requiredPermissions.allGranted(in: permissions.snapshot) {
+                settingsWindow.show(.permissions)
+            }
         }
     }
 
     private func permissionsChanged() {
         updateStatus()
-        settingsWindow.renderPermissions(.init(accessibility: permissions.accessibility,
-                                               screenRecording: permissions.screenRecording,
-                                               microphone: permissions.microphone,
-                                               calendar: permissions.calendar))
+        settingsWindow.renderPermissions(permissions.snapshot)
         // A calendar grant from the Permissions page lets reminders that wait for access start.
         Task { await calendarReminders?.refresh() }
     }
@@ -212,6 +222,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.mainMenu = statusMenu.applicationMenu()
         settingsWindow.onTilingChanged = { [weak self] enabled in
             self?.hotkeyManager.tilingEnabled = enabled
+            self?.permissionsChanged()
         }
         toolActions.onCaptureArea = { [weak self] in self?.startCapture(.interactive) }
         toolActions.onCaptureScreen = { [weak self] in self?.startCapture(.fullScreen) }
@@ -221,6 +232,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             settings.windowTilingEnabled = enabled
             hotkeyManager.tilingEnabled = enabled
             settingsWindow.refresh()
+            permissionsChanged()
         }
         settingsWindow.onCalendarRemindersChanged = { [weak self] enabled in
             Task { await self?.calendarReminders?.setEnabled(enabled) }
@@ -229,6 +241,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self else { return }
             if visible {
                 permissions.refresh()
+                Task { await self.permissions.refreshNotifications() }
                 permissionsChanged()
                 permissions.startPolling()
             } else {
@@ -236,7 +249,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         settingsWindow.onMeetingsFolderChanged = { [weak self] _ in self?.meetingNotes.meetingsFolderChanged() }
-        settingsWindow.onScreenshotsChanged = { [weak self] enabled in self?.hotkeyManager.screenshotsEnabled = enabled }
+        settingsWindow.onScreenshotsChanged = { [weak self] enabled in
+            self?.hotkeyManager.screenshotsEnabled = enabled
+            self?.permissionsChanged()
+        }
         statusMenu.onShowLog = { [weak self] in self?.logWindow.show() }
         statusMenu.onOpenKeyboardSettings = { [weak self] in self?.permissions.openSettings(.keyboardShortcuts) }
     }
@@ -247,6 +263,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         settingsWindow.onClipboardChanged = { [weak self] enabled in
             guard let self else { return }
             hotkeyManager.clipboardHistoryEnabled = enabled
+            permissionsChanged()
             if enabled {
                 clipboardHistory.enable()
             } else {
@@ -324,6 +341,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupMeetingNotes() {
         settingsWindow.onMeetingsChanged = { [weak self] enabled in
             guard let self else { return }
+            permissionsChanged()
             if enabled {
                 meetingNotes.resumeUnfinished()
             } else {
@@ -376,7 +394,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func updateStatus() {
         let health = permissionHandlingEnabled
-            ? HotkeyHealth(accessibilityMissing: !permissions.accessibility, issues: hotkeyManager.issues)
+            ? HotkeyHealth(accessibilityMissing: settings.requiredPermissions.permissions.contains(.accessibility)
+                           && !permissions.accessibility, issues: hotkeyManager.issues)
             : .healthy
         statusMenu.updateHotkeyHealth(health)
         settingsWindow.permissionsPage.showShortcutConflicts(
@@ -384,7 +403,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let warning: StatusWarning?
         if health != .healthy {
             warning = .shortcutsUnavailable
-        } else if permissionHandlingEnabled && !permissions.screenRecording {
+        } else if permissionHandlingEnabled && settings.requiredPermissions.permissions.contains(.screenRecording)
+                    && !permissions.screenRecording {
             warning = .screenRecordingMissing
         } else {
             warning = nil

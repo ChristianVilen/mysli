@@ -1,25 +1,17 @@
 import Cocoa
 
-struct PermissionSnapshot: Equatable {
-    let accessibility: Bool
-    let screenRecording: Bool
-    let microphone: MicrophoneAccess
-    let calendar: CalendarAccess
-}
-
 struct PermissionActions {
     let accessibility: () -> Void
     let screenRecording: () -> Void
     let microphone: () -> Void
     let calendar: () -> Void
+    let notifications: () -> Void
     let keyboardSettings: () -> Void
 
-    static let inert = Self(accessibility: {}, screenRecording: {}, microphone: {}, calendar: {}, keyboardSettings: {})
+    static let inert = Self(accessibility: {}, screenRecording: {}, microphone: {}, calendar: {}, notifications: {}, keyboardSettings: {})
 }
 
 final class PermissionRowView: NSView {
-    enum Status { case granted, missing, notAsked }
-
     let grantButton = NSButton(title: "Grant", target: nil, action: nil)
     private let statusLabel = NSTextField(labelWithString: "")
     private let name: String
@@ -52,7 +44,7 @@ final class PermissionRowView: NSView {
 
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
-    func setStatus(_ status: Status) {
+    func setStatus(_ status: PermissionSnapshot.Status) {
         let text: String
         switch status {
         case .granted:
@@ -81,21 +73,31 @@ final class SettingsPermissionsView: NSStackView {
     let screenRecordingRow: PermissionRowView
     let microphoneRow: PermissionRowView
     let calendarRow: PermissionRowView
+    let notificationsRow: PermissionRowView
     let keyboardSettings = NSButton(title: "Open Keyboard Settings…", target: nil, action: nil)
     private let shortcutText = SettingsLayout.label("", size: 12)
     private let keyboardAction: () -> Void
     private let shortcutGroup: SettingsGlass
+    private let shortcutHeading = SettingsLayout.heading("Screenshot shortcuts", symbol: "keyboard", color: .systemOrange)
+    private let permissionGroup: SettingsGlass
+
+    var rows: [(permission: MysliPermission, view: PermissionRowView)] {
+        [(.accessibility, accessibilityRow), (.screenRecording, screenRecordingRow),
+         (.microphone, microphoneRow), (.calendar, calendarRow), (.notifications, notificationsRow)]
+    }
 
     var controls: [NSView] {
-        [accessibilityRow.grantButton, screenRecordingRow.grantButton, microphoneRow.grantButton, calendarRow.grantButton,
-         keyboardSettings]
+        rows.filter { !$0.view.isHidden }.map { $0.view.grantButton }
+            + (shortcutGroup.isHidden ? [] : [keyboardSettings])
     }
 
     init(actions: PermissionActions) {
         accessibilityRow = PermissionRowView(title: "Accessibility", explanation: "Move windows and paste items from clipboard history.", grant: actions.accessibility)
         screenRecordingRow = PermissionRowView(title: "Screen Recording", explanation: "Take screenshots and record Mac audio for meeting notes. After you grant access, macOS may ask you to restart Mysli.", grant: actions.screenRecording)
-        microphoneRow = PermissionRowView(title: "Microphone", explanation: "Record your voice for meeting notes. This permission is optional until you record a meeting.", grant: actions.microphone)
-        calendarRow = PermissionRowView(title: "Calendar", explanation: "Read event titles and times for calendar reminders. Mysli never changes your calendar. Reminders stay off until you turn them on in Meetings.", grant: actions.calendar)
+        microphoneRow = PermissionRowView(title: "Microphone", explanation: "Record your voice for meeting notes.", grant: actions.microphone)
+        calendarRow = PermissionRowView(title: "Calendar", explanation: "Read event titles and times for calendar reminders. Mysli never changes your calendar.", grant: actions.calendar)
+        notificationsRow = PermissionRowView(title: "Notifications", explanation: "Show reminders when a calendar meeting starts or ends.", grant: actions.notifications)
+        permissionGroup = SettingsLayout.group([accessibilityRow, screenRecordingRow, microphoneRow, calendarRow, notificationsRow])
         keyboardAction = actions.keyboardSettings
         shortcutGroup = SettingsLayout.group([shortcutText, keyboardSettings])
         super.init(frame: .zero)
@@ -103,32 +105,32 @@ final class SettingsPermissionsView: NSStackView {
         alignment = .leading
         spacing = 16
         SettingsLayout.add(SettingsLayout.page(title: "Permissions", subtitle: "Allow access for the features you use. Status updates while this page is open."), to: self)
-        SettingsLayout.add(SettingsLayout.group([accessibilityRow, screenRecordingRow, microphoneRow, calendarRow]), to: self)
-        SettingsLayout.add(SettingsLayout.heading("Screenshot shortcuts", symbol: "keyboard", color: .systemOrange), to: self)
+        SettingsLayout.add(permissionGroup, to: self)
+        SettingsLayout.add(SettingsLayout.label("Turn on more tools to see their permissions.", size: 12, secondary: true), to: self)
+        SettingsLayout.add(shortcutHeading, to: self)
         SettingsLayout.add(shortcutGroup, to: self)
         SettingsLayout.add(SettingsLayout.label("Meeting audio stays on this Mac. To create a summary, Mysli sends the transcript and any selected background file to your chosen AI tool.", size: 12, secondary: true), to: self)
         keyboardSettings.bezelStyle = .rounded
         keyboardSettings.target = self
         keyboardSettings.action = #selector(openKeyboardSettings)
-        render(.init(accessibility: false, screenRecording: false, microphone: .notDetermined, calendar: .notDetermined))
+        render(.init(accessibility: false, screenRecording: false, microphone: .notDetermined,
+                     calendar: .notDetermined, notifications: .notDetermined))
         showShortcutConflicts([])
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
     func render(_ snapshot: PermissionSnapshot) {
-        accessibilityRow.setStatus(snapshot.accessibility ? .granted : .missing)
-        screenRecordingRow.setStatus(snapshot.screenRecording ? .granted : .missing)
-        switch snapshot.microphone {
-        case .granted: microphoneRow.setStatus(.granted)
-        case .denied: microphoneRow.setStatus(.missing)
-        case .notDetermined: microphoneRow.setStatus(.notAsked)
+        for row in rows { row.view.setStatus(snapshot.status(for: row.permission)) }
+    }
+
+    func showRequired(_ required: RequiredPermissions, screenshotShortcuts: Bool) {
+        for row in rows {
+            row.view.isHidden = !required.permissions.contains(row.permission)
         }
-        switch snapshot.calendar {
-        case .full: calendarRow.setStatus(.granted)
-        case .denied: calendarRow.setStatus(.missing)
-        case .notDetermined: calendarRow.setStatus(.notAsked)
-        }
+        permissionGroup.isHidden = required.permissions.isEmpty
+        shortcutGroup.isHidden = !screenshotShortcuts
+        shortcutHeading.isHidden = !screenshotShortcuts
     }
 
     func showShortcutConflicts(_ shortcuts: [HotkeyShortcut]) {

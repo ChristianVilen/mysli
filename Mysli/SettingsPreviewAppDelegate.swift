@@ -26,7 +26,8 @@ final class SettingsPreviewAppDelegate: NSObject, NSApplicationDelegate {
         settingsWindow.onKeepAwakeChanged = { [keepAwake] enabled in
             if !enabled { keepAwake.deactivate() }
         }
-        settingsWindow.renderPermissions(.init(accessibility: true, screenRecording: false, microphone: .notDetermined, calendar: .notDetermined))
+        settingsWindow.renderPermissions(.init(accessibility: true, screenRecording: false, microphone: .notDetermined,
+                                               calendar: .notDetermined, notifications: .notDetermined))
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {

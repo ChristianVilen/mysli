@@ -1,5 +1,6 @@
 import AVFoundation
 import Cocoa
+import UserNotifications
 
 /// The System Settings panes Mysli opens for permissions and shortcut setup.
 enum SettingsPane {
@@ -7,22 +8,21 @@ enum SettingsPane {
     case screenCapture
     case microphone
     case calendars
+    case notifications
     case keyboardShortcuts
-
-    private var anchor: String {
-        switch self {
-        case .accessibility: return "Privacy_Accessibility"
-        case .screenCapture: return "Privacy_ScreenCapture"
-        case .microphone: return "Privacy_Microphone"
-        case .calendars: return "Privacy_Calendars"
-        case .keyboardShortcuts: return "Shortcuts"
-        }
-    }
 
     /// Privacy panes try the modern identifier first. Keyboard setup tries
     /// the shortcuts link, then falls back to the general Keyboard pane.
     var urls: [URL] {
-        if self == .keyboardShortcuts {
+        let anchor: String
+        switch self {
+        case .accessibility: anchor = "Privacy_Accessibility"
+        case .screenCapture: anchor = "Privacy_ScreenCapture"
+        case .microphone: anchor = "Privacy_Microphone"
+        case .calendars: anchor = "Privacy_Calendars"
+        case .notifications:
+            return [URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension")!]
+        case .keyboardShortcuts:
             return [
                 URL(string: "x-apple.systempreferences:com.apple.preference.keyboard?Shortcuts")!,
                 URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension")!,
@@ -50,11 +50,19 @@ enum MicrophoneAccess: Equatable {
     }
 }
 
-/// Single source of truth for the permissions Mysli needs: Accessibility
-/// (window moves for tiling and synthetic clipboard paste), Screen
-/// Recording (ScreenCaptureKit capture), Microphone (Meeting Notes only) and
-/// Calendar (calendar reminders).
-///
+enum NotificationAccess: Equatable {
+    case granted, denied, notDetermined
+
+    init(_ status: UNAuthorizationStatus) {
+        switch status {
+        case .authorized, .provisional: self = .granted
+        case .notDetermined: self = .notDetermined
+        case .denied: self = .denied
+        @unknown default: self = .denied
+        }
+    }
+}
+
 /// macOS offers no callback when the user grants a permission in System
 /// Settings, so status is re-read either on demand (`refresh()`) or on a
 /// short timer while the Permissions page is visible (`startPolling()`).
@@ -68,6 +76,7 @@ final class PermissionsManager {
     private(set) var screenRecording = false
     private(set) var microphone = MicrophoneAccess.notDetermined
     private(set) var calendar = CalendarAccess.notDetermined
+    private(set) var notifications = NotificationAccess.notDetermined
 
     /// Fired after `refresh()` whenever any status changed.
     var onChange: (@MainActor () -> Void)?
@@ -78,20 +87,22 @@ final class PermissionsManager {
     private let requestMicrophoneAccess: @MainActor () async -> Bool
     private let calendarAccess: () -> CalendarAccess
     private let requestCalendarAccess: @MainActor () async -> Bool
+    private let notificationAccess: @MainActor () async -> NotificationAccess
+    private let requestNotificationAccess: @MainActor () async -> Bool
     private let openURL: (URL) -> Bool
     private let showAccessibilityPrompt: () -> Void
     private let defaults: UserDefaults
     private let pollInterval: TimeInterval
     private var timer: Timer?
 
-    /// Launch opens the Permissions page when this is false. It leaves out Microphone on purpose:
-    /// people who never record a meeting must not get that page for Microphone. Calendar counts
-    /// (decided by the user, 2026-11-04), although calendar reminders stay off until turned on.
-    var allGranted: Bool { accessibility && screenRecording && calendar == .full }
+    var snapshot: PermissionSnapshot {
+        PermissionSnapshot(accessibility: accessibility, screenRecording: screenRecording,
+                           microphone: microphone, calendar: calendar, notifications: notifications)
+    }
 
     /// The probes, the opener and the prompt default to the real system
-    /// calls; tests inject stand-ins. The calendar probes are the exception: the app
-    /// passes its one `EventKitCalendarSource`, and the defaults never touch EventKit.
+    /// calls; tests inject stand-ins. Calendar and notification probes are supplied by the app,
+    /// so their defaults never reach EventKit or the notification center.
     init(
         isAccessibilityTrusted: @escaping () -> Bool = { AXIsProcessTrusted() },
         hasScreenCaptureAccess: @escaping () -> Bool = { CGPreflightScreenCaptureAccess() },
@@ -99,6 +110,8 @@ final class PermissionsManager {
         requestMicrophoneAccess: @escaping @MainActor () async -> Bool = { await AVCaptureDevice.requestAccess(for: .audio) },
         calendarAccess: @escaping () -> CalendarAccess = { .notDetermined },
         requestCalendarAccess: @escaping @MainActor () async -> Bool = { false },
+        notificationAccess: @escaping @MainActor () async -> NotificationAccess = { .notDetermined },
+        requestNotificationAccess: @escaping @MainActor () async -> Bool = { false },
         openURL: @escaping (URL) -> Bool = { NSWorkspace.shared.open($0) },
         showAccessibilityPrompt: @escaping () -> Void = {
             _ = AXIsProcessTrustedWithOptions(
@@ -114,6 +127,8 @@ final class PermissionsManager {
         self.requestMicrophoneAccess = requestMicrophoneAccess
         self.calendarAccess = calendarAccess
         self.requestCalendarAccess = requestCalendarAccess
+        self.notificationAccess = notificationAccess
+        self.requestNotificationAccess = requestNotificationAccess
         self.openURL = openURL
         self.showAccessibilityPrompt = showAccessibilityPrompt
         self.defaults = defaults
@@ -132,6 +147,24 @@ final class PermissionsManager {
         microphone = mic
         calendar = cal
         onChange?()
+    }
+
+    func refreshNotifications() async {
+        let access = await notificationAccess()
+        guard access != notifications else { return }
+        notifications = access
+        onChange?()
+    }
+
+    func requestNotifications() async {
+        await refreshNotifications()
+        switch notifications {
+        case .granted: return
+        case .denied: openSettings(.notifications)
+        case .notDetermined:
+            _ = await requestNotificationAccess()
+            await refreshNotifications()
+        }
     }
 
     /// Asks macOS for calendar access when it never asked; macOS asks only once, so after a
@@ -203,7 +236,10 @@ final class PermissionsManager {
             queue: .main
         ) { [weak self] _ in
             // The .main queue delivers on the main thread.
-            MainActor.assumeIsolated { self?.refresh() }
+            MainActor.assumeIsolated {
+                self?.refresh()
+                Task { await self?.refreshNotifications() }
+            }
         }
     }
 
@@ -213,7 +249,10 @@ final class PermissionsManager {
         guard timer == nil else { return }
         timer = Timer.scheduledTimer(withTimeInterval: pollInterval, repeats: true) { [weak self] _ in
             // Timers scheduled from the main thread fire on the main run loop.
-            MainActor.assumeIsolated { self?.refresh() }
+            MainActor.assumeIsolated {
+                self?.refresh()
+                Task { await self?.refreshNotifications() }
+            }
         }
     }
 

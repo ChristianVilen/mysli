@@ -82,6 +82,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         super.init(window: window)
         window.delegate = self
         buildForm()
+        refreshPermissionRequirements()
         displayObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification, object: nil, queue: .main
         ) { [weak self] _ in
@@ -136,7 +137,15 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         onPermissionsVisibilityChanged?(visible)
     }
 
-    func renderPermissions(_ snapshot: PermissionSnapshot) { permissionsPage.render(snapshot) }
+    func renderPermissions(_ snapshot: PermissionSnapshot) {
+        refreshPermissionRequirements()
+        permissionsPage.render(snapshot)
+    }
+
+    private func refreshPermissionRequirements() {
+        permissionsPage.showRequired(settings.requiredPermissions, screenshotShortcuts: settings.screenshotShortcutsEnabled)
+        if selectedPage == .permissions { updateKeyViewLoop() }
+    }
 
     @discardableResult
     func showScreenshotSetupIfNeeded(issues: [HotkeyRegistrationIssue]) -> Bool {
@@ -153,6 +162,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
     /// Shows the saved preferences, also after the menu changed one while the window is open.
     func refresh() {
+        refreshPermissionRequirements()
         launchAtLogin.state = settings.launchAtLogin ? .on : .off
         screenshotShortcuts.state = settings.screenshotShortcutsEnabled ? .on : .off
         windowTiling.state = settings.windowTilingEnabled ? .on : .off
@@ -370,7 +380,13 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             button.isBordered = selected
             button.contentTintColor = selected ? .controlAccentColor : .labelColor
         }
-        let controls: [NSView] = switch page {
+        updateKeyViewLoop()
+        window?.makeFirstResponder(pageButtons[page.rawValue])
+        refreshPermissionsVisibility()
+    }
+
+    private func updateKeyViewLoop() {
+        let controls: [NSView] = switch selectedPage {
         case .general: [launchAtLogin]
         case .screenshots: [screenshotShortcuts, thumbnailDuration]
         case .clipboard: [clipboardHistory]
@@ -380,10 +396,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         case .permissions: permissionsPage.controls
         case .help: helpPage.controls
         }
-        let keyViews: [NSView] = pageButtons + controls + (guides[page]?.buttons ?? [])
+        let keyViews: [NSView] = pageButtons + controls + (guides[selectedPage]?.buttons ?? [])
         for (control, next) in zip(keyViews, keyViews.dropFirst() + [pageButtons[0]]) { control.nextKeyView = next }
-        window?.makeFirstResponder(pageButtons[page.rawValue])
-        refreshPermissionsVisibility()
     }
 
     func applyDisplayOptions(_ options: SettingsDisplayOptions) {
@@ -405,6 +419,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
     @objc private func screenshotsChanged() {
         settings.screenshotShortcutsEnabled = screenshotShortcuts.state == .on
+        refreshPermissionRequirements()
         onScreenshotsChanged?(settings.screenshotShortcutsEnabled)
     }
 
@@ -420,17 +435,20 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
     @objc private func meetingsChanged() {
         settings.meetingsEnabled = meetingsEnabled.state == .on
+        refreshPermissionRequirements()
         calendarReminders.isEnabled = settings.meetingsEnabled
         onMeetingsChanged?(settings.meetingsEnabled)
     }
 
     @objc private func tilingChanged() {
         settings.windowTilingEnabled = windowTiling.state == .on
+        refreshPermissionRequirements()
         onTilingChanged?(settings.windowTilingEnabled)
     }
 
     @objc private func clipboardChanged() {
         settings.clipboardHistoryEnabled = clipboardHistory.state == .on
+        refreshPermissionRequirements()
         onClipboardChanged?(settings.clipboardHistoryEnabled)
     }
 
@@ -439,6 +457,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     }
 
     func showCalendarStatus(_ status: CalendarReminderController.Status) {
+        refreshPermissionRequirements()
         calendarReminders.state = settings.calendarRecordingRemindersEnabled ? .on : .off
         let text = switch status {
         case .off, .ready: ""

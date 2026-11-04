@@ -27,7 +27,6 @@ final class PermissionsManagerTests: XCTestCase {
 
         XCTAssertTrue(sut.accessibility)
         XCTAssertFalse(sut.screenRecording)
-        XCTAssertFalse(sut.allGranted)
     }
 
     func testOnChangeFiresWhenAStatusChanges() {
@@ -46,7 +45,6 @@ final class PermissionsManagerTests: XCTestCase {
         sut.refresh()
 
         XCTAssertEqual(changeCount, 1)
-        XCTAssertTrue(sut.allGranted)
     }
 
     func testOnChangeDoesNotFireWhenNothingChanged() {
@@ -151,24 +149,41 @@ final class PermissionsManagerTests: XCTestCase {
         XCTAssertEqual(changeCount, 1)
     }
 
-    func testADeniedMicrophoneDoesNotOpenOnboarding() {
-        let sut = PermissionsManager(isAccessibilityTrusted: { true }, hasScreenCaptureAccess: { true },
-                                     microphoneAccess: { .denied }, calendarAccess: { .full })
-
-        sut.refresh()
-
-        XCTAssertEqual(sut.microphone, .denied)
-        XCTAssertTrue(sut.allGranted)
+    func testNotificationRefreshReadsStatusWithoutPrompting() async {
+        var access = NotificationAccess.notDetermined
+        var prompts = 0
+        let sut = PermissionsManager(notificationAccess: { access },
+                                     requestNotificationAccess: { prompts += 1; return true })
+        var changes = 0
+        sut.onChange = { changes += 1 }
+        await sut.refreshNotifications()
+        XCTAssertEqual(changes, 0)
+        access = .granted
+        await sut.refreshNotifications()
+        XCTAssertEqual(sut.snapshot.notifications, .granted)
+        XCTAssertEqual(changes, 1)
+        XCTAssertEqual(prompts, 0)
     }
 
-    func testCalendarCountsAsRequiredUntilItIsFullyAllowed() {
-        for (access, granted) in [(CalendarAccess.notDetermined, false), (.denied, false), (.full, true)] {
-            let sut = PermissionsManager(isAccessibilityTrusted: { true }, hasScreenCaptureAccess: { true },
-                                         calendarAccess: { access })
-            sut.refresh()
-            XCTAssertEqual(sut.calendar, access)
-            XCTAssertEqual(sut.allGranted, granted, "\(access)")
-        }
+    func testNotificationRequestAsksOnceThenOpensSettingsAfterDenial() async {
+        var access = NotificationAccess.notDetermined
+        var prompts = 0
+        var opened: [String] = []
+        let sut = PermissionsManager(notificationAccess: { access }, requestNotificationAccess: {
+            prompts += 1
+            access = .denied
+            return false
+        }, openURL: { opened.append($0.absoluteString); return true })
+        await sut.requestNotifications()
+        XCTAssertEqual(prompts, 1)
+        XCTAssertEqual(sut.snapshot.notifications, .denied)
+        await sut.requestNotifications()
+        XCTAssertEqual(prompts, 1)
+        XCTAssertEqual(opened, ["x-apple.systempreferences:com.apple.Notifications-Settings.extension"])
+        access = .granted
+        await sut.requestNotifications()
+        XCTAssertEqual(prompts, 1)
+        XCTAssertEqual(opened.count, 1)
     }
 
     func testRequestCalendarAsksOnlyWhenNeverAskedAndThenOpensItsSettingsPane() async {

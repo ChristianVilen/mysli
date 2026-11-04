@@ -63,6 +63,20 @@ final class Settings {
         set { defaults.set(newValue, forKey: "meetingsEnabled") }
     }
 
+    var enabledTools: Set<MysliTool> {
+        var tools: Set<MysliTool> = []
+        if screenshotShortcutsEnabled { tools.insert(.screenshots) }
+        if clipboardHistoryEnabled { tools.insert(.clipboard) }
+        if windowTilingEnabled { tools.insert(.windows) }
+        if keepAwakeEnabled { tools.insert(.keepAwake) }
+        if meetingsEnabled { tools.insert(.meetings) }
+        return tools
+    }
+
+    var requiredPermissions: RequiredPermissions {
+        RequiredPermissions(tools: enabledTools, calendarReminders: calendarRecordingRemindersEnabled)
+    }
+
     /// On by default: a dark, locked screen looks like Keep Awake did not work.
     var keepDisplayAwake: Bool {
         get { defaults.object(forKey: "keepDisplayAwake") as? Bool ?? true }
