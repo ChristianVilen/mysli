@@ -3,7 +3,9 @@ import CoreGraphics
 /// Pure geometry for the pill and its drawer, in NS coordinates (bottom-left origin).
 enum MeetingPanelPlacement {
     static let inset: CGFloat = 16
-    static let drawerHeights: ClosedRange<CGFloat> = 140...460
+    /// Only a panel with notes goes through `fitted(…)`. The upper limit keeps a panel with only
+    /// the transcript, pill included, inside a 13-inch MacBook Air's visible height (about 860 points).
+    static let drawerHeights: ClosedRange<CGFloat> = 140...800
     static let defaultDrawerHeight: CGFloat = 280
 
     /// The pill's top-right corner: the saved corner, moved so the whole pill lies in the
