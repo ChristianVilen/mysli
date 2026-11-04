@@ -2,17 +2,23 @@
 
 The integration is off by default. Eligible events offer **Start Recording**, then **Stop Recording** or **Continue Recording** at the end. Only accepted actions change recording. Calendar edits and permission loss never stop audio.
 
-## Settings contract for #43
+## Settings and onboarding
 
-`AppDelegate.calendarReminders` exposes the app-owned `CalendarReminderController?` on the main actor. It becomes available when production launch begins its resume task. It stays nil in XCTest and `--uitesting`. Settings must use this controller, with no second EventKit store or notification delegate.
+`AppDelegate.calendarReminders` exposes the app-owned `CalendarReminderController?` on the main actor. It becomes available when production launch begins its resume task. XCTest and `--uitesting` do not construct this controller. Settings and onboarding use the same controller, EventKit source, and notification delegate.
 
 The switch reads `Settings.calendarRecordingRemindersEnabled`, whose default is false. Its action awaits `calendarReminders?.setEnabled(newValue)`. Writing the defaults key alone does not enable reminders or request access.
 
-Read `controller.status` and assign `controller.onStatusChange: (() -> Void)?` to refresh the view. The cases are `off`, `requestingAccess`, `ready`, `calendarAccessRequired`, `notificationsRequired`, and `readFailed`. The callback runs on the main actor. Read the initial status and clear the callback when the view no longer needs updates.
+Meetings must be on. Turning Meetings off calls `setEnabled(false)` and disables the reminder switch. Turning Meetings back on leaves reminders off. The controller also refuses an enable request while `Settings.meetingsEnabled` is false.
 
-`setEnabled(true) async` requests Calendar and notification access. The Calendar row on the Permissions page also requests Calendar access, through `PermissionsManager.requestCalendar()` and the same `EventKitCalendarSource`. That row never turns reminders on and never asks for notifications. Calendar counts as a required permission, so a missing grant opens the Permissions page at launch. `resume() async` restores the saved preference without prompting. `refresh() async` rechecks grants and events. Settings can call it when its window opens or returns from System Settings. The driver also checks every 60 seconds. Denied Calendar access requires a grant in System Settings. Enable does not repeat a denied Calendar prompt.
+Onboarding offers reminders as an unchecked choice under Meetings. Continue applies that choice through `setEnabled(_:)` when it differs from the saved preference. `Onboarding` saves the Allow access step before the callback can show permission prompts. Skip setup keeps the saved reminder setting and does not apply an unsubmitted choice.
 
-Suggested explanation text is "Calendar events offer recording reminders. Mysli never starts or stops recording automatically." The Settings window's **Calendar reminders** switch ([#43](https://github.com/ChristianVilen/mysli/issues/43)) uses this explanation and follows this contract. `AppDelegate` awaits `setEnabled(_:)` for the switch, shows each status change in the window, and calls `refresh()` when Settings opens.
+`AppDelegate` owns `controller.onStatusChange`. The callback runs on the main actor and updates the Meetings status line and permission snapshots. Views do not replace it. The status cases are `off`, `requestingAccess`, `ready`, `calendarAccessRequired`, `notificationsRequired`, and `readFailed`.
+
+`setEnabled(true) async` requests Calendar access, then notification access if Calendar is allowed. A denied Calendar grant needs a change in System Settings. The system prompt does not repeat after a refusal. Event checks stay suspended across both permission requests, so polling cannot interrupt the request sequence.
+
+`RequiredPermissions` includes Calendar and Notifications only while Meetings and reminders are on. Setup, the Permissions page, and the launch check use that list. After setup, a missing required grant opens the Permissions page at launch. Its Calendar row calls `PermissionsManager.requestCalendar()` through the same `EventKitCalendarSource`. Its Notifications row calls `PermissionsManager.requestNotifications()`. Neither row turns reminders on.
+
+`resume() async` reads the Meetings and reminder preferences without writing or prompting. Meetings off keeps the controller off, even if an external defaults write left the reminder flag on. `refresh() async` rechecks grants and events after permission requests finish. Settings can call it when its window opens or returns from System Settings. The driver also checks every 60 seconds.
 
 ## Ownership and shared files
 
@@ -24,7 +30,7 @@ The controller holds one optional offer whose kind carries the event and, for an
 
 `CalendarReminderDriver` owns EventKit-change, wake, clock-change, and time-zone-change observers. It owns a 60-second safety timer and one replaceable next-boundary timer. `schedule(at: nil)` cancels only the boundary. `stop()` removes all resources. Tests replace the observers and timers through `Calls`.
 
-`AppDelegate` constructs the integration outside its test-host guard only. Its existing `meetingNotes.onStateChange` updates the status icon and forwards `recorderDidChange()`. It does not replace recorder callbacks. Quit cancels startup and shuts down calendar watchers before meeting processing. The notification adapter removes stale pending and delivered requests with the `calendar-recording.` prefix at launch, while preserving other requests and categories.
+Production `AppDelegate` constructs the integration. `AppLaunchMode` selects separate passive and preview hosts for tests. The existing `meetingNotes.onStateChange` updates the status icon and forwards `recorderDidChange()`. It does not replace recorder callbacks. Quit cancels startup and shuts down calendar watchers before meeting processing. The notification adapter removes stale pending and delivered requests with the `calendar-recording.` prefix at launch, while preserving other requests and categories.
 
 The Settings work in #43 reconciled `AppDelegate.swift` and `Settings.swift` with this integration. `MeetingNotesController.swift` adds a title to its existing disabled recording line. The visible suffix is limited to 48 characters. The tooltip and accessibility label retain the full title. Manual recording keeps its existing status. `Info.plist` adds `NSCalendarsFullAccessUsageDescription`. Source folders remain synchronized with Xcode, with no project-file entries.
 
@@ -46,4 +52,6 @@ Accepted Start fixes the normalized title for that recording and its documents. 
 
 Tests use synthetic calendar fields, fake timer signals, injected notification-center calls, isolated defaults, and temporary generated notes. No test constructs a real EventKit store or posts a real notification. See the [synthetic evidence record](superpowers/evidence/2026-10-29-calendar-reminders.md).
 
-Native banner layout, action expansion, VoiceOver announcement and action order, actual grants, real recurrence edits, sleep and wake, provider sync, and System Settings navigation remain manual checks. They were not run because this task forbids real calendar access, recording, and notification delivery. Settings UI checks belong to #43.
+Onboarding tests cover saved progress, tool choices, prompt order, and the shared window. A fake Calendar request stays pending during a refresh to check that Notifications is still requested after Calendar access is allowed. Native pictures check layout without using real permission prompts.
+
+Native notification banners, action expansion, VoiceOver, actual grants, real recurrence edits, sleep and wake, provider sync, and System Settings navigation still need manual checks. A real restart after Screen Recording access and Stage Manager activation also remain unchecked.

@@ -69,14 +69,54 @@ The `aa-docs-meeting` skill in the AA knowledge base changes in the same step. I
 - **Menu bar icon.** A template image of the bowl, the split square, and the berry. The berry sits where the recording mark appears, so the mark covers it while Mysli records. The Keep Awake dot is fixed system blue, because the lingonberry accent would look like the recording mark.
 - **Palette.** One warm palette for the app and the website. Light: oat `#F6F0E4`, cream `#EFE6D3`, rule `#E2D5BC`, toast `#6F5B47`, roast `#2E2118`, lingonberry `#B4233C`. Dark: `#1E1712`, `#2A211A`, `#3D3027`, `#B9A58E`, `#F3EADB`, lingonberry `#E5566B`. It replaces the "Cobalt" theme. The lingonberry is the app's accent color.
 - **Window.** One sidebar page for each tool: General, Screenshots, Clipboard, Windows, Keep Awake, and Meetings, then Permissions and Help. Each tool page holds its switch, settings, shortcuts, and guide. The "Features & instructions" page goes away. The window keeps the standard macOS background and the glass sidebar; the brand shows in the accent color, the tool squares, and the header.
-- **Menu.** The dropdown stays an `NSMenu`, grouped by tool, with section headers and tool icons. Settings… replaces "Mysli…" and "Permissions…".
+- **Menu.** The dropdown stays an `NSMenu`, grouped by enabled tool, with section headers and tool icons. A disabled tool has no menu group. Settings… replaces "Mysli…" and "Permissions…".
 - **Screenshots switch.** "Use Mysli for screenshots" gives Shift+Command+3 and 4 back to macOS when it is off.
-- **Calendar permission.** Calendar is a required permission: a missing grant opens the Permissions page at launch, and Grant asks macOS only for Calendar access. Calendar reminders stay off until the user turns them on.
+- **Permissions.** Required access comes from enabled tools and the reminder choice, as listed below. Calendar is required only while reminders are on. Notifications has its own row in that case.
 - **Website.** The hero gets the tagline. Features gets one block for each tool. The comparison table becomes "One app instead of five": one row for each tool, the separate app that people install for it today, and an honest note where Mysli does less.
+
+## Onboarding
+
+The approved reference is the Onboarding row of the [design canvas](https://claude.ai/artifact/KZMmW1CEbRR3djsF7jeFgb), with boards `OnbWelcome`, `OnbTools`, and `OnbPermissions`.
+
+Onboarding uses the full width of the Mysli window without a sidebar. It keeps the standard macOS background, Liquid Glass, the lingonberry accent, and `MysliTool.icon(size:)` squares. A footer holds navigation and three progress marks.
+
+1. **Welcome** shows the icon, tagline, and five tools, with Get Started and Skip setup.
+2. **Choose tools** starts with all tools selected. Continue applies the choices and releases the shortcuts of disabled tools. Keep Awake and Meetings have their own preferences and page switches. Keep Awake off ends its session. Meetings off turns reminders off but leaves active recording and queued processing running.
+3. **Allow access** shows only required permission rows, with current status and a count of allowed grants. A restored access step shows a welcome-back banner. Finish is available while access is missing.
+
+Calendar reminders is an unchecked choice under Meetings. It is unavailable while Meetings is off. Continue applies it through `calendarReminders.setEnabled(_:)` when it differs from the saved preference. Only `setEnabled(_:)` changes the actual reminder preference. Calendar and Notifications rows grant access without enabling reminders.
+
+`RequiredPermissions` supplies one list to onboarding, the Settings Permissions page, and the launch check. A shared permission appears once:
+
+| Enabled tool or choice | Required access |
+|---|---|
+| Screenshots | Screen Recording |
+| Clipboard | Accessibility |
+| Windows | Accessibility |
+| Keep Awake | None |
+| Meetings | Microphone, Screen Recording |
+| Calendar reminders | Calendar, Notifications |
+
+Optional Teams speaker names does not add Accessibility to the list. The Permissions page includes the line "Turn on more tools to see their permissions." Screenshot shortcut guidance is hidden while Screenshots is off.
+
+`Onboarding` saves progress in these defaults keys:
+
+| Key | Saved value |
+|---|---|
+| `onboardingStep` | `welcome`, `tools`, or `permissions` |
+| `onboardingTools` | Selected `MysliTool` raw values |
+| `onboardingCalendarReminders` | Draft reminder choice |
+| `onboardingFinished` | Whether Finish or Skip setup was clicked |
+
+Continue saves the access step before it can request reminder permissions. A quit and reopen returns to the saved step and reads the current grants. Opening setup or refreshing it never writes preferences. The user's existing preferences have no finished mark, so onboarding appears once for this user too.
+
+Finish replaces onboarding with the normal window pages. Skip setup finishes with all tools on and keeps the saved reminder setting. It does not apply an unsubmitted reminder choice. After setup, missing required access opens the Permissions page at launch.
 
 ## Order of work
 
-The work lands as commits on `main`, without pull requests. Each push to `main` runs `release.yml`, which publishes a release and updates the cask. Nothing is pushed without the user's approval.
+The rename, icon, and initial app redesign land as commits on `main`, without pull requests. Onboarding uses the `onboarding` worktree and merges later with `workmux merge`. Each onboarding step needs full tests, `scripts/check-tests.sh`, a shown diff, and approval before its commit.
+
+Each push to `main` runs `release.yml`, which publishes a release and updates the cask. Build Release, quit the running app, and replace `/Applications/Mysli.app` only after approval. Warn before each install that an ad-hoc build loses its grants. The push waits for the user's app test and separate approval.
 
 1. The rename, with no change in behavior. The repo and tap renames happen with the first push.
 2. The icon and the palette.
@@ -86,3 +126,15 @@ The work lands as commits on `main`, without pull requests. Each push to `main` 
 The rename commit also fixes three old mistakes: the bundle ID in the website's `tccutil` command, the `/Applications/Ku-Ka.app` quarantine path, and the `KuKaUITests` line in `justfile`. It deletes `APP_STORE.md`, which describes notarization that was never set up.
 
 Dated specs, plans, research, and `.claude/` notes are history and keep the old name.
+
+## Manual checks still needed
+
+Fakes and native pictures cover setup rules and layout. They do not prove these checks in the installed app:
+
+- Complete onboarding and check that disabled tools lose their menu groups and shortcuts.
+- Grant Screen Recording, quit and reopen when asked, and check the saved step and allowed rows.
+- Check the Calendar and Notifications prompts after selecting reminders and clicking Continue.
+- Check that the activation fix brings the window forward with Stage Manager on.
+- Check the menu, normal pages, keyboard use, and VoiceOver.
+
+The website work has not started.

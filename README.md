@@ -22,11 +22,27 @@ Mysli is Finnish for muesli: a mix of good things.
 - Clipboard history — `Shift+Command+C` opens a searchable list of what you've copied, text and images, and pastes the item you choose back into the app you were using
 - Meeting notes. Record a call from the menu bar, and Mysli writes a transcript and a summary as Markdown files. Transcription runs on your Mac, and so does the step that tells apart the voices in your room. A floating panel lets you pause and stop the recording and shows a live draft of the transcript.
 - App logs. **Show Log…** opens a live, searchable log window with filters, copy, save, and deletion.
-- Runs as a menu bar agent (no Dock icon)
+- Lives in the menu bar. The Dock icon appears while a normal Mysli window is open.
+
+## Set up Mysli
+
+On first launch, the Mysli window shows three steps without a sidebar:
+
+1. **Welcome.** Click **Get Started**.
+2. **Choose your tools.** All five tools start selected. Clear the tools you do not want, then click **Continue**. Unselected tools turn off and release their shortcuts. **Calendar reminders** is a separate choice under Meetings and starts off.
+3. **Allow access.** Allow the permissions for your chosen tools. Each row updates when you grant access. Click **Finish** to open the normal pages, even if some permissions are missing.
+
+Mysli saves your step and choices. If macOS asks you to quit and reopen after Screen Recording access, setup returns to the saved step. The rows show the current grants.
+
+**Skip setup** on Welcome finishes setup with all tools on. It keeps the saved reminder setting and does not apply an unsubmitted reminder choice. You can change the tools later in **Settings…**.
+
+After setup, missing access for an enabled tool opens the **Permissions** page at launch.
 
 ## Keep Awake
 
 Choose a duration in the menu's **Keep Awake** section. The choices are 30 minutes, 1, 2, or 4 hours, and until turned off. A blue dot in the lower-right corner of the menu-bar icon marks an active session, and the menu shows how much time is left.
+
+The **Keep Awake** switch on its Settings page turns the tool on or off. Turning it off ends an active session and hides its menu group.
 
 **Keep screen on** is on by default in the Keep Awake menu. Turn it off to let the display sleep and lock on its normal schedule. Changing this choice also updates an active session without restarting its timer. Closing a laptop's lid still sleeps the Mac unless it is plugged in with an external display attached. Keep the lid open or run it docked.
 
@@ -42,7 +58,7 @@ If you use Stage Manager (the macOS feature that shows recent apps as small thum
 
 With more than one display, the window is tiled on the screen it overlaps the most. This differs from the screenshot features, which follow the cursor.
 
-The whole feature can be turned on and off with the **Enable window tiling** checkbox in **Settings…**; the choice is remembered across restarts. While it's off, the hotkeys pass through to other apps. The keys themselves aren't configurable.
+Use the **Window tiling** switch on the Windows page in **Settings…** to turn the tool on or off. Mysli remembers the choice across restarts. While it is off, Mysli releases its shortcuts and hides its menu group. The keys are not configurable.
 
 ## Clipboard History
 
@@ -54,11 +70,13 @@ Text and images both get recorded, including screenshots Mysli itself saves to y
 
 The history lives in memory only — nothing is written to disk, so it's empty again after a restart. It holds at most 100 items; images are capped at about 100 MB in total, with the oldest images dropped first. A single item over 50 MB is not recorded. Copies that your password manager marks as sensitive are never recorded.
 
-The whole feature can be turned on and off with the **Record clipboard history** checkbox in **Settings…**; the choice is remembered across restarts. While it's off, Mysli stops recording, clears the history it collected, and gives `Shift+Command+C` back to other apps. With the feature on, Mysli takes that shortcut from Chrome and Arc (Inspect Element), Xcode (Activate Console), VS Code (Open External Terminal), and Finder (Computer window).
+Use the **Clipboard history** switch on the Clipboard page in **Settings…** to turn the tool on or off. Mysli remembers the choice across restarts. While it is off, Mysli stops collecting copies, clears its history, releases `Shift+Command+C`, and hides its menu group. With the feature on, Mysli takes that shortcut from Chrome and Arc (Inspect Element), Xcode (Activate Console), VS Code (Open External Terminal), and Finder (Computer window).
 
 ## Meeting Notes
 
-Calendar recording reminders are off by default. Eligible events offer **Start Recording**, then **Stop Recording** or **Continue Recording** at the end. Mysli never starts or stops automatically. A calendar recording keeps the event title in its menu status and note headings. Turn them on with **Calendar reminders** in Settings. The first time, macOS asks for Calendar and notification access, and Settings says what to allow when access is missing. See the [integration contract and limits](docs/calendar-recording-reminders.md).
+The **Meetings** switch on its Settings page turns the tool on or off. Turning it off hides the meeting menu group and turns reminders off. An active recording and queued processing continue. Use the floating controls to stop, or turn Meetings on again to use its menu. At launch, unfinished meetings resume only while Meetings is on.
+
+Calendar recording reminders are off by default and need Meetings to be on. Eligible events offer **Start Recording**, then **Stop Recording** or **Continue Recording** at the end. Mysli never starts or stops automatically. A calendar recording keeps the event title in its menu status and note headings. Select **Calendar reminders** during setup and click **Continue**, or turn it on on the Meetings page. The first time, macOS asks for Calendar and notification access. Settings says what to allow when access is missing. See the [integration contract and limits](docs/calendar-recording-reminders.md).
 
 When a call starts, open the Mysli menu and choose **Start Recording Meeting**. Mysli records your microphone and the sound your Mac plays, so any call app works. If Start cannot record, for example because a permission is missing, an alert says why.
 
@@ -128,7 +146,7 @@ The AI tool also tells Mysli which words it thinks speech recognition got wrong.
 
 Update Notes makes `transcript.md` again from the text that speech recognition wrote and from the list. So a change that you made to `transcript.md` by hand is lost. To fix a word, add it to the list instead.
 
-Recording needs the Screen Recording permission (for the sound your Mac plays) and the Microphone permission. Mysli asks for Microphone the first time you start a recording.
+Recording needs Screen Recording access for the sound your Mac plays and Microphone access for your voice. Allow them during setup or on the Permissions page. If Microphone access has not been requested, starting a recording shows the prompt.
 
 ### Experimental Teams speaker names
 
@@ -287,7 +305,22 @@ Alternatively, you can use the GUI method:
 
 ## Permissions
 
-Screen Recording lets Mysli take screenshots and record the sound of a call for Meeting Notes. Accessibility lets it move windows and paste from clipboard history. Calendar lets it offer calendar reminders. On first launch, the Permissions page explains these permissions. Grant the permissions for the features you use; each row updates after you allow it in System Settings. Open the page again from **Settings…** in the menu. A red dot in the bottom-left corner of the menu bar icon means an Accessibility or shortcut problem. An orange dot in that corner means Screen Recording is missing, when no red warning is present.
+Setup, the Permissions page, and the launch check use the same list of required access:
+
+| Enabled tool or choice | Required access |
+|---|---|
+| Screenshots | Screen Recording |
+| Clipboard | Accessibility |
+| Windows | Accessibility |
+| Keep Awake | None |
+| Meetings | Microphone, Screen Recording |
+| Calendar reminders | Calendar, Notifications |
+
+The Permissions page shows only the needed rows. A shared permission appears once. The line **Turn on more tools to see their permissions.** explains how to add rows. The optional Teams speaker names feature does not add Accessibility to this list.
+
+Open **Settings…**, then **Permissions**, to check access again. The rows update while the page is open. After setup, missing required access opens this page at launch.
+
+A red dot in the bottom-left corner of the menu bar icon means a needed Accessibility grant or shortcut is missing. An orange dot means needed Screen Recording access is missing, when no red warning is present.
 
 ### Accessibility (window tiling and automatic paste)
 Accessibility lets Mysli move and resize windows and paste items from clipboard history. The optional Teams speaker-name feature also uses it to read meeting UI. Registering the shortcuts does not need this permission.
@@ -298,7 +331,7 @@ Mysli detects the permission when it becomes active or you open its menu. You do
 
 ### Screenshot shortcut setup
 
-Mysli keeps `Shift+Command+3` and `Shift+Command+4`. If macOS already uses them, Mysli opens the Permissions page with screenshot setup instructions once and lists the conflicts in its menu. Permission checks and shortcut setup share the same page. Choose **Open Keyboard Settings…**, then **Keyboard Shortcuts → Screenshots**, and turn off the matching macOS shortcuts:
+With Screenshots on, Mysli requests `Shift+Command+3` and `Shift+Command+4`. If macOS already uses them, Mysli lists the conflicts in its menu. After onboarding, it opens screenshot setup once. Permission checks and shortcut setup share the Permissions page. Choose **Open Keyboard Settings…**, then **Keyboard Shortcuts → Screenshots**, and turn off the matching macOS shortcuts:
 
 - **Save picture of screen as a file** — `Shift+Command+3`
 - **Save picture of selected area as a file** — `Shift+Command+4`
@@ -309,26 +342,35 @@ To keep the macOS screenshot tool instead, turn off **Use Mysli for screenshots*
 
 All Mysli shortcuts use registered macOS hotkeys instead of a keyboard event tap. The menu lists registration failures for each shortcut; other registered shortcuts remain available. If a shortcut cannot be released, Mysli reports it and retries while running. Opening clipboard history and pasting are separate operations, so automatic paste can still fail in protected fields.
 
-### Screen Recording (required)
-ScreenCaptureKit requires screen recording permission to capture screen content. Meeting Notes also needs it to record the sound your Mac plays.
+### Screen Recording
+
+Screen Recording is required while Screenshots or Meetings is on. It allows screenshots and the Mac audio track of a meeting.
 
 **System Settings → Privacy & Security → Screen Recording** → Enable Mysli
 
-Two macOS quirks to expect: the first capture can require one quit-and-reopen of Mysli before the grant takes effect, and roughly every month macOS makes every screenshot app ask again for screen recording. Neither is something Mysli can turn off.
+macOS can ask you to quit and reopen Mysli before this grant takes effect. If setup is unfinished, Mysli returns to its saved step.
 
 ### Microphone (Meeting Notes)
-Microphone lets Mysli record your side of a meeting. Only Meeting Notes needs it, so the setup window does not open for it at launch. Mysli shows the macOS prompt the first time you choose **Start Recording Meeting**. If you said no, an alert offers **Open Permissions**; there, **Grant** opens the Microphone pane. Until you are asked, the Microphone row shows "–" and **Allow** instead of ❌, because the permission is optional.
+
+Microphone access is required while Meetings is on. It records your voice. **Allow** shows the first prompt; after a refusal, **Grant** opens the Microphone pane. A missing grant opens the Permissions page at launch after setup.
 
 **System Settings → Privacy & Security → Microphone** → Enable Mysli
 
-### Calendar (required)
-Calendar lets Mysli read event titles and times for calendar reminders. Mysli never changes your calendar. Calendar counts as required, so Mysli opens the Permissions page at launch until you allow it. **Allow** on the Calendar row shows the macOS prompt the first time; after a refusal, **Grant** opens the Calendars pane. Allowing Calendar does not turn calendar reminders on. Turn them on with **Calendar reminders** on the Meetings page, which also asks for notification access.
+### Calendar (calendar reminders)
+
+Calendar is required only while calendar reminders are on. It lets Mysli read event titles and times. Mysli never changes your calendar. **Allow** shows the first Calendar prompt; after a refusal, **Grant** opens the Calendars pane. Granting access does not turn reminders on.
 
 **System Settings → Privacy & Security → Calendars** → Enable Mysli (full access)
 
+### Notifications (calendar reminders)
+
+The Notifications row appears while calendar reminders are on. It shows whether Mysli can post reminders when an event starts or ends. **Allow** shows the first prompt; after a refusal, **Grant** opens Notifications in System Settings.
+
+Other tools can ask to show their own completion notifications when you start them. Those notifications do not add a required row.
+
 ## Usage
 
-1. Launch Mysli — it appears as a camera icon in the menu bar
+1. Launch Mysli. Its bowl icon appears in the menu bar. Complete or skip setup on first launch.
 2. Press `Shift+Command+3` to capture the full screen (the screen where your cursor is) — a flash animation confirms the capture
 3. Press `Shift+Command+4` anywhere
 3. Click and drag to select the area you want to capture
@@ -351,11 +393,11 @@ The folder is created automatically if it doesn't exist.
 
 ## Menu Bar Options
 
-The menu has one group for each tool, with the tool's colored icon.
+The menu has one group for each enabled tool, with the tool's colored icon. A tool that is off has no menu group. Use its page in **Settings…** to turn it on again.
 
-- **Screenshots**: **Capture Area** and **Capture Screen** work even when **Use Mysli for screenshots** is off. They show their shortcuts only while Mysli owns them.
-- **Clipboard**: **Show Clipboard History** opens the history panel. It is disabled while clipboard history is off.
-- **Windows**: **Window Tiling** turns the tiling shortcuts on and off. It saves the same preference as the switch in Settings.
+- **Screenshots** has **Capture Area** and **Capture Screen**, with their shortcuts while Mysli owns them.
+- **Clipboard** has **Show Clipboard History**, which opens the history panel.
+- **Windows** has **Window Tiling**, which turns the tiling shortcuts off. It saves the same preference as the switch in Settings.
 - **Keep Awake** keeps the Mac awake for 30 minutes, 1, 2, or 4 hours, or until turned off. **Keep screen on** controls whether the display stays awake too. **Turn Off** ends the session.
 - **Start Recording Meeting** and **Stop Recording Meeting** start and stop a meeting recording. While Mysli records, a line above them shows the recorded time, and "Paused" while the recording is paused. While Mysli makes notes, a line shows the step and how many meetings wait.
 - **Pause Recording** or **Resume Recording**, **Show Meeting Controls**, and **Restore Default Position** appear while a meeting records or is paused.
@@ -372,24 +414,27 @@ Open **Settings…** in the menu to change preferences and find setup or help. T
 
 - **General** has Launch at login.
 - **Screenshots**, **Clipboard**, **Windows**, **Keep Awake**, and **Meetings** each hold the tool's switch and settings, its keyboard shortcuts, and a guide that you can open.
-- **Permissions** shows live access checks, Grant buttons, and screenshot shortcut setup. Mysli opens this page when required access is missing at launch.
+- **Permissions** shows access checks for enabled tools and screenshot shortcut setup while Screenshots is on. After setup, missing required access opens this page at launch.
 - **Help** opens GitHub to report a bug or send feedback. You review the message before sending it.
 
 **Keep screen on** on the Keep Awake page and in the menu is one preference. A change in one place shows in the other.
 
-Command-comma always opens the General page. Opening a page does not change preferences.
+Until setup is finished, **Settings…** and Command-comma return to the saved setup step. After setup, they open General. Opening a page does not change preferences.
 
 | Preference | Default and choices |
 |---|---|
 | Launch at login | Current macOS login-item state. A failed change shows the error and the actual state. |
 | Use Mysli for screenshots | On. Off releases `Shift+Command+3` and `Shift+Command+4` to macOS. |
-| Enable window tiling | On |
-| Record clipboard history | On |
+| Window tiling | On. Off releases its shortcuts and hides its menu group. |
+| Clipboard history | On. Off clears its in-memory history, releases its shortcut, and hides its menu group. |
+| Keep Awake | On. Off ends an active session and hides its menu group. |
+| Keep screen on | On. Keeps the display awake during a Keep Awake session. |
+| Meetings | On. Off hides its menu group and turns calendar reminders off. Active recordings and queued work continue. |
 | Show thumbnail for | 5 seconds. Choices are 3, 5, 15 seconds, and Forever. Existing custom values stay intact until changed. |
 | Meetings folder | `~/Meetings`. Choosing another folder does not move existing meetings. |
 | Summary tool | Automatic tries Antigravity, then Claude Code. Antigravity (agy) and Claude Code (claude) each use only that tool. |
 | Background file | None. Choose an optional file, or Clear the preference without deleting the file. The complete accepted file goes to the selected provider with the transcript. |
-| Calendar recording reminders | Off. Turning it on asks for Calendar and notification access. A line under the switch says what to allow when access is missing. |
+| Calendar reminders | Off. Available while Meetings is on. Turning it on asks for Calendar and notification access. |
 | Teams speaker names | Off. Experimental. Applies from the next recording. |
 
 The summary tool is read when each queued job starts. A running job keeps its choice. Opening Settings does not write preferences.
@@ -402,6 +447,9 @@ Mysli/
 ├── main.swift           # App entry point
 ├── AppDelegate.swift    # Menu bar setup, wires hotkey → overlay → capture → thumbnail → editor
 ├── SettingsWindowController.swift # Native Settings form and actions
+├── Onboarding.swift     # Setup choices, saved progress, and launch destination
+├── OnboardingView.swift # Welcome, tool choices, and access steps
+├── RequiredPermissions.swift # Access needed by enabled tools and reminder choice
 ├── OrdinaryWindowActivation.swift # Shared activation while ordinary windows are open
 ├── HotkeyManager.swift  # Desired shortcuts, feature toggles, retry and wake recovery
 ├── HotkeyShortcut.swift # Shortcut definitions and registration failures
