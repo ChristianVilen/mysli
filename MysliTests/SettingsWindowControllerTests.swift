@@ -71,6 +71,23 @@ final class SettingsWindowControllerTests: XCTestCase {
                      "only CalendarReminderController.setEnabled saves the calendar choice")
     }
 
+    func testToolSwitchesSaveAndReportChoicesAndMeetingsControlsReminders() {
+        var awake: [Bool] = []
+        var meetings: [Bool] = []
+        sut.onKeepAwakeChanged = { awake.append($0) }
+        sut.onMeetingsChanged = { meetings.append($0) }
+        sut.show()
+        sut.keepAwakeEnabled.performClick(nil)
+        sut.meetingsEnabled.performClick(nil)
+        XCTAssertFalse(settings.keepAwakeEnabled)
+        XCTAssertFalse(settings.meetingsEnabled)
+        XCTAssertEqual(awake, [false])
+        XCTAssertEqual(meetings, [false])
+        XCTAssertFalse(sut.calendarReminders.isEnabled)
+        sut.meetingsEnabled.performClick(nil)
+        XCTAssertTrue(sut.calendarReminders.isEnabled)
+    }
+
     func testCalendarStatusSaysWhatTheUserMustDoAndShowsTheSavedChoice() {
         sut.show()
         let shown: [(CalendarReminderController.Status, Bool)] = [
@@ -212,8 +229,8 @@ final class SettingsWindowControllerTests: XCTestCase {
             .screenshots: [sut.screenshotShortcuts, sut.thumbnailDuration] + guides(.screenshots),
             .clipboard: [sut.clipboardHistory] + guides(.clipboard),
             .windows: [sut.windowTiling] + guides(.windows),
-            .keepAwake: [sut.keepScreenOn] + guides(.keepAwake),
-            .meetings: [sut.chooseMeetingsFolder, sut.summaryTool, sut.chooseBackground, sut.clearBackground,
+            .keepAwake: [sut.keepAwakeEnabled, sut.keepScreenOn] + guides(.keepAwake),
+            .meetings: [sut.meetingsEnabled, sut.chooseMeetingsFolder, sut.summaryTool, sut.chooseBackground, sut.clearBackground,
                         sut.calendarReminders, sut.teamsSpeakerNames] + guides(.meetings),
             .permissions: sut.permissionsPage.controls + guides(.permissions),
             .help: sut.helpPage.controls

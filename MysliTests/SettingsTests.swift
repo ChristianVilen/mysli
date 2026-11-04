@@ -94,6 +94,19 @@ final class SettingsTests: XCTestCase {
         XCTAssertFalse(Settings(defaults: defaults, loginItem: loginItem).clipboardHistoryEnabled)
     }
 
+    func testToolSwitchesReadWithoutWritingAndPersistWithTheirKeys() {
+        for (key, property) in [("keepAwakeEnabled", \Settings.keepAwakeEnabled),
+                                ("meetingsEnabled", \Settings.meetingsEnabled)] {
+            XCTAssertTrue(sut[keyPath: property])
+            XCTAssertNil(defaults.object(forKey: key))
+            sut[keyPath: property] = false
+            XCTAssertEqual(defaults.object(forKey: key) as? Bool, false)
+            XCTAssertFalse(Settings(defaults: defaults, loginItem: loginItem)[keyPath: property])
+            sut[keyPath: property] = true
+            XCTAssertEqual(defaults.object(forKey: key) as? Bool, true)
+        }
+    }
+
     func testMeetingsFolderDefaultsToMeetingsInTheHomeFolder() {
         XCTAssertEqual(sut.meetingsFolder.path, NSHomeDirectory() + "/Meetings")
     }

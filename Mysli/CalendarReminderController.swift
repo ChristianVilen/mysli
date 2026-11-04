@@ -67,6 +67,7 @@ final class CalendarReminderController {
     }
 
     func setEnabled(_ enabled: Bool) async {
+        let enabled = enabled && settings.meetingsEnabled
         settings.calendarRecordingRemindersEnabled = enabled
         reset()
         self.enabled = enabled
@@ -87,7 +88,7 @@ final class CalendarReminderController {
 
     func resume() async {
         reset()
-        enabled = settings.calendarRecordingRemindersEnabled
+        enabled = settings.meetingsEnabled && settings.calendarRecordingRemindersEnabled
         guard enabled else { setStatus(.off); return }
         await activate()
     }

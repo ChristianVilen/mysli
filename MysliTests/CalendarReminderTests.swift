@@ -42,6 +42,22 @@ final class CalendarReminderTests: XCTestCase {
                            end: Date(timeIntervalSince1970: 10_000 + end))
     }
 
+    func testMeetingsOffPreventsRemindersAtLaunchAndWhenRequested() async {
+        settings.meetingsEnabled = false
+        settings.calendarRecordingRemindersEnabled = true
+        source.events = [event()]
+        await sut.resume()
+        XCTAssertEqual(sut.status, .off)
+        XCTAssertTrue(notices.added.isEmpty)
+
+        await sut.setEnabled(true)
+        XCTAssertEqual(sut.status, .off)
+        XCTAssertFalse(settings.calendarRecordingRemindersEnabled)
+        XCTAssertTrue(notices.added.isEmpty)
+        XCTAssertEqual(source.prompts, 0)
+        XCTAssertEqual(notices.prompts, 0)
+    }
+
     func testStartArrivesAtBoundaryOnlyOnceAcrossRefreshAndRestart() async {
         source.events = [event(start: 30)]
         await sut.setEnabled(true)

@@ -53,6 +53,16 @@ final class Settings {
         set { defaults.set(newValue, forKey: "clipboardHistoryEnabled") }
     }
 
+    var keepAwakeEnabled: Bool {
+        get { defaults.object(forKey: "keepAwakeEnabled") as? Bool ?? true }
+        set { defaults.set(newValue, forKey: "keepAwakeEnabled") }
+    }
+
+    var meetingsEnabled: Bool {
+        get { defaults.object(forKey: "meetingsEnabled") as? Bool ?? true }
+        set { defaults.set(newValue, forKey: "meetingsEnabled") }
+    }
+
     /// On by default: a dark, locked screen looks like Keep Awake did not work.
     var keepDisplayAwake: Bool {
         get { defaults.object(forKey: "keepDisplayAwake") as? Bool ?? true }

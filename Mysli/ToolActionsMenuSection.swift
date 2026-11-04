@@ -11,6 +11,7 @@ final class ToolActionsMenuSection: NSObject, NSMenuItemValidation, MenuSection 
     private let screenshotsOn: () -> Bool
     private let clipboardOn: () -> Bool
     private let tilingOn: () -> Bool
+    private var groups: [(isEnabled: () -> Bool, items: [NSMenuItem])] = []
     private let captureAreaItem = NSMenuItem(title: "Capture Area", action: #selector(captureArea), keyEquivalent: "")
     private let captureScreenItem = NSMenuItem(title: "Capture Screen", action: #selector(captureScreen), keyEquivalent: "")
     private let clipboardItem = NSMenuItem(title: "Show Clipboard History", action: #selector(showClipboardHistory), keyEquivalent: "")
@@ -25,20 +26,24 @@ final class ToolActionsMenuSection: NSObject, NSMenuItemValidation, MenuSection 
     }
 
     func buildMenuSection(into menu: NSMenu) {
-        let groups: [(MysliTool, [NSMenuItem])] = [
-            (.screenshots, [captureAreaItem, captureScreenItem]),
-            (.clipboard, [clipboardItem]),
-            (.windows, [tilingItem])
+        let tools: [(MysliTool, () -> Bool, [NSMenuItem])] = [
+            (.screenshots, screenshotsOn, [captureAreaItem, captureScreenItem]),
+            (.clipboard, clipboardOn, [clipboardItem]),
+            (.windows, tilingOn, [tilingItem])
         ]
-        for (tool, items) in groups {
-            menu.addItem(.toolHeader(tool))
+        for (tool, isEnabled, actions) in tools {
+            let items = [NSMenuItem.toolHeader(tool)] + actions + [.separator()]
+            groups.append((isEnabled, items))
             items.forEach(menu.addItem)
-            menu.addItem(.separator())
         }
         menuWillOpen()
     }
 
     func menuWillOpen() {
+        for group in groups {
+            let hidden = !group.isEnabled()
+            for item in group.items { item.isHidden = hidden }
+        }
         let screenshots = screenshotsOn()
         show(screenshots ? .captureArea : nil, on: captureAreaItem)
         show(screenshots ? .captureFullScreen : nil, on: captureScreenItem)

@@ -10,6 +10,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     let screenshotShortcuts = NSSwitch()
     let windowTiling = NSSwitch()
     let clipboardHistory = NSSwitch()
+    let keepAwakeEnabled = NSSwitch()
+    let meetingsEnabled = NSSwitch()
     let keepScreenOn = NSSwitch()
     let calendarReminders = NSSwitch()
     let teamsSpeakerNames = NSSwitch()
@@ -49,6 +51,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     var onScreenshotsChanged: ((Bool) -> Void)?
     var onTilingChanged: ((Bool) -> Void)?
     var onClipboardChanged: ((Bool) -> Void)?
+    var onKeepAwakeChanged: ((Bool) -> Void)?
+    var onMeetingsChanged: ((Bool) -> Void)?
     var onKeepScreenOnChanged: ((Bool) -> Void)?
     var onPermissionsVisibilityChanged: ((Bool) -> Void)?
     var onMeetingsFolderChanged: ((URL) -> Void)?
@@ -153,6 +157,9 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         screenshotShortcuts.state = settings.screenshotShortcutsEnabled ? .on : .off
         windowTiling.state = settings.windowTilingEnabled ? .on : .off
         clipboardHistory.state = settings.clipboardHistoryEnabled ? .on : .off
+        keepAwakeEnabled.state = settings.keepAwakeEnabled ? .on : .off
+        meetingsEnabled.state = settings.meetingsEnabled ? .on : .off
+        calendarReminders.isEnabled = settings.meetingsEnabled
         keepScreenOn.state = settings.keepDisplayAwake ? .on : .off
         calendarReminders.state = settings.calendarRecordingRemindersEnabled ? .on : .off
         teamsSpeakerNames.state = settings.teamsSpeakerNamesEnabled ? .on : .off
@@ -183,6 +190,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         for (control, action) in [
             (launchAtLogin, #selector(loginChanged)), (screenshotShortcuts, #selector(screenshotsChanged)),
             (windowTiling, #selector(tilingChanged)), (clipboardHistory, #selector(clipboardChanged)),
+            (keepAwakeEnabled, #selector(keepAwakeChanged)), (meetingsEnabled, #selector(meetingsChanged)),
             (keepScreenOn, #selector(keepScreenOnChanged)), (calendarReminders, #selector(calendarChanged)), (teamsSpeakerNames, #selector(teamsChanged)),
             (chooseMeetingsFolder, #selector(folderClicked)), (chooseBackground, #selector(contextClicked)),
             (clearBackground, #selector(clearClicked)), (thumbnailDuration, #selector(durationChanged)),
@@ -196,6 +204,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         screenshotShortcuts.setAccessibilityLabel("Use Mysli for screenshots")
         windowTiling.setAccessibilityLabel("Enable window tiling")
         clipboardHistory.setAccessibilityLabel("Record clipboard history")
+        keepAwakeEnabled.setAccessibilityLabel("Enable Keep Awake")
+        meetingsEnabled.setAccessibilityLabel("Enable Meetings")
         keepScreenOn.setAccessibilityLabel("Keep screen on")
         calendarReminders.setAccessibilityLabel("Calendar recording reminders")
         teamsSpeakerNames.setAccessibilityLabel("Teams speaker names")
@@ -264,12 +274,15 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
                 SettingsLayout.row("Window tiling", detail: "Move windows with Control + Option.", control: windowTiling)
             ])]),
             .keepAwake: toolPage(.keepAwake, [
-                SettingsLayout.group([SettingsLayout.row("Keep screen on", detail: "The display stays awake too while a session runs.",
+                SettingsLayout.group([
+                    SettingsLayout.row("Keep Awake", control: keepAwakeEnabled),
+                    SettingsLayout.row("Keep screen on", detail: "The display stays awake too while a session runs.",
                                                          control: keepScreenOn)]),
                 note("Start a session from the Mysli menu.")
             ]),
             .meetings: toolPage(.meetings, [
                 SettingsLayout.group([
+                    SettingsLayout.row("Meetings", control: meetingsEnabled),
                     pathRow("Meetings folder", path: folderPath, buttons: [chooseMeetingsFolder]),
                     SettingsLayout.row("Summary tool", control: summaryTool)
                 ]),
@@ -362,8 +375,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         case .screenshots: [screenshotShortcuts, thumbnailDuration]
         case .clipboard: [clipboardHistory]
         case .windows: [windowTiling]
-        case .keepAwake: [keepScreenOn]
-        case .meetings: [chooseMeetingsFolder, summaryTool, chooseBackground, clearBackground, calendarReminders, teamsSpeakerNames]
+        case .keepAwake: [keepAwakeEnabled, keepScreenOn]
+        case .meetings: [meetingsEnabled, chooseMeetingsFolder, summaryTool, chooseBackground, clearBackground, calendarReminders, teamsSpeakerNames]
         case .permissions: permissionsPage.controls
         case .help: helpPage.controls
         }
@@ -398,6 +411,17 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     @objc private func keepScreenOnChanged() {
         settings.keepDisplayAwake = keepScreenOn.state == .on
         onKeepScreenOnChanged?(settings.keepDisplayAwake)
+    }
+
+    @objc private func keepAwakeChanged() {
+        settings.keepAwakeEnabled = keepAwakeEnabled.state == .on
+        onKeepAwakeChanged?(settings.keepAwakeEnabled)
+    }
+
+    @objc private func meetingsChanged() {
+        settings.meetingsEnabled = meetingsEnabled.state == .on
+        calendarReminders.isEnabled = settings.meetingsEnabled
+        onMeetingsChanged?(settings.meetingsEnabled)
     }
 
     @objc private func tilingChanged() {

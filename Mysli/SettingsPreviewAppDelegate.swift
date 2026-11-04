@@ -13,7 +13,9 @@ final class SettingsPreviewAppDelegate: NSObject, NSApplicationDelegate {
         let settings = Settings(defaults: defaults, loginItem: DisabledLoginItem())
         keepAwake = KeepAwakeController(wakeManager: WakeManager(preventer: PreviewSleepPreventer()),
                                         keepDisplayAwake: settings.keepDisplayAwake, notifier: PreviewNotifier())
-        statusMenu = StatusMenu(sections: [keepAwake])
+        statusMenu = StatusMenu(sections: [
+            EnabledMenuSection(keepAwake, isEnabled: { settings.keepAwakeEnabled })
+        ])
         settingsWindow = SettingsWindowController(
             settings: settings, permissionActions: .inert, openURL: { _ in },
             present: present, activation: activation)
@@ -21,6 +23,9 @@ final class SettingsPreviewAppDelegate: NSObject, NSApplicationDelegate {
         statusMenu.onShowSettings = { [weak self] in self?.settingsWindow.show() }
         keepAwake.onDisplayAwakeChanged = { settings.keepDisplayAwake = $0 }
         settingsWindow.onKeepScreenOnChanged = { [keepAwake] in keepAwake.setDisplayAwake($0) }
+        settingsWindow.onKeepAwakeChanged = { [keepAwake] enabled in
+            if !enabled { keepAwake.deactivate() }
+        }
         settingsWindow.renderPermissions(.init(accessibility: true, screenRecording: false, microphone: .notDetermined, calendar: .notDetermined))
     }
 

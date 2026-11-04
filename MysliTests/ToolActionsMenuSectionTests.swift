@@ -68,4 +68,17 @@ final class ToolActionsMenuSectionTests: XCTestCase {
         click(try item("Window Tiling"))
         XCTAssertEqual(asked, [false, true])
     }
+
+    func testDisabledToolsHideTheirWholeGroupAndReturnWhenEnabled() {
+        screenshotsOn = false
+        clipboardOn = false
+        tilingOn = false
+        sut.menuWillOpen()
+        XCTAssertTrue(menu.items.allSatisfy(\.isHidden))
+
+        clipboardOn = true
+        sut.menuWillOpen()
+        XCTAssertEqual(menu.items.filter { !$0.isHidden }.map { $0.isSeparatorItem ? "-" : $0.title },
+                       ["Clipboard", "Show Clipboard History", "-"])
+    }
 }

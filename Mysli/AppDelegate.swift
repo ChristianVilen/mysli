@@ -62,7 +62,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         screenshotsOn: { [unowned self] in settings.screenshotShortcutsEnabled },
         clipboardOn: { [unowned self] in settings.clipboardHistoryEnabled },
         tilingOn: { [unowned self] in settings.windowTilingEnabled })
-    private lazy var statusMenu = StatusMenu(sections: [toolActions, keepAwake, meetingNotes])
+    private lazy var statusMenu = StatusMenu(sections: [
+        toolActions,
+        EnabledMenuSection(keepAwake, isEnabled: { [settings] in settings.keepAwakeEnabled }),
+        EnabledMenuSection(meetingNotes, isEnabled: { [settings] in settings.meetingsEnabled })
+    ])
     private lazy var settingsWindow = SettingsWindowController(settings: settings, permissionActions: .init(
         accessibility: { [weak self] in self?.permissions.requestAccessibility() },
         screenRecording: { [weak self] in self?.permissions.requestScreenRecording() },
@@ -131,7 +135,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if settings.clipboardHistoryEnabled {
             clipboardHistory.enable()
         }
-        meetingNotes.resumeUnfinished()
+        if settings.meetingsEnabled { meetingNotes.resumeUnfinished() }
     }
 
     private func setupCalendarReminders() {
@@ -306,6 +310,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func setupKeepAwake() {
+        settingsWindow.onKeepAwakeChanged = { [weak self] enabled in
+            if !enabled { self?.keepAwake.deactivate() }
+        }
         keepAwake.onStateChange = { [weak self] in self?.updateStatus() }
         keepAwake.onDisplayAwakeChanged = { [weak self] enabled in
             self?.settings.keepDisplayAwake = enabled
@@ -315,6 +322,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func setupMeetingNotes() {
+        settingsWindow.onMeetingsChanged = { [weak self] enabled in
+            guard let self else { return }
+            if enabled {
+                meetingNotes.resumeUnfinished()
+            } else {
+                Task { await self.calendarReminders?.setEnabled(false) }
+            }
+        }
         meetingNotes.onStateChange = { [weak self] in
             self?.updateStatus()
             self?.calendarReminders?.recorderDidChange()
