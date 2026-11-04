@@ -13,9 +13,10 @@ struct PermissionActions {
 
 final class PermissionRowView: NSView {
     let grantButton = NSButton(title: "Grant", target: nil, action: nil)
-    private let statusLabel = NSTextField(labelWithString: "")
+    private let statusIcon = NSImageView()
     private let name: String
     private let grant: () -> Void
+    private var shownStatus: PermissionSnapshot.Status?
 
     init(title: String, explanation: String, grant: @escaping () -> Void) {
         name = title
@@ -28,13 +29,14 @@ final class PermissionRowView: NSView {
         SettingsLayout.add(SettingsLayout.label(explanation, size: 12, secondary: true), to: copy)
         copy.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         copy.setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)
-        statusLabel.setContentHuggingPriority(.required, for: .horizontal)
+        statusIcon.widthAnchor.constraint(equalToConstant: 18).isActive = true
+        statusIcon.heightAnchor.constraint(equalToConstant: 18).isActive = true
         grantButton.target = self
         grantButton.action = #selector(grantClicked)
         grantButton.bezelStyle = .rounded
         grantButton.setContentHuggingPriority(.required, for: .horizontal)
         grantButton.setContentCompressionResistancePriority(.required, for: .horizontal)
-        let row = NSStackView(views: [statusLabel, copy, grantButton])
+        let row = NSStackView(views: [statusIcon, copy, grantButton])
         row.distribution = .fill
         row.alignment = .top
         row.spacing = 10
@@ -45,22 +47,28 @@ final class PermissionRowView: NSView {
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
     func setStatus(_ status: PermissionSnapshot.Status) {
+        guard status != shownStatus else { return }
+        shownStatus = status
         let text: String
+        let symbol: String
         switch status {
         case .granted:
-            statusLabel.stringValue = "✅"
-            grantButton.title = "Granted"
-            text = "Granted"
+            symbol = "checkmark.circle.fill"
+            statusIcon.contentTintColor = .systemGreen
+            grantButton.title = "Allowed"
+            text = "Allowed"
         case .missing:
-            statusLabel.stringValue = "❌"
+            symbol = "xmark.circle"
+            statusIcon.contentTintColor = .systemRed
             grantButton.title = "Grant"
             text = "Not granted"
         case .notAsked:
-            statusLabel.stringValue = "–"
+            symbol = "minus.circle"
+            statusIcon.contentTintColor = .secondaryLabelColor
             grantButton.title = "Allow"
             text = "Not asked yet"
         }
-        statusLabel.setAccessibilityLabel("\(name): \(text)")
+        statusIcon.image = NSImage(systemSymbolName: symbol, accessibilityDescription: "\(name): \(text)")
         grantButton.setAccessibilityLabel("\(grantButton.title) \(name)")
         grantButton.isEnabled = status != .granted
     }
@@ -97,7 +105,12 @@ final class SettingsPermissionsView: NSStackView {
         microphoneRow = PermissionRowView(title: "Microphone", explanation: "Record your voice for meeting notes.", grant: actions.microphone)
         calendarRow = PermissionRowView(title: "Calendar", explanation: "Read event titles and times for calendar reminders. Mysli never changes your calendar.", grant: actions.calendar)
         notificationsRow = PermissionRowView(title: "Notifications", explanation: "Show reminders when a calendar meeting starts or ends.", grant: actions.notifications)
-        permissionGroup = SettingsLayout.group([accessibilityRow, screenRecordingRow, microphoneRow, calendarRow, notificationsRow])
+        permissionGroup = SettingsGlass()
+        let permissionRows = SettingsLayout.stack(spacing: 14)
+        for row in [accessibilityRow, screenRecordingRow, microphoneRow, calendarRow, notificationsRow] {
+            SettingsLayout.add(row, to: permissionRows)
+        }
+        SettingsLayout.fill(permissionRows, in: permissionGroup.content, inset: 10)
         keyboardAction = actions.keyboardSettings
         shortcutGroup = SettingsLayout.group([shortcutText, keyboardSettings])
         super.init(frame: .zero)

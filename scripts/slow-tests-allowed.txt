@@ -3,3 +3,5 @@
 MeetingCombinedPanelTests/testNotesRemainAfterStopAndNoticeExpires() Lays out the real panel through a recording, Stop, the notice, and a resize.
 SettingsWindowControllerTests/testEveryPageKeepsItsControlsInsideTheCompactViewport() Lays out all eight pages of the Mysli window at the smallest window size.
 SettingsWindowControllerTests/testLongPathsStayWithinTheFormAndExposeFullAccessibleValues() Lays out the Meetings page with long paths at two window sizes.
+SettingsPermissionsTests/testShortcutSetupRequiresAVisibleScreenshotConflictAndRunsOnce() Opens the native window for shortcut setup, reveals its guide, and switches pages to check that setup runs once.
+OnboardingWindowTests/testSetupAndNormalPagesShareOneWindowAndPollOnlyOnTheAccessStep() Lays out all three onboarding steps and the normal pages in one native window.

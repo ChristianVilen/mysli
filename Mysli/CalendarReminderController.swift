@@ -50,6 +50,7 @@ final class CalendarReminderController {
     private var recordingLink: RecordingLink?
     private var enabled = false
     private var generation = UUID()
+    private var permissionRequest: UUID?
     private var worker: Task<Void, Never>?
     private var refreshRevision = 0
     private var dirty = false
@@ -73,6 +74,8 @@ final class CalendarReminderController {
         self.enabled = enabled
         guard enabled else { setStatus(.off); return }
         let stamp = generation
+        permissionRequest = stamp
+        defer { if permissionRequest == stamp { permissionRequest = nil } }
         setStatus(.requestingAccess)
         _ = await source.requestAccess()
         guard valid(stamp) else { return }
@@ -83,6 +86,7 @@ final class CalendarReminderController {
         }
         _ = await notifications.requestAccess()
         guard valid(stamp) else { return }
+        permissionRequest = nil
         await activate()
     }
 
@@ -107,7 +111,7 @@ final class CalendarReminderController {
     }
 
     func refresh() async {
-        guard enabled else { return }
+        guard enabled, permissionRequest == nil else { return }
         refreshRevision += 1
         dirty = true
         if let worker { await worker.value; return }
@@ -234,6 +238,7 @@ final class CalendarReminderController {
 
     private func reset() {
         generation = UUID()
+        permissionRequest = nil
         refreshRevision += 1
         dirty = false
         recordingLink = nil

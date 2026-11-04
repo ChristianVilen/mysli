@@ -1,5 +1,15 @@
 enum MysliPermission: CaseIterable {
     case accessibility, screenRecording, microphone, calendar, notifications
+
+    var title: String {
+        switch self {
+        case .accessibility: "Accessibility"
+        case .screenRecording: "Screen Recording"
+        case .microphone: "Microphone"
+        case .calendar: "Calendar"
+        case .notifications: "Notifications"
+        }
+    }
 }
 
 struct RequiredPermissions {

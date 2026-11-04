@@ -76,11 +76,7 @@ final class SettingsPermissionsTests: XCTestCase {
         controller.renderPermissions(.init(accessibility: true, screenRecording: false, microphone: .notDetermined,
                                            calendar: .notDetermined, notifications: .notDetermined))
         let page = controller.permissionsPage
-        XCTAssertEqual(page.accessibilityRow.grantButton.title, "Granted")
         XCTAssertFalse(page.accessibilityRow.grantButton.isEnabled)
-        XCTAssertEqual(page.screenRecordingRow.grantButton.title, "Grant")
-        XCTAssertEqual(page.microphoneRow.grantButton.title, "Allow")
-        XCTAssertEqual(page.calendarRow.grantButton.title, "Allow")
         page.screenRecordingRow.grantButton.performClick(nil)
         page.microphoneRow.grantButton.performClick(nil)
         page.calendarRow.grantButton.performClick(nil)
@@ -90,8 +86,6 @@ final class SettingsPermissionsTests: XCTestCase {
         controller.renderPermissions(.init(accessibility: false, screenRecording: true, microphone: .denied,
                                            calendar: .denied, notifications: .denied))
         page.accessibilityRow.grantButton.performClick(nil)
-        XCTAssertEqual(page.microphoneRow.grantButton.title, "Grant")
-        XCTAssertEqual(page.calendarRow.grantButton.title, "Grant")
         XCTAssertEqual(actions.last, "accessibility")
         controller.renderPermissions(.init(accessibility: true, screenRecording: true, microphone: .granted,
                                            calendar: .full, notifications: .granted))
@@ -138,7 +132,6 @@ final class SettingsPermissionsTests: XCTestCase {
             .init(shortcut: .captureArea, failure: .registrationFailed(-108))
         ]))
         XCTAssertFalse(settings.didShowScreenshotShortcutSetup)
-        controller.show(.permissions)
         XCTAssertTrue(controller.showScreenshotSetupIfNeeded(issues: [
             .init(shortcut: .captureFullScreen, failure: .systemConflict)
         ]))
@@ -149,8 +142,6 @@ final class SettingsPermissionsTests: XCTestCase {
             .init(shortcut: .captureFullScreen, failure: .systemConflict)
         ]))
         XCTAssertEqual(controller.selectedPage, .general)
-        controller.show(.permissions)
-        XCTAssertFalse(controller.permissionsPage.keyboardSettings.isHidden)
     }
 
     func testFailedPresentationDoesNotConsumeShortcutSetup() {

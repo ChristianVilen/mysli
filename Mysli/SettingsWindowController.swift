@@ -25,6 +25,9 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private let folderPath = NSTextField(labelWithString: "")
     private let backgroundPath = NSTextField(labelWithString: "")
     private let settings: Settings
+    private let onboarding: Onboarding?
+    private var settingsContent: NSView?
+    private(set) var onboardingView: OnboardingView?
     private let chooseFolder: Picker
     private let chooseContext: Picker
     private let present: @MainActor (NSWindow) -> Void
@@ -59,6 +62,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     var onCalendarRemindersChanged: ((Bool) -> Void)?
 
     init(settings: Settings,
+         onboarding: Onboarding? = nil,
          permissionActions: PermissionActions = .inert,
          openURL: @escaping (URL) -> Void = { NSWorkspace.shared.open($0) },
          chooseFolder: @escaping Picker = SettingsWindowController.folderPicker,
@@ -67,6 +71,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
          activation: OrdinaryWindowActivation = .shared,
          isWindowVisible: @escaping (NSWindow) -> Bool = { $0.isVisible && !$0.isMiniaturized && !NSApp.isHidden }) {
         self.settings = settings
+        self.onboarding = onboarding
         permissionsPage = SettingsPermissionsView(actions: permissionActions)
         helpPage = SettingsHelpView(openURL: openURL)
         self.chooseFolder = chooseFolder
@@ -82,6 +87,11 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         super.init(window: window)
         window.delegate = self
         buildForm()
+        if let onboarding, !onboarding.isFinished {
+            let view = OnboardingView(model: onboarding, actions: permissionActions)
+            view.onChange = { [weak self] in self?.onboardingChanged() }
+            onboardingView = view
+        }
         refreshPermissionRequirements()
         displayObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification, object: nil, queue: .main
@@ -112,10 +122,27 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         loginError.stringValue = ""
         loginError.isHidden = true
         refresh()
-        selectPage(page)
+        if let onboarding, !onboarding.isFinished {
+            if window?.contentView !== onboardingView { window?.contentView = onboardingView }
+            onboardingView?.render()
+        } else {
+            if window?.contentView !== settingsContent { window?.contentView = settingsContent }
+            selectPage(page)
+        }
         guard let window else { return }
         activation.open(window)
         present(window)
+        if onboarding?.isFinished == false { window.makeFirstResponder(onboardingView?.controls.first) }
+        refreshPermissionsVisibility()
+    }
+
+    private func onboardingChanged() {
+        if onboarding?.isFinished == true {
+            window?.contentView = settingsContent
+            refresh()
+            selectPage(.general)
+            applyDisplayOptions(.current)
+        }
         refreshPermissionsVisibility()
     }
 
@@ -128,7 +155,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     func windowDidDeminiaturize(_ notification: Notification) { refreshPermissionsVisibility() }
 
     private func refreshPermissionsVisibility() {
-        setPermissionsVisible(selectedPage == .permissions && window.map(isWindowVisible) == true)
+        let needsPolling = onboarding?.isFinished == false ? onboarding?.step == .permissions : selectedPage == .permissions
+        setPermissionsVisible(needsPolling && window.map(isWindowVisible) == true)
     }
 
     private func setPermissionsVisible(_ visible: Bool) {
@@ -140,6 +168,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     func renderPermissions(_ snapshot: PermissionSnapshot) {
         refreshPermissionRequirements()
         permissionsPage.render(snapshot)
+        onboardingView?.renderPermissions(snapshot)
     }
 
     private func refreshPermissionRequirements() {
@@ -150,7 +179,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     @discardableResult
     func showScreenshotSetupIfNeeded(issues: [HotkeyRegistrationIssue]) -> Bool {
         let conflicts = issues.filter { $0.shortcut.isScreenshot && $0.failure == .systemConflict }.map(\.shortcut)
-        guard !conflicts.isEmpty, !settings.didShowScreenshotShortcutSetup else { return false }
+        guard onboarding?.isFinished != false, !conflicts.isEmpty, !settings.didShowScreenshotShortcutSetup else { return false }
         permissionsPage.showShortcutConflicts(conflicts)
         show(.permissions)
         // The guidance shows only once, so keep the flag unset while the app is hidden or the window is minimized.
@@ -310,6 +339,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             .help: helpPage
         ]
         let root = SettingsBackground()
+        settingsContent = root
         window?.contentView = root
         let sidebar = SettingsGlass(radius: 16)
         sidebar.translatesAutoresizingMaskIntoConstraints = false

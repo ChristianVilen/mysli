@@ -2,7 +2,7 @@ import Cocoa
 
 /// A tool that the menu and the window group their items by. The square colours are the pieces
 /// of the app icon.
-enum MysliTool: CaseIterable {
+enum MysliTool: String, CaseIterable {
     case screenshots, clipboard, windows, keepAwake, meetings
 
     var title: String {

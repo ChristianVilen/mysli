@@ -67,7 +67,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         EnabledMenuSection(keepAwake, isEnabled: { [settings] in settings.keepAwakeEnabled }),
         EnabledMenuSection(meetingNotes, isEnabled: { [settings] in settings.meetingsEnabled })
     ])
-    private lazy var settingsWindow = SettingsWindowController(settings: settings, permissionActions: .init(
+    private lazy var onboarding = Onboarding(settings: settings, defaults: .standard)
+    private lazy var settingsWindow = SettingsWindowController(settings: settings, onboarding: onboarding, permissionActions: .init(
         accessibility: { [weak self] in self?.permissions.requestAccessibility() },
         screenRecording: { [weak self] in self?.permissions.requestScreenRecording() },
         microphone: { [weak self] in Task { _ = await self?.permissions.requestMicrophone() } },
@@ -138,6 +139,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         SystemNotifier.shared.onCheckWords = { [weak self] in self?.wordReviewWindow.show($0) }
         setupCalendarReminders()
         setupHotkey()
+        onboarding.onApplyChoices = { [weak self] in self?.applyOnboardingChoices($0) }
         setupPermissions()
         if settings.clipboardHistoryEnabled {
             clipboardHistory.enable()
@@ -184,9 +186,27 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         permissionsChanged()
         Task {
             await permissions.refreshNotifications()
-            if !settings.requiredPermissions.allGranted(in: permissions.snapshot) {
-                settingsWindow.show(.permissions)
+            switch onboarding.launchDestination(for: permissions.snapshot) {
+            case .onboarding: settingsWindow.show()
+            case .permissions: settingsWindow.show(.permissions)
+            case .none: break
             }
+        }
+    }
+
+    private func applyOnboardingChoices(_ reminders: Bool) {
+        hotkeyManager.screenshotsEnabled = settings.screenshotShortcutsEnabled
+        hotkeyManager.tilingEnabled = settings.windowTilingEnabled
+        applyClipboardHistory(settings.clipboardHistoryEnabled)
+        if !settings.keepAwakeEnabled { keepAwake.deactivate() }
+        if settings.meetingsEnabled { meetingNotes.resumeUnfinished() }
+        Task {
+            if reminders != settings.calendarRecordingRemindersEnabled {
+                await calendarReminders?.setEnabled(reminders)
+            }
+            permissions.refresh()
+            await permissions.refreshNotifications()
+            permissionsChanged()
         }
     }
 
@@ -261,21 +281,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         clipboardPanel.bindController()
 
         settingsWindow.onClipboardChanged = { [weak self] enabled in
-            guard let self else { return }
-            hotkeyManager.clipboardHistoryEnabled = enabled
-            permissionsChanged()
-            if enabled {
-                clipboardHistory.enable()
-            } else {
-                clipboardHistory.disable()
-                if clipboardPanel.isVisible {
-                    clipboardPanel.dismiss()
-                }
-            }
+            self?.applyClipboardHistory(enabled)
         }
 
         imageStore.onDeletedHash = { [weak self] hash in
             self?.clipboardHistory.removeItem(hash: hash)
+        }
+    }
+
+    private func applyClipboardHistory(_ enabled: Bool) {
+        hotkeyManager.clipboardHistoryEnabled = enabled
+        permissionsChanged()
+        if enabled {
+            clipboardHistory.enable()
+        } else {
+            clipboardHistory.disable()
+            if clipboardPanel.isVisible { clipboardPanel.dismiss() }
         }
     }
 

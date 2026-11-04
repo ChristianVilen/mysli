@@ -303,6 +303,20 @@ final class CalendarReminderTests: XCTestCase {
         XCTAssertTrue(notices.visible.isEmpty)
     }
 
+    func testRefreshDuringCalendarPromptStillRequestsNotificationsAfterAccessIsAllowed() async {
+        source.authorization = .notDetermined
+        var answer: CheckedContinuation<Bool, Never>?
+        source.request = { await withCheckedContinuation { answer = $0 } }
+        let enabling = Task { await self.sut.setEnabled(true) }
+        await waitUntil { answer != nil }
+        await sut.refresh()
+        source.authorization = .full
+        answer?.resume(returning: true)
+        await enabling.value
+        XCTAssertEqual(notices.prompts, 1)
+        XCTAssertEqual(sut.status, .ready)
+    }
+
     func testLateNotificationAddAfterDisableIsRemoved() async {
         source.events = [event()]
         let center = CalendarCenterFake()
