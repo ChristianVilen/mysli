@@ -4,15 +4,17 @@ struct PermissionSnapshot: Equatable {
     let accessibility: Bool
     let screenRecording: Bool
     let microphone: MicrophoneAccess
+    let calendar: CalendarAccess
 }
 
 struct PermissionActions {
     let accessibility: () -> Void
     let screenRecording: () -> Void
     let microphone: () -> Void
+    let calendar: () -> Void
     let keyboardSettings: () -> Void
 
-    static let inert = Self(accessibility: {}, screenRecording: {}, microphone: {}, keyboardSettings: {})
+    static let inert = Self(accessibility: {}, screenRecording: {}, microphone: {}, calendar: {}, keyboardSettings: {})
 }
 
 final class PermissionRowView: NSView {
@@ -78,19 +80,22 @@ final class SettingsPermissionsView: NSStackView {
     let accessibilityRow: PermissionRowView
     let screenRecordingRow: PermissionRowView
     let microphoneRow: PermissionRowView
+    let calendarRow: PermissionRowView
     let keyboardSettings = NSButton(title: "Open Keyboard Settings…", target: nil, action: nil)
     private let shortcutText = SettingsLayout.label("", size: 12)
     private let keyboardAction: () -> Void
     private let shortcutGroup: SettingsGlass
 
     var controls: [NSView] {
-        [accessibilityRow.grantButton, screenRecordingRow.grantButton, microphoneRow.grantButton, keyboardSettings]
+        [accessibilityRow.grantButton, screenRecordingRow.grantButton, microphoneRow.grantButton, calendarRow.grantButton,
+         keyboardSettings]
     }
 
     init(actions: PermissionActions) {
         accessibilityRow = PermissionRowView(title: "Accessibility", explanation: "Move windows and paste items from clipboard history.", grant: actions.accessibility)
         screenRecordingRow = PermissionRowView(title: "Screen Recording", explanation: "Take screenshots and record Mac audio for meeting notes. After you grant access, macOS may ask you to restart Mysli.", grant: actions.screenRecording)
         microphoneRow = PermissionRowView(title: "Microphone", explanation: "Record your voice for meeting notes. This permission is optional until you record a meeting.", grant: actions.microphone)
+        calendarRow = PermissionRowView(title: "Calendar", explanation: "Read event titles and times for calendar reminders. Mysli never changes your calendar. Reminders stay off until you turn them on in Meetings.", grant: actions.calendar)
         keyboardAction = actions.keyboardSettings
         shortcutGroup = SettingsLayout.group([shortcutText, keyboardSettings])
         super.init(frame: .zero)
@@ -98,14 +103,14 @@ final class SettingsPermissionsView: NSStackView {
         alignment = .leading
         spacing = 16
         SettingsLayout.add(SettingsLayout.page(title: "Permissions", subtitle: "Allow access for the features you use. Status updates while this page is open."), to: self)
-        SettingsLayout.add(SettingsLayout.group([accessibilityRow, screenRecordingRow, microphoneRow]), to: self)
+        SettingsLayout.add(SettingsLayout.group([accessibilityRow, screenRecordingRow, microphoneRow, calendarRow]), to: self)
         SettingsLayout.add(SettingsLayout.heading("Screenshot shortcuts", symbol: "keyboard", color: .systemOrange), to: self)
         SettingsLayout.add(shortcutGroup, to: self)
         SettingsLayout.add(SettingsLayout.label("Meeting audio stays on this Mac. To create a summary, Mysli sends the transcript and any selected background file to your chosen AI tool.", size: 12, secondary: true), to: self)
         keyboardSettings.bezelStyle = .rounded
         keyboardSettings.target = self
         keyboardSettings.action = #selector(openKeyboardSettings)
-        render(.init(accessibility: false, screenRecording: false, microphone: .notDetermined))
+        render(.init(accessibility: false, screenRecording: false, microphone: .notDetermined, calendar: .notDetermined))
         showShortcutConflicts([])
     }
 
@@ -118,6 +123,11 @@ final class SettingsPermissionsView: NSStackView {
         case .granted: microphoneRow.setStatus(.granted)
         case .denied: microphoneRow.setStatus(.missing)
         case .notDetermined: microphoneRow.setStatus(.notAsked)
+        }
+        switch snapshot.calendar {
+        case .full: calendarRow.setStatus(.granted)
+        case .denied: calendarRow.setStatus(.missing)
+        case .notDetermined: calendarRow.setStatus(.notAsked)
         }
     }
 

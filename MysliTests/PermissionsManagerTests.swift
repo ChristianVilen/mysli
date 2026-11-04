@@ -34,7 +34,8 @@ final class PermissionsManagerTests: XCTestCase {
         var screenGranted = false
         let sut = PermissionsManager(
             isAccessibilityTrusted: { true },
-            hasScreenCaptureAccess: { screenGranted }
+            hasScreenCaptureAccess: { screenGranted },
+            calendarAccess: { .full }
         )
         sut.refresh()
 
@@ -152,12 +153,42 @@ final class PermissionsManagerTests: XCTestCase {
 
     func testADeniedMicrophoneDoesNotOpenOnboarding() {
         let sut = PermissionsManager(isAccessibilityTrusted: { true }, hasScreenCaptureAccess: { true },
-                                     microphoneAccess: { .denied })
+                                     microphoneAccess: { .denied }, calendarAccess: { .full })
 
         sut.refresh()
 
         XCTAssertEqual(sut.microphone, .denied)
         XCTAssertTrue(sut.allGranted)
+    }
+
+    func testCalendarCountsAsRequiredUntilItIsFullyAllowed() {
+        for (access, granted) in [(CalendarAccess.notDetermined, false), (.denied, false), (.full, true)] {
+            let sut = PermissionsManager(isAccessibilityTrusted: { true }, hasScreenCaptureAccess: { true },
+                                         calendarAccess: { access })
+            sut.refresh()
+            XCTAssertEqual(sut.calendar, access)
+            XCTAssertEqual(sut.allGranted, granted, "\(access)")
+        }
+    }
+
+    func testRequestCalendarAsksOnlyWhenNeverAskedAndThenOpensItsSettingsPane() async {
+        var calendar = CalendarAccess.notDetermined
+        var prompts = 0
+        var opened: [String] = []
+        let sut = PermissionsManager(isAccessibilityTrusted: { true }, hasScreenCaptureAccess: { true },
+                                     calendarAccess: { calendar },
+                                     requestCalendarAccess: { prompts += 1; calendar = .denied; return false },
+                                     openURL: { opened.append($0.absoluteString); return true })
+        sut.refresh()
+
+        await sut.requestCalendar()
+        XCTAssertEqual(prompts, 1)
+        XCTAssertEqual(sut.calendar, .denied)
+        XCTAssertEqual(opened, [])
+
+        await sut.requestCalendar()
+        XCTAssertEqual(prompts, 1, "macOS asks only once")
+        XCTAssertEqual(opened, ["x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_Calendars"])
     }
 
     func testRequestMicrophoneShowsTheSystemPromptWhenNeverAsked() async {

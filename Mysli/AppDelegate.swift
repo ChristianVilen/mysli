@@ -67,8 +67,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         accessibility: { [weak self] in self?.permissions.requestAccessibility() },
         screenRecording: { [weak self] in self?.permissions.requestScreenRecording() },
         microphone: { [weak self] in Task { _ = await self?.permissions.requestMicrophone() } },
+        calendar: { [weak self] in Task { await self?.permissions.requestCalendar() } },
         keyboardSettings: { [weak self] in self?.permissions.openSettings(.keyboardShortcuts) }))
-    private let permissions = PermissionsManager()
+    private lazy var calendarSource = EventKitCalendarSource()
+    private lazy var permissions = PermissionsManager(
+        calendarAccess: { [unowned self] in calendarSource.authorization },
+        requestCalendarAccess: { [unowned self] in await calendarSource.requestAccess() })
     // False until setupPermissions() reads the grants. Hotkey setup calls updateStatus() before that,
     // and grants that were not read yet must not show warnings or open screenshot setup.
     private var permissionHandlingEnabled = false
@@ -132,7 +136,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func setupCalendarReminders() {
         let notifications = CalendarReminderNotifications()
-        let controller = CalendarReminderController(source: EventKitCalendarSource(), notifications: notifications,
+        let controller = CalendarReminderController(source: calendarSource, notifications: notifications,
             recorder: meetingRecorder, driver: CalendarReminderDriver(), settings: settings,
             store: CalendarReminderStore(defaults: .standard))
         SystemNotifier.shared.onCalendarReminder = { [weak controller] action, token in
@@ -173,7 +177,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         updateStatus()
         settingsWindow.renderPermissions(.init(accessibility: permissions.accessibility,
                                                screenRecording: permissions.screenRecording,
-                                               microphone: permissions.microphone))
+                                               microphone: permissions.microphone,
+                                               calendar: permissions.calendar))
+        // A calendar grant from the Permissions page lets reminders that wait for access start.
+        Task { await calendarReminders?.refresh() }
     }
 
     private func showScreenshotSetupIfNeeded() {

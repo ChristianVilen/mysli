@@ -287,7 +287,7 @@ Alternatively, you can use the GUI method:
 
 ## Permissions
 
-Screen Recording lets Mysli take screenshots and record the sound of a call for Meeting Notes. Accessibility lets it move windows and paste from clipboard history. On first launch, a setup window explains these permissions. Grant the permissions for the features you use; each row updates after you allow it in System Settings. Open the window again from **Permissions…** in the menu. A red dot in the bottom-left corner of the menu bar icon means an Accessibility or shortcut problem. An orange dot in that corner means Screen Recording is missing, when no red warning is present.
+Screen Recording lets Mysli take screenshots and record the sound of a call for Meeting Notes. Accessibility lets it move windows and paste from clipboard history. Calendar lets it offer calendar reminders. On first launch, the Permissions page explains these permissions. Grant the permissions for the features you use; each row updates after you allow it in System Settings. Open the page again from **Settings…** in the menu. A red dot in the bottom-left corner of the menu bar icon means an Accessibility or shortcut problem. An orange dot in that corner means Screen Recording is missing, when no red warning is present.
 
 ### Accessibility (window tiling and automatic paste)
 Accessibility lets Mysli move and resize windows and paste items from clipboard history. The optional Teams speaker-name feature also uses it to read meeting UI. Registering the shortcuts does not need this permission.
@@ -320,6 +320,11 @@ Two macOS quirks to expect: the first capture can require one quit-and-reopen of
 Microphone lets Mysli record your side of a meeting. Only Meeting Notes needs it, so the setup window does not open for it at launch. Mysli shows the macOS prompt the first time you choose **Start Recording Meeting**. If you said no, an alert offers **Open Permissions**; there, **Grant** opens the Microphone pane. Until you are asked, the Microphone row shows "–" and **Allow** instead of ❌, because the permission is optional.
 
 **System Settings → Privacy & Security → Microphone** → Enable Mysli
+
+### Calendar (required)
+Calendar lets Mysli read event titles and times for calendar reminders. Mysli never changes your calendar. Calendar counts as required, so Mysli opens the Permissions page at launch until you allow it. **Allow** on the Calendar row shows the macOS prompt the first time; after a refusal, **Grant** opens the Calendars pane. Allowing Calendar does not turn calendar reminders on. Turn them on with **Calendar reminders** on the Meetings page, which also asks for notification access.
+
+**System Settings → Privacy & Security → Calendars** → Enable Mysli (full access)
 
 ## Usage
 

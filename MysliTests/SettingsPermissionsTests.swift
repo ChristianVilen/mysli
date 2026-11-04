@@ -24,6 +24,7 @@ final class SettingsPermissionsTests: XCTestCase {
             permissionActions: .init(accessibility: { self.actions.append("accessibility") },
                                      screenRecording: { self.actions.append("screen") },
                                      microphone: { self.actions.append("microphone") },
+                                     calendar: { self.actions.append("calendar") },
                                      keyboardSettings: { self.actions.append("keyboard") }),
             openURL: { self.actions.append($0.absoluteString) },
             present: { _ in if !self.presentFails { self.visible = true } }, activation: .fake(),
@@ -70,20 +71,26 @@ final class SettingsPermissionsTests: XCTestCase {
 
     func testPermissionRowsRenderAndDispatchOnlyTheirInjectedActions() {
         controller.show(.permissions)
-        controller.renderPermissions(.init(accessibility: true, screenRecording: false, microphone: .notDetermined))
+        controller.renderPermissions(.init(accessibility: true, screenRecording: false, microphone: .notDetermined,
+                                           calendar: .notDetermined))
         let page = controller.permissionsPage
         XCTAssertEqual(page.accessibilityRow.grantButton.title, "Granted")
         XCTAssertFalse(page.accessibilityRow.grantButton.isEnabled)
         XCTAssertEqual(page.screenRecordingRow.grantButton.title, "Grant")
         XCTAssertEqual(page.microphoneRow.grantButton.title, "Allow")
+        XCTAssertEqual(page.calendarRow.grantButton.title, "Allow")
         page.screenRecordingRow.grantButton.performClick(nil)
         page.microphoneRow.grantButton.performClick(nil)
+        page.calendarRow.grantButton.performClick(nil)
         page.keyboardSettings.performClick(nil)
-        XCTAssertEqual(actions, ["screen", "microphone", "keyboard"])
-        controller.renderPermissions(.init(accessibility: false, screenRecording: true, microphone: .denied))
+        XCTAssertEqual(actions, ["screen", "microphone", "calendar", "keyboard"])
+        controller.renderPermissions(.init(accessibility: false, screenRecording: true, microphone: .denied, calendar: .denied))
         page.accessibilityRow.grantButton.performClick(nil)
         XCTAssertEqual(page.microphoneRow.grantButton.title, "Grant")
+        XCTAssertEqual(page.calendarRow.grantButton.title, "Grant")
         XCTAssertEqual(actions.last, "accessibility")
+        controller.renderPermissions(.init(accessibility: true, screenRecording: true, microphone: .granted, calendar: .full))
+        XCTAssertFalse(page.calendarRow.grantButton.isEnabled)
     }
 
     func testShortcutSetupRequiresAVisibleScreenshotConflictAndRunsOnce() {

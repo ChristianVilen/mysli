@@ -6,6 +6,7 @@ enum SettingsPane {
     case accessibility
     case screenCapture
     case microphone
+    case calendars
     case keyboardShortcuts
 
     private var anchor: String {
@@ -13,6 +14,7 @@ enum SettingsPane {
         case .accessibility: return "Privacy_Accessibility"
         case .screenCapture: return "Privacy_ScreenCapture"
         case .microphone: return "Privacy_Microphone"
+        case .calendars: return "Privacy_Calendars"
         case .keyboardShortcuts: return "Shortcuts"
         }
     }
@@ -50,7 +52,8 @@ enum MicrophoneAccess: Equatable {
 
 /// Single source of truth for the permissions Mysli needs: Accessibility
 /// (window moves for tiling and synthetic clipboard paste), Screen
-/// Recording (ScreenCaptureKit capture) and Microphone (Meeting Notes only).
+/// Recording (ScreenCaptureKit capture), Microphone (Meeting Notes only) and
+/// Calendar (calendar reminders).
 ///
 /// macOS offers no callback when the user grants a permission in System
 /// Settings, so status is re-read either on demand (`refresh()`) or on a
@@ -64,6 +67,7 @@ final class PermissionsManager {
     private(set) var accessibility = false
     private(set) var screenRecording = false
     private(set) var microphone = MicrophoneAccess.notDetermined
+    private(set) var calendar = CalendarAccess.notDetermined
 
     /// Fired after `refresh()` whenever any status changed.
     var onChange: (@MainActor () -> Void)?
@@ -72,23 +76,29 @@ final class PermissionsManager {
     private let hasScreenCaptureAccess: () -> Bool
     private let microphoneAccess: () -> MicrophoneAccess
     private let requestMicrophoneAccess: @MainActor () async -> Bool
+    private let calendarAccess: () -> CalendarAccess
+    private let requestCalendarAccess: @MainActor () async -> Bool
     private let openURL: (URL) -> Bool
     private let showAccessibilityPrompt: () -> Void
     private let defaults: UserDefaults
     private let pollInterval: TimeInterval
     private var timer: Timer?
 
-    /// Leaves out Microphone on purpose: launch opens the Permissions page when this is false,
-    /// and people who never record a meeting must not get that page for Microphone.
-    var allGranted: Bool { accessibility && screenRecording }
+    /// Launch opens the Permissions page when this is false. It leaves out Microphone on purpose:
+    /// people who never record a meeting must not get that page for Microphone. Calendar counts
+    /// (decided by the user, 2026-11-04), although calendar reminders stay off until turned on.
+    var allGranted: Bool { accessibility && screenRecording && calendar == .full }
 
     /// The probes, the opener and the prompt default to the real system
-    /// calls; tests inject stand-ins.
+    /// calls; tests inject stand-ins. The calendar probes are the exception: the app
+    /// passes its one `EventKitCalendarSource`, and the defaults never touch EventKit.
     init(
         isAccessibilityTrusted: @escaping () -> Bool = { AXIsProcessTrusted() },
         hasScreenCaptureAccess: @escaping () -> Bool = { CGPreflightScreenCaptureAccess() },
         microphoneAccess: @escaping () -> MicrophoneAccess = { MicrophoneAccess(AVCaptureDevice.authorizationStatus(for: .audio)) },
         requestMicrophoneAccess: @escaping @MainActor () async -> Bool = { await AVCaptureDevice.requestAccess(for: .audio) },
+        calendarAccess: @escaping () -> CalendarAccess = { .notDetermined },
+        requestCalendarAccess: @escaping @MainActor () async -> Bool = { false },
         openURL: @escaping (URL) -> Bool = { NSWorkspace.shared.open($0) },
         showAccessibilityPrompt: @escaping () -> Void = {
             _ = AXIsProcessTrustedWithOptions(
@@ -102,6 +112,8 @@ final class PermissionsManager {
         self.hasScreenCaptureAccess = hasScreenCaptureAccess
         self.microphoneAccess = microphoneAccess
         self.requestMicrophoneAccess = requestMicrophoneAccess
+        self.calendarAccess = calendarAccess
+        self.requestCalendarAccess = requestCalendarAccess
         self.openURL = openURL
         self.showAccessibilityPrompt = showAccessibilityPrompt
         self.defaults = defaults
@@ -113,11 +125,27 @@ final class PermissionsManager {
         let ax = isAccessibilityTrusted()
         let screen = hasScreenCaptureAccess()
         let mic = microphoneAccess()
-        guard ax != accessibility || screen != screenRecording || mic != microphone else { return }
+        let cal = calendarAccess()
+        guard ax != accessibility || screen != screenRecording || mic != microphone || cal != calendar else { return }
         accessibility = ax
         screenRecording = screen
         microphone = mic
+        calendar = cal
         onChange?()
+    }
+
+    /// Asks macOS for calendar access when it never asked; macOS asks only once, so after a
+    /// refusal this opens the Calendars pane instead. Calendar reminders stay as they are.
+    func requestCalendar() async {
+        switch calendar {
+        case .full:
+            return
+        case .denied:
+            openSettings(.calendars)
+        case .notDetermined:
+            _ = await requestCalendarAccess()
+            refresh()
+        }
     }
 
     /// Open the Accessibility pane, and show the system prompt on the first
