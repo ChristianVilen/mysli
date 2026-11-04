@@ -83,8 +83,8 @@ final class MeetingTranscriptDrawer: NSView {
         if let chip, chip != behindLabel.stringValue { behindLabel.stringValue = chip }
     }
 
-    /// `keepScrollPosition` holds the transcript still while the user writes notes below it.
-    func showRows(_ newRows: [LiveRow], keepScrollPosition: Bool = false) {
+    /// Follows new rows also while the user types notes. Only a scroll up or a selection stops it.
+    func showRows(_ newRows: [LiveRow]) {
         guard newRows != transcript.rows else { return }
         let oldCount = transcript.rows.count
         let shown = transcriptView.string
@@ -99,7 +99,7 @@ final class MeetingTranscriptDrawer: NSView {
             sizeTranscript()
             if selection.length > 0 { follow.scrolled(lastRowVisible: false) }
             follow.rowsChanged(from: oldCount, to: newRows.count)
-            if follow.isFollowing && !keepScrollPosition {
+            if follow.isFollowing {
                 scrollToEnd(animated: false)
             } else {
                 scrollView.contentView.scroll(to: scrollOrigin)

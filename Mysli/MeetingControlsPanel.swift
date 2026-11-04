@@ -203,7 +203,7 @@ final class MeetingControlsPanel: FloatingPanel, MeetingNotesSlot {
             render(shape)
             relayout(shape, animated: !isAppearing && !displayOptions().reduceMotion)
         }
-        drawer.showRows(preview?.rows ?? [], keepScrollPosition: notesHaveKeyboard)
+        drawer.showRows(preview?.rows ?? [])
         if !drawer.isHidden, !wasOpen { drawer.opened() }
         if isAppearing { appear() }
     }
@@ -218,11 +218,6 @@ final class MeetingControlsPanel: FloatingPanel, MeetingNotesSlot {
             if isRecording { return notesView == nil ? .transcript : .transcriptAndNotes }
             return notesView == nil || status == .starting ? .none : .notesOnly
         }
-    }
-
-    private var notesHaveKeyboard: Bool {
-        guard let notesView, let responder = firstResponder as? NSView else { return false }
-        return responder.isDescendant(of: notesView)
     }
 
     private func renderTime(_ recorded: TimeInterval?) {
