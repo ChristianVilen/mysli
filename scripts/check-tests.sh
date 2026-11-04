@@ -17,8 +17,8 @@ failed=0
 
 result=${1:-}
 if [ -z "$result" ]; then
-    project="$PWD/KuKa.xcodeproj"
-    for info in ~/Library/Developer/Xcode/DerivedData/KuKa-*/info.plist; do
+    project="$PWD/Mysli.xcodeproj"
+    for info in ~/Library/Developer/Xcode/DerivedData/Mysli-*/info.plist; do
         if [ "$(/usr/libexec/PlistBuddy -c 'Print :WorkspacePath' "$info" 2>/dev/null)" = "$project" ]; then
             result=$(/bin/ls -dt "$(dirname "$info")"/Logs/Test/*.xcresult 2>/dev/null | head -1)
         fi

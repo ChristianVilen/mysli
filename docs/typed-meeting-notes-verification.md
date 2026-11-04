@@ -34,9 +34,9 @@ Create one temporary directory and run the full suite from the repository root.
 
 ```sh
 task_output=$(mktemp -d "${TMPDIR:-/tmp}/codex-task-XXXXXX")
-xcodebuild -project KuKa.xcodeproj -scheme KuKa \
+xcodebuild -project Mysli.xcodeproj -scheme Mysli \
   -destination 'platform=macOS' -derivedDataPath "$task_output/build" \
-  test -only-testing:KuKaTests
+  test -only-testing:MysliTests
 ```
 
 Use the same directory for native tests and images.
@@ -57,6 +57,6 @@ rm -rf "$task_output"
 
 ## Limits
 
-No real recording, permission prompt, model load, or real summary-provider call was used. The tests verify the provider input and invocation, not the provider's response quality. The notes lock coordinates Ku-Ka processes. An outside editor can still change `notes.md` between the read-before-write comparison and the atomic replacement.
+No real recording, permission prompt, model load, or real summary-provider call was used. The tests verify the provider input and invocation, not the provider's response quality. The notes lock coordinates Mysli processes. An outside editor can still change `notes.md` between the read-before-write comparison and the atomic replacement.
 
 Xcode prints existing CoreDevice/CoreSimulator version warnings and Swift actor warnings in Settings code on this Mac. They did not prevent the native macOS tests from running.

@@ -1,16 +1,16 @@
 ---
 // Honest differences only — no all-tick marketing column.
 const rows = [
-	{ what: "Where files land", macos: "Desktop, by default", kuka: "~/Screenshots/, timestamped" },
-	{ what: "Clipboard", macos: "hold ⌃ while capturing", kuka: "copied every time" },
-	{ what: "Thumbnails", macos: "one, briefly", kuka: "a stack of five; combine into one image" },
+	{ what: "Where files land", macos: "Desktop, by default", mysli: "~/Screenshots/, timestamped" },
+	{ what: "Clipboard", macos: "hold ⌃ while capturing", mysli: "copied every time" },
+	{ what: "Thumbnails", macos: "one, briefly", mysli: "a stack of five; combine into one image" },
 	{
 		what: "After the shot",
 		macos: "Markup toolbar",
-		kuka: "freehand draw, crop, or delete + clear clipboard",
+		mysli: "freehand draw, crop, or delete + clear clipboard",
 	},
-	{ what: "Multi-monitor", macos: "active display", kuka: "every screen dims; your cursor picks" },
-	{ what: "Beyond capture", macos: "—", kuka: "tiling hotkeys, keep-awake timer" },
+	{ what: "Multi-monitor", macos: "active display", mysli: "every screen dims; your cursor picks" },
+	{ what: "Beyond capture", macos: "—", mysli: "tiling hotkeys, keep-awake timer" },
 ];
 ---
 <section class="px-6 py-20">
@@ -19,7 +19,7 @@ const rows = [
       Same shortcuts you already press.
     </h2>
     <p class="mt-4 max-w-[55ch] text-neutral">
-      Ku-Ka takes over <kbd>⇧⌘3</kbd> and <kbd>⇧⌘4</kbd>, so there's nothing
+      Mysli takes over <kbd>⇧⌘3</kbd> and <kbd>⇧⌘4</kbd>, so there's nothing
       new to learn. The differences start after the keypress.
     </p>
 
@@ -29,7 +29,7 @@ const rows = [
           <tr>
             <th class="w-[24%] pb-3 pr-4"><span class="sr-only">Difference</span></th>
             <th scope="col" class="mono-label w-[34%] pb-3 pr-4 font-medium">Built-in ⇧⌘4</th>
-            <th scope="col" class="mono-label pb-3 font-medium text-accent!">Ku-Ka</th>
+            <th scope="col" class="mono-label pb-3 font-medium text-accent!">Mysli</th>
           </tr>
         </thead>
         <tbody>
@@ -37,7 +37,7 @@ const rows = [
             <tr class="border-t border-rule">
               <th scope="row" class="py-3.5 pr-4 align-top font-display text-base font-medium text-ink">{r.what}</th>
               <td class="py-3.5 pr-4 align-top text-muted">{r.macos}</td>
-              <td class="py-3.5 align-top text-neutral">{r.kuka}</td>
+              <td class="py-3.5 align-top text-neutral">{r.mysli}</td>
             </tr>
           ))}
         </tbody>

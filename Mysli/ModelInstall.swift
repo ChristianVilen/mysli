@@ -1,0 +1,63 @@
+import Foundation
+
+/// `<name>/` exists only when the model is complete: that is the only install
+/// state. A download writes `.<name>.partial/`, which the next download
+/// continues in, and holds `.lock`, because the hub downloader appends to
+/// fixed `.incomplete` paths that two Mysli processes would corrupt.
+struct ModelInstall {
+    let root: URL
+    let name: String
+    let label: String
+    /// How long `install` waits while another Mysli holds the lock.
+    var lockWait: Duration = .zero
+    var lockRetryInterval: Duration = .milliseconds(250)
+
+    var folder: URL { root.appendingPathComponent(name, isDirectory: true) }
+    private var partial: URL { root.appendingPathComponent(".\(name).partial", isDirectory: true) }
+
+    var isInstalled: Bool { FileManager.default.fileExists(atPath: folder.path) }
+
+    /// Calls `download` only while this Mysli holds the lock and the model is
+    /// still missing. A failed or cancelled `download` keeps the partial folder.
+    @concurrent
+    func install(using download: (URL) async throws -> Void) async throws {
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        excludeFromBackup()
+        guard let lock = try await acquireLock() else { return }
+        defer { lock.release() }
+        // Another Mysli can install the model and release the lock before this one gets it.
+        guard !isInstalled else { return }
+        try await download(partial)
+        try FileManager.default.moveItem(at: partial, to: folder)
+    }
+
+    /// Nil if another Mysli installed the model while holding the lock.
+    private func acquireLock() async throws -> FileLock? {
+        let clock = ContinuousClock()
+        let deadline = clock.now + lockWait
+        while true {
+            do {
+                return try FileLock.acquire(at: root.appendingPathComponent(".lock"))
+            } catch FileLockError.held {
+                if isInstalled { return nil }
+                guard clock.now < deadline else {
+                    throw MeetingStepError("Another Mysli is downloading the \(label) model.")
+                }
+                try await Task.sleep(for: lockRetryInterval)
+            } catch FileLockError.failed(let reason) {
+                throw MeetingStepError("Mysli could not lock the \(label) models folder \(root.path): \(reason).")
+            }
+        }
+    }
+
+    func excludeFromBackup() {
+        var folder = root
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        do {
+            try folder.setResourceValues(values)
+        } catch {
+            Log.meeting.error("Could not exclude the \(label, privacy: .public) model cache from backups (code \((error as NSError).code)): \(error.localizedDescription)")
+        }
+    }
+}

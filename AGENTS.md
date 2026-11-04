@@ -1,14 +1,14 @@
-# Ku-Ka
+# Mysli
 
-Ku-Ka (kuvakaappaus) is a macOS menu bar app. It takes screenshots, keeps the Mac awake, tiles windows, keeps a clipboard history, and records meetings into local transcripts and AI summaries. `README.md` describes how to use it, `CONTEXT.md` defines the terms, and `docs/superpowers/specs/` holds the feature designs. For behavior, read the code, its comments, and its tests.
+Mysli is a macOS menu bar app. It takes screenshots, keeps the Mac awake, tiles windows, keeps a clipboard history, and records meetings into local transcripts and AI summaries. `README.md` describes how to use it, `CONTEXT.md` defines the terms, and `docs/superpowers/specs/` holds the feature designs. For behavior, read the code, its comments, and its tests.
 
 Keep this file short. Add a rule only when an agent would break it without being told. Do not describe code. A trap that belongs to one place in the code goes in a comment at that place.
 
 ## Build and run
 
-- Build with `xcodebuild -project KuKa.xcodeproj -scheme KuKa build`, and test with the `test` action. The project uses the Swift 6.2 compiler in Swift 5 language mode, for macOS 26.0 or later.
-- Keep the `-enable-upcoming-feature IsolatedDefaultValues` flag of the KuKa target until the project moves to Swift 6 mode.
-- Xcode compiles every file in `KuKa/` and `KuKaTests/`, because they are synchronized folders. Never edit `KuKa.xcodeproj/project.pbxproj` to add or remove a file. To keep a file out of the build, put it outside these folders.
+- Build with `xcodebuild -project Mysli.xcodeproj -scheme Mysli build`, and test with the `test` action. The project uses the Swift 6.2 compiler in Swift 5 language mode, for macOS 26.0 or later.
+- Keep the `-enable-upcoming-feature IsolatedDefaultValues` flag of the Mysli target until the project moves to Swift 6 mode.
+- Xcode compiles every file in `Mysli/` and `MysliTests/`, because they are synchronized folders. Never edit `Mysli.xcodeproj/project.pbxproj` to add or remove a file. To keep a file out of the build, put it outside these folders.
 - `argmax-oss-swift`, pinned to exactly 1.1.1, is the only package. Only `WhisperKitTranscriber.swift`, `SpeakerKitRoomLabeller.swift`, and their tests import WhisperKit or SpeakerKit.
 - Run a build that tests capture from a folder outside `/private/tmp`. macOS does not add an app in `/private/tmp` to the Screen Recording list.
 - Create worktrees with `workmux add <branch>`, and remove them with `workmux remove` or `workmux merge`. Do not create worktrees in `.claude/worktrees/`, and do not use the worktree option of an agent tool.
@@ -22,12 +22,12 @@ Keep this file short. Add a rule only when an agent would break it without being
 - Make `setUp` and `tearDown` sync when they await nothing. In this test host, an `async` one costs 0.1 to 0.2 s for each test.
 - XCTest starts a passive host that never constructs `AppDelegate`, and `--uitesting` starts the isolated `SettingsPreviewAppDelegate`. `AppDelegate` has no test-mode branches.
 - Tests use fakes, temporary folders, and isolated defaults. They never use real capture, EventKit, Teams Accessibility, notification delivery, permission prompts, model downloads, the log folder, or `~/Meetings`. The calendar source `"synthetic"` is for tests only.
-- The `Real*Tests` classes and the picture writers (`KUKA_*_SNAPSHOTS`) are opt-in. They skip unless their variables are set, and the comment above each one gives its command. xcodebuild passes a variable to the tests only with the `TEST_RUNNER_` prefix.
+- The `Real*Tests` classes and the picture writers (`MYSLI_*_SNAPSHOTS`) are opt-in. They skip unless their variables are set, and the comment above each one gives its command. xcodebuild passes a variable to the tests only with the `TEST_RUNNER_` prefix.
 - Unit tests and pictures do not prove that capture, tiling, paste, keyboard use, sheets, or VoiceOver work in the real app. Report those checks as not done.
 
 ## App-wide rules
 
-- Show every ordinary window through `OrdinaryWindowActivation`, so Ku-Ka stays a regular app until the last one closes.
+- Show every ordinary window through `OrdinaryWindowActivation`, so Mysli stays a regular app until the last one closes.
 - Key equivalents come only from `StatusMenu.applicationMenu()`. No window handles one itself.
 - Launch, opening a window, and a refresh never write a preference. Only a user action writes one.
 - Post every notification through `Notifying`. `SystemNotifier` is the only notification delegate. Ask for notification permission only when the user starts something that notifies.
@@ -72,7 +72,7 @@ Keep this file short. Add a rule only when an agent would break it without being
 ## Known words and word review
 
 - `transcript.md` is always made again from `.transcript-as-heard.md`, never patched. So Update Notes replaces hand edits in `transcript.md` (decided by the user, 2026-10-29).
-- Read the known-words list at each use, and never cache it. Ku-Ka only inserts lines. It never changes or removes a line.
+- Read the known-words list at each use, and never cache it. Mysli only inserts lines. It never changes or removes a line.
 - An answer is only a line in the list. It closes the same question in every meeting, and each of those meetings offers Update Notes (decided by the user, 2026-10-29).
 - Update Notes asks no new questions. Only the review window writes `review-skipped.json`, after `summary.md` exists, so a skip needs no folder lock.
 - An answer for a person, a company, or a product always gets ✓. Only term and other answers go through the spell check (decided by the user, 2026-10-29).
@@ -80,7 +80,7 @@ Keep this file short. Add a rule only when an agent would break it without being
 ## Teams speaker names
 
 - Nobody has checked Teams names in a real call. They are best effort, approved by the user on 2026-10-29. Fake trees prove the policy only. Run the real probe only after the user confirms a call.
-- Ku-Ka only reads the Teams Accessibility tree. Never write attributes, perform actions, or ask for permission. Missing permission never stops a recording. Never guess a name from chat, a roster, or nearby text.
+- Mysli only reads the Teams Accessibility tree. Never write attributes, perform actions, or ask for permission. Missing permission never stops a recording. Never guess a name from chat, a roster, or nearby text.
 - Only validated final names reach the transcript and the summary tool. Never save AX trees, observations, rosters, or voice profiles.
 - A Teams name alone never makes someone an action owner. Keep the evidence rule and `Unclear`. Never split or stretch a segment without word times.
 

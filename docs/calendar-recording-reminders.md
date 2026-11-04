@@ -12,7 +12,7 @@ Read `controller.status` and assign `controller.onStatusChange: (() -> Void)?` t
 
 Only `setEnabled(true) async` requests Calendar and notification access. `resume() async` restores the saved preference without prompting. `refresh() async` rechecks grants and events. Settings can call it when its window opens or returns from System Settings. The driver also checks every 60 seconds. Denied Calendar access requires a grant in System Settings. Enable does not repeat a denied Calendar prompt.
 
-Suggested explanation text is "Calendar events offer recording reminders. Ku-Ka never starts or stops recording automatically." The Settings window's **Calendar reminders** switch ([#43](https://github.com/ChristianVilen/ku-ka/issues/43)) uses this explanation and follows this contract. `AppDelegate` awaits `setEnabled(_:)` for the switch, shows each status change in the window, and calls `refresh()` when Settings opens.
+Suggested explanation text is "Calendar events offer recording reminders. Mysli never starts or stops recording automatically." The Settings window's **Calendar reminders** switch ([#43](https://github.com/ChristianVilen/mysli/issues/43)) uses this explanation and follows this contract. `AppDelegate` awaits `setEnabled(_:)` for the switch, shows each status change in the window, and calls `refresh()` when Settings opens.
 
 ## Ownership and shared files
 
@@ -38,7 +38,7 @@ Within one source lifetime, an external identifier can preserve identity across 
 
 `CalendarEventFields` requires an explicit provider source. Native mapping supplies `calendar.source.sourceIdentifier`. Only test fixtures use `"synthetic"`.
 
-Provider identity changes after restart, a cache reset beyond 4,096 observed identities, and detached events moved outside both exact-read windows can lose the association. A series that still resolves under its old identifier can prevent a detached alias from moving. These cases fail closed. They can miss a reminder or treat a changed identifier as a new occurrence. Ku-Ka cannot prove identity across a full provider resync. Provider sync delays can also delay edits. The app must be running. A long sleep can miss starts outside the two-minute grace period.
+Provider identity changes after restart, a cache reset beyond 4,096 observed identities, and detached events moved outside both exact-read windows can lose the association. A series that still resolves under its old identifier can prevent a detached alias from moving. These cases fail closed. They can miss a reminder or treat a changed identifier as a new occurrence. Mysli cannot prove identity across a full provider resync. Provider sync delays can also delay edits. The app must be running. A long sleep can miss starts outside the two-minute grace period.
 
 Accepted Start fixes the normalized title for that recording and its documents. End-time changes move the end offer. Continue suppresses later end offers for that session. Recording remains manual if its association becomes unsafe.
 

@@ -35,12 +35,12 @@ Create one task output directory, then run the complete suite with optional nati
 
 ```sh
 task_output=$(mktemp -d "${TMPDIR:-/tmp}/codex-task-XXXXXX")
-TEST_RUNNER_KUKA_COMBINED_SNAPSHOTS="$task_output/combined" \
-TEST_RUNNER_KUKA_TYPED_NOTES_SNAPSHOTS="$task_output/notes" \
-TEST_RUNNER_KUKA_PANEL_SNAPSHOTS="$task_output/panel" \
-xcodebuild -quiet -project KuKa.xcodeproj -scheme KuKa \
+TEST_RUNNER_MYSLI_COMBINED_SNAPSHOTS="$task_output/combined" \
+TEST_RUNNER_MYSLI_TYPED_NOTES_SNAPSHOTS="$task_output/notes" \
+TEST_RUNNER_MYSLI_PANEL_SNAPSHOTS="$task_output/panel" \
+xcodebuild -quiet -project Mysli.xcodeproj -scheme Mysli \
   -destination 'platform=macOS' -derivedDataPath "$task_output/build" \
-  test -only-testing:KuKaTests
+  test -only-testing:MysliTests
 ```
 
 Inspect the native images and the Xcode result bundle. After all commands finish, remove only this task's output directory.

@@ -6,16 +6,16 @@ const cmdBlock = (label: string, lines: string[]) =>
 
 const items = [
 	{
-		q: "Ku-Ka won't open.",
-		a: `Ku-Ka is unsigned, so Gatekeeper blocks the first launch. Clear the quarantine flag:${cmdBlock("Terminal", ["sudo xattr -d com.apple.quarantine /Applications/Ku-Ka.app"])}<p class="mt-3">Or go to <strong>System Settings → Privacy &amp; Security</strong> and click <strong>"Open Anyway"</strong>.</p>`,
+		q: "Mysli won't open.",
+		a: `Mysli is unsigned, so Gatekeeper blocks the first launch. Clear the quarantine flag:${cmdBlock("Terminal", ["sudo xattr -d com.apple.quarantine /Applications/Mysli.app"])}<p class="mt-3">Or go to <strong>System Settings → Privacy &amp; Security</strong> and click <strong>"Open Anyway"</strong>.</p>`,
 	},
 	{
 		q: "The shortcut does nothing.",
-		a: `Ku-Ka needs <strong>Accessibility</strong> permission to intercept <code>⇧⌘4</code> — the same permission also powers window tiling. Go to <strong>System Settings → Privacy &amp; Security → Accessibility</strong>, enable Ku-Ka, then restart it from the menu bar.`,
+		a: `Mysli needs <strong>Accessibility</strong> permission to intercept <code>⇧⌘4</code> — the same permission also powers window tiling. Go to <strong>System Settings → Privacy &amp; Security → Accessibility</strong>, enable Mysli, then restart it from the menu bar.`,
 	},
 	{
 		q: "Captures come out black, or fail.",
-		a: `That's the <strong>Screen Recording</strong> permission. Go to <strong>System Settings → Privacy &amp; Security → Screen Recording</strong>, enable Ku-Ka, and capture again.`,
+		a: `That's the <strong>Screen Recording</strong> permission. Go to <strong>System Settings → Privacy &amp; Security → Screen Recording</strong>, enable Mysli, and capture again.`,
 	},
 	{
 		q: "Screenshots aren't saving.",
@@ -23,7 +23,7 @@ const items = [
 	},
 	{
 		q: "⌃⌥ keys stopped working in another app.",
-		a: `While Window Tiling is on, Ku-Ka takes <code>⌃⌥←/→/↩</code> globally, even in apps that use those keys themselves. Untick <strong>Window Tiling</strong> in the menu bar menu to give them back; Ku-Ka remembers the choice across restarts.`,
+		a: `While Window Tiling is on, Mysli takes <code>⌃⌥←/→/↩</code> globally, even in apps that use those keys themselves. Untick <strong>Window Tiling</strong> in the menu bar menu to give them back; Mysli remembers the choice across restarts.`,
 	},
 	{
 		q: "The Mac still sleeps with Keep Awake on.",
@@ -34,8 +34,8 @@ const items = [
 		a: `Some apps refuse to let anything move their windows through the Accessibility API, so the hotkey silently does nothing. With more than one display, the window tiles on the screen it overlaps the most, so check the other display before assuming it didn't work.`,
 	},
 	{
-		q: "A permission looks granted, but Ku-Ka still doesn't work.",
-		a: `Reset both permissions so you can grant them again from scratch. These commands <strong>remove</strong> Ku-Ka from the permission lists:${cmdBlock("Terminal", ["tccutil reset Accessibility com.christianvilen.Ku-Ka", "tccutil reset ScreenCapture com.christianvilen.Ku-Ka"])}<p class="mt-3">Then re-enable Accessibility and Screen Recording in System Settings and restart Ku-Ka.</p>`,
+		q: "A permission looks granted, but Mysli still doesn't work.",
+		a: `Reset both permissions so you can grant them again from scratch. These commands <strong>remove</strong> Mysli from the permission lists:${cmdBlock("Terminal", ["tccutil reset Accessibility io.github.christianvilen.mysli", "tccutil reset ScreenCapture io.github.christianvilen.mysli"])}<p class="mt-3">Then re-enable Accessibility and Screen Recording in System Settings and restart Mysli.</p>`,
 	},
 ];
 ---

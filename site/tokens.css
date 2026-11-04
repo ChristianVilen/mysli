@@ -1,4 +1,4 @@
-/* Ku-Ka design tokens — portable export (mirrors src/styles/global.css :root).
+/* Mysli design tokens — portable export (mirrors src/styles/global.css :root).
  * Theme: Cobalt — cool engineered paper, charcoal ink, one electric cobalt signal. */
 :root {
 	--color-paper: oklch(98.5% 0.004 250);
