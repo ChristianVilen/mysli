@@ -173,11 +173,12 @@ struct TeamsAXSnapshot: Equatable, Sendable {
     var nodes = 0
 }
 
-/// Not checked in a real Teams call: the bundle ID, the English control labels, the tile
-/// structure, and the highlight classes in `borders` are guesses. Fake trees test policy only.
+/// Window wrappers and call controls were observed in a real Teams call. The tile
+/// structure and highlight classes in `borders` remain unverified. Fake trees test policy only.
 final class TeamsAccessibility<Reader: TeamsAXReading> {
     private struct Item {
         let node: Reader.Node
+        let parent: Int?
         let metadata: TeamsAXMetadata
         var subtree: Range<Int>
         let rootOwned: Bool
@@ -187,6 +188,7 @@ final class TeamsAccessibility<Reader: TeamsAXReading> {
     }
     private struct MeetingControls {
         let node: Reader.Node
+        let parent: Int?
         let identifier: String
         var buttons: [Reader.Node] = []
     }
@@ -236,7 +238,7 @@ final class TeamsAccessibility<Reader: TeamsAXReading> {
                 var tree = Tree()
                 try walk(window, parent: nil, ownership: Ownership(), depth: 0,
                          tree: &tree, count: &count, deadline: deadline)
-                if try isMeeting(tree.controls, deadline: deadline) { meetings.append((tree, window)) }
+                if try isMeeting(tree, deadline: deadline) { meetings.append((tree, window)) }
             }
             guard meetings.count <= 1 else { throw TeamsScanReason.multipleMeetingWindows }
             guard let (tree, window) = meetings.first else { throw TeamsScanReason.noMeetingWindow }
@@ -283,7 +285,7 @@ final class TeamsAccessibility<Reader: TeamsAXReading> {
         let excluded = forbidden(metadata)
         let selfScope = ownership.selfScope || isSelf(metadata)
         let bounded = validBounds(metadata.bounds) && ownership.bounds.contains(metadata.bounds)
-        tree.items.append(Item(node: node, metadata: metadata, subtree: index..<(index + 1),
+        tree.items.append(Item(node: node, parent: parent, metadata: metadata, subtree: index..<(index + 1),
                                rootOwned: ownership.rootScope && bounded, selfOwned: selfScope,
                                bounded: bounded,
                                tileMember: !excluded && !isSelf(metadata)
@@ -298,7 +300,7 @@ final class TeamsAccessibility<Reader: TeamsAXReading> {
         if metadata.role == "AXToolbar", metadata.enabled, ownership.rootScope, bounded,
            tree.items.first?.metadata.role == "AXWindow" {
             control = tree.controls.count
-            tree.controls.append(MeetingControls(node: node, identifier: metadata.identifier.lowercased()))
+            tree.controls.append(MeetingControls(node: node, parent: parent, identifier: metadata.identifier.lowercased()))
         } else if metadata.role == "AXGroup" {
             control = ownership.control
         }
@@ -308,7 +310,7 @@ final class TeamsAccessibility<Reader: TeamsAXReading> {
         }
         let descendants = Ownership(
             bounds: validBounds(metadata.bounds) ? ownership.bounds.intersection(metadata.bounds) : .null,
-            rootScope: ownership.rootScope && ["AXWindow", "AXWebArea", "AXGroup"].contains(metadata.role),
+            rootScope: ownership.rootScope && ["AXWindow", "AXWebArea", "AXScrollArea", "AXGroup"].contains(metadata.role),
             selfScope: selfScope,
             control: control)
         let children = try reader.children(node, timeout: budget(deadline))
@@ -330,8 +332,8 @@ final class TeamsAccessibility<Reader: TeamsAXReading> {
         (metadata.identifier + " " + metadata.classes.joined(separator: " ")).lowercased().contains("self")
     }
 
-    private func isMeeting(_ controls: [MeetingControls], deadline: TimeInterval) throws -> Bool {
-        for control in controls {
+    private func isMeeting(_ tree: Tree, deadline: TimeInterval) throws -> Bool {
+        for control in tree.controls {
             let knownScope: Bool
             if ["meeting-controls", "calling-controls"].contains(control.identifier) { knownScope = true }
             else {
@@ -340,11 +342,34 @@ final class TeamsAccessibility<Reader: TeamsAXReading> {
                 knownScope = label == "Meeting controls" || label == "Calling controls"
             }
             guard knownScope else { continue }
-            for button in control.buttons {
-                let label = try reader.label(button, kind: .control, timeout: budget(deadline))
-                guard label?.utf8.count ?? 0 <= 256 else { throw TeamsScanReason.scanLimit }
-                if label == "Hang up" || label == "Leave" { return true }
+            if try hasEndCallButton(control.buttons, deadline: deadline) { return true }
+            for (index, group) in tree.items.enumerated() {
+                let metadata = group.metadata
+                guard group.parent == control.parent, metadata.role == "AXGroup",
+                      group.rootOwned, metadata.visible, !group.selfOwned, !forbidden(metadata) else { continue }
+                let buttons = tree.items.filter {
+                    $0.parent == index && $0.metadata.role == "AXButton"
+                        && $0.metadata.enabled && $0.metadata.visible && $0.bounded && !forbidden($0.metadata)
+                }.map(\.node)
+                guard !buttons.isEmpty else { continue }
+                let callingControls: Bool
+                if metadata.identifier.lowercased() == "calling-controls" { callingControls = true }
+                else {
+                    let label = try reader.label(group.node, kind: .control, timeout: budget(deadline))
+                    guard label?.utf8.count ?? 0 <= 256 else { throw TeamsScanReason.scanLimit }
+                    callingControls = label == "Calling controls"
+                }
+                if callingControls, try hasEndCallButton(buttons, deadline: deadline) { return true }
             }
+        }
+        return false
+    }
+
+    private func hasEndCallButton(_ buttons: [Reader.Node], deadline: TimeInterval) throws -> Bool {
+        for button in buttons {
+            let label = try reader.label(button, kind: .control, timeout: budget(deadline))
+            guard label?.utf8.count ?? 0 <= 256 else { throw TeamsScanReason.scanLimit }
+            if label == "Hang up" || label == "Leave" { return true }
         }
         return false
     }

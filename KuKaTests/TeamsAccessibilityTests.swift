@@ -190,6 +190,72 @@ final class TeamsAccessibilityTests: XCTestCase {
         XCTAssertFalse(tree.labelReads.contains(0))
     }
 
+    func testScrollAreaAroundWebContentPreservesTheCallWindowScope() {
+        let tree = FakeTeamsAX.meeting()
+        tree.nodes[0]!.children = [5]
+        tree.nodes[5] = .init(metadata: TeamsAXMetadata(role: "AXScrollArea"), children: [6])
+        tree.nodes[6] = .init(metadata: TeamsAXMetadata(role: "AXWebArea"), children: [1, 3])
+
+        let snapshot = TeamsAccessibility(reader: tree).snapshot()
+        XCTAssertEqual(snapshot.result.speaker?.value, "Ada Lovelace", "\(snapshot.result)")
+    }
+
+    func testCallingControlsGroupBesideMeetingToolbarIdentifiesTheCall() {
+        let snapshot = TeamsAccessibility(reader: FakeTeamsAX.callWithSeparateControls()).snapshot()
+        XCTAssertEqual(snapshot.result.speaker?.value, "Ada Lovelace", "\(snapshot.result)")
+    }
+
+    func testSeparateCallingControlsNeedARecognisedToolbarWithTheSameParent() {
+        let tree = FakeTeamsAX.callWithSeparateControls()
+        tree.nodes[1]!.metadata.identifier = ""
+        tree.nodes[1]!.label = "Other tools"
+        XCTAssertEqual(TeamsAccessibility(reader: tree).snapshot().result, .unnamed(.noMeetingWindow))
+        XCTAssertFalse(tree.labelReads.contains(5))
+        XCTAssertFalse(tree.labelReads.contains(2))
+
+        tree.nodes[1]!.metadata.identifier = "meeting-controls"
+        tree.nodes[0]!.children = [6, 3, 5]
+        tree.nodes[6] = .init(children: [1])
+        XCTAssertEqual(TeamsAccessibility(reader: tree).snapshot().result, .unnamed(.noMeetingWindow))
+        XCTAssertFalse(tree.labelReads.contains(5))
+        XCTAssertFalse(tree.labelReads.contains(2))
+    }
+
+    func testSeparateCallingControlsRejectUnsafeGroupsBeforeReadingTheirLabels() {
+        for metadata in [TeamsAXMetadata(identifier: "meeting-chat"), TeamsAXMetadata(classes: ["shared-content"]),
+                         TeamsAXMetadata(identifier: "self-video"), TeamsAXMetadata(visible: false),
+                         TeamsAXMetadata(bounds: .zero), TeamsAXMetadata(role: "AXUnknown")] {
+            let tree = FakeTeamsAX.callWithSeparateControls()
+            tree.nodes[5]!.metadata = metadata
+            XCTAssertEqual(TeamsAccessibility(reader: tree).snapshot().result, .unnamed(.noMeetingWindow))
+            XCTAssertFalse(tree.labelReads.contains(5))
+            XCTAssertFalse(tree.labelReads.contains(2))
+        }
+    }
+
+    func testSeparateCallingControlsRequireTheirOwnNameBeforeReadingButtons() {
+        for (label, reason) in [(nil, TeamsScanReason.noMeetingWindow), ("Other tools", .noMeetingWindow),
+                                (String(repeating: "x", count: 257), .scanLimit)] {
+            let tree = FakeTeamsAX.callWithSeparateControls()
+            tree.nodes[5]!.label = label
+            XCTAssertEqual(TeamsAccessibility(reader: tree).snapshot().result, .unnamed(reason))
+            XCTAssertFalse(tree.labelReads.contains(2))
+        }
+    }
+
+    func testSeparateCallingControlsIgnoreIneligibleButtonsBeforeReadingAnyLabels() {
+        for metadata in [TeamsAXMetadata(role: "AXButton", enabled: false),
+                         TeamsAXMetadata(role: "AXButton", visible: false),
+                         TeamsAXMetadata(role: "AXButton", bounds: .zero),
+                         TeamsAXMetadata(role: "AXButton", identifier: "chat")] {
+            let tree = FakeTeamsAX.callWithSeparateControls()
+            tree.nodes[2]!.metadata = metadata
+            XCTAssertEqual(TeamsAccessibility(reader: tree).snapshot().result, .unnamed(.noMeetingWindow))
+            XCTAssertFalse(tree.labelReads.contains(5))
+            XCTAssertFalse(tree.labelReads.contains(2))
+        }
+    }
+
     func testNoTeamsDeniedRevokedAndTransportFailuresHaveTheirReasons() {
         let tree = FakeTeamsAX.meeting()
         let source = TeamsAccessibility(reader: tree)
@@ -474,6 +540,15 @@ final class FakeTeamsAX: TeamsAXReading {
             3: Entry(metadata: TeamsAXMetadata(classes: ["vdi-frame-occlusion", "frwhdur", "f578s74"]), children: [4]),
             4: Entry(metadata: TeamsAXMetadata(role: "AXStaticText"), label: "Ada Lovelace")
         ]
+        return tree
+    }
+
+    static func callWithSeparateControls() -> FakeTeamsAX {
+        let tree = meeting()
+        tree.nodes[1]!.children = []
+        tree.nodes[0]!.children.append(5)
+        tree.nodes[5] = .init(children: [2], label: "Calling controls")
+        tree.nodes[2]!.label = "Leave"
         return tree
     }
 }
