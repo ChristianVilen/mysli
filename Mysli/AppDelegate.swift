@@ -159,7 +159,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             guard let controller else { return }
             self?.settingsWindow.showCalendarStatus(controller.status)
             self?.permissions.refresh()
-            Task { await self?.permissions.refreshNotifications() }
         }
         calendarReminderStartup = Task { [weak self] in
             guard !Task.isCancelled, let self else { return }
@@ -178,14 +177,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Settings would leave the warning badge stale until Permissions opens.
         statusMenu.onMenuWillOpen = { [weak self] in
             self?.permissions.refresh()
-            Task { await self?.permissions.refreshNotifications() }
             self?.hotkeyManager.refresh()
             self?.updateStatus()
         }
-        permissions.refresh()
-        permissionsChanged()
         Task {
-            await permissions.refreshNotifications()
+            await permissions.refreshAndWait()
+            permissionsChanged()
             switch onboarding.launchDestination(for: permissions.snapshot) {
             case .onboarding: settingsWindow.show()
             case .permissions: settingsWindow.show(.permissions)
@@ -204,8 +201,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             if reminders != settings.calendarRecordingRemindersEnabled {
                 await calendarReminders?.setEnabled(reminders)
             }
-            permissions.refresh()
-            await permissions.refreshNotifications()
+            await permissions.refreshAndWait()
             permissionsChanged()
         }
     }
@@ -261,7 +257,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self else { return }
             if visible {
                 permissions.refresh()
-                Task { await self.permissions.refreshNotifications() }
                 permissionsChanged()
                 permissions.startPolling()
             } else {

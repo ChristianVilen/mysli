@@ -78,7 +78,7 @@ final class PermissionsManager {
     private(set) var calendar = CalendarAccess.notDetermined
     private(set) var notifications = NotificationAccess.notDetermined
 
-    /// Fired after `refresh()` whenever any status changed.
+    /// Notification reads can call this after `refresh()` returns.
     var onChange: (@MainActor () -> Void)?
 
     private let isAccessibilityTrusted: () -> Bool
@@ -94,6 +94,8 @@ final class PermissionsManager {
     private let defaults: UserDefaults
     private let pollInterval: TimeInterval
     private var timer: Timer?
+    private var notificationRevision = 0
+    private var notificationRefresh: Task<Void, Never>?
 
     var snapshot: PermissionSnapshot {
         PermissionSnapshot(accessibility: accessibility, screenRecording: screenRecording,
@@ -137,33 +139,37 @@ final class PermissionsManager {
 
     /// Re-read every status without prompting the user.
     func refresh() {
-        let ax = isAccessibilityTrusted()
-        let screen = hasScreenCaptureAccess()
-        let mic = microphoneAccess()
-        let cal = calendarAccess()
-        guard ax != accessibility || screen != screenRecording || mic != microphone || cal != calendar else { return }
-        accessibility = ax
-        screenRecording = screen
-        microphone = mic
-        calendar = cal
-        onChange?()
+        let before = snapshot
+        accessibility = isAccessibilityTrusted()
+        screenRecording = hasScreenCaptureAccess()
+        microphone = microphoneAccess()
+        calendar = calendarAccess()
+        notificationRevision += 1
+        let revision = notificationRevision
+        notificationRefresh = Task { [weak self, notificationAccess] in
+            let access = await notificationAccess()
+            guard let self, revision == notificationRevision else { return }
+            notificationRefresh = nil
+            guard access != notifications else { return }
+            notifications = access
+            onChange?()
+        }
+        if snapshot != before { onChange?() }
     }
 
-    func refreshNotifications() async {
-        let access = await notificationAccess()
-        guard access != notifications else { return }
-        notifications = access
-        onChange?()
+    func refreshAndWait() async {
+        refresh()
+        while let pending = notificationRefresh { await pending.value }
     }
 
     func requestNotifications() async {
-        await refreshNotifications()
+        await refreshAndWait()
         switch notifications {
         case .granted: return
         case .denied: openSettings(.notifications)
         case .notDetermined:
             _ = await requestNotificationAccess()
-            await refreshNotifications()
+            await refreshAndWait()
         }
     }
 
@@ -238,7 +244,6 @@ final class PermissionsManager {
             // The .main queue delivers on the main thread.
             MainActor.assumeIsolated {
                 self?.refresh()
-                Task { await self?.refreshNotifications() }
             }
         }
     }
@@ -251,7 +256,6 @@ final class PermissionsManager {
             // Timers scheduled from the main thread fire on the main run loop.
             MainActor.assumeIsolated {
                 self?.refresh()
-                Task { await self?.refreshNotifications() }
             }
         }
     }

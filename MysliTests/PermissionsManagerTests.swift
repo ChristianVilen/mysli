@@ -152,24 +152,66 @@ final class PermissionsManagerTests: XCTestCase {
     func testNotificationRefreshReadsStatusWithoutPrompting() async {
         var access = NotificationAccess.notDetermined
         var prompts = 0
-        let sut = PermissionsManager(notificationAccess: { access },
+        let sut = PermissionsManager(isAccessibilityTrusted: { false }, hasScreenCaptureAccess: { false },
+                                     microphoneAccess: { .notDetermined }, notificationAccess: { access },
                                      requestNotificationAccess: { prompts += 1; return true })
         var changes = 0
         sut.onChange = { changes += 1 }
-        await sut.refreshNotifications()
+        await sut.refreshAndWait()
         XCTAssertEqual(changes, 0)
         access = .granted
-        await sut.refreshNotifications()
+        await sut.refreshAndWait()
         XCTAssertEqual(sut.snapshot.notifications, .granted)
         XCTAssertEqual(changes, 1)
         XCTAssertEqual(prompts, 0)
+    }
+
+    func testRoutineRefreshIncludesNotificationsWithoutPrompting() async {
+        var prompts = 0
+        let sut = PermissionsManager(
+            isAccessibilityTrusted: { true }, hasScreenCaptureAccess: { true },
+            microphoneAccess: { .granted }, calendarAccess: { .full },
+            notificationAccess: { .granted }, requestNotificationAccess: { prompts += 1; return true })
+        sut.refresh()
+        for _ in 0..<1_000 where sut.snapshot.notifications != .granted { await Task.yield() }
+        XCTAssertEqual(sut.snapshot, PermissionSnapshot(accessibility: true, screenRecording: true,
+                                                       microphone: .granted, calendar: .full, notifications: .granted))
+        XCTAssertEqual(prompts, 0)
+    }
+
+    func testOlderNotificationReadCannotReplaceANewerGrant() async throws {
+        var replies: [CheckedContinuation<NotificationAccess, Never>] = []
+        let sut = PermissionsManager(
+            isAccessibilityTrusted: { false }, hasScreenCaptureAccess: { false },
+            microphoneAccess: { .notDetermined }, notificationAccess: {
+                await withCheckedContinuation { replies.append($0) }
+            })
+        var published: [NotificationAccess] = []
+        sut.onChange = { published.append(sut.snapshot.notifications) }
+        defer { sut.onChange = nil }
+
+        let older = Task { await sut.refreshAndWait() }
+        for _ in 0..<1_000 where replies.count < 1 { await Task.yield() }
+        let olderReply = try XCTUnwrap(replies.first)
+        let newer = Task { await sut.refreshAndWait() }
+        for _ in 0..<1_000 where replies.count < 2 { await Task.yield() }
+        let newerReply = try XCTUnwrap(replies.dropFirst().first)
+
+        newerReply.resume(returning: .granted)
+        await newer.value
+        olderReply.resume(returning: .denied)
+        await older.value
+
+        XCTAssertEqual(sut.snapshot.notifications, .granted)
+        XCTAssertEqual(published, [.granted])
     }
 
     func testNotificationRequestAsksOnceThenOpensSettingsAfterDenial() async {
         var access = NotificationAccess.notDetermined
         var prompts = 0
         var opened: [String] = []
-        let sut = PermissionsManager(notificationAccess: { access }, requestNotificationAccess: {
+        let sut = PermissionsManager(isAccessibilityTrusted: { false }, hasScreenCaptureAccess: { false },
+                                     microphoneAccess: { .notDetermined }, notificationAccess: { access }, requestNotificationAccess: {
             prompts += 1
             access = .denied
             return false
