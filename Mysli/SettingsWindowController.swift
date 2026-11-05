@@ -25,8 +25,10 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private let folderPath = NSTextField(labelWithString: "")
     private let backgroundPath = NSTextField(labelWithString: "")
     private let settings: Settings
+    let sidebar = SettingsSidebarController()
     private let onboarding: Onboarding?
-    private var settingsContent: NSView?
+    private let settingsContent = NSSplitViewController()
+    private let pageContainer = SettingsBackground()
     private(set) var onboardingView: OnboardingView?
     private let chooseFolder: Picker
     private let chooseContext: Picker
@@ -36,16 +38,6 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private var permissionsVisible = false
     private var visibilityObservers: [NSObjectProtocol] = []
     private(set) var selectedPage: SettingsPage = .general
-    let pageButtons = SettingsPage.allCases.map { page in
-        let button = NSButton(title: page.title, image: page.icon(size: 20), target: nil, action: nil)
-        button.tag = page.rawValue
-        button.setButtonType(.pushOnPushOff)
-        button.bezelStyle = .glass
-        button.alignment = .left
-        button.imagePosition = .imageLeading
-        button.setAccessibilityLabel(page.title)
-        return button
-    }
     private(set) var pages: [SettingsPage: NSScrollView] = [:]
     private(set) var guides: [SettingsPage: SettingsGuides] = [:]
     let permissionsPage: SettingsPermissionsView
@@ -119,10 +111,13 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         loginError.isHidden = true
         refresh()
         if let onboarding, !onboarding.isFinished {
-            if window?.contentView !== onboardingView { window?.contentView = onboardingView }
+            if window?.contentView !== onboardingView {
+                window?.contentViewController = nil
+                window?.contentView = onboardingView
+            }
             onboardingView?.render()
         } else {
-            if window?.contentView !== settingsContent { window?.contentView = settingsContent }
+            if window?.contentViewController !== settingsContent { showSettingsContent() }
             selectPage(page)
         }
         guard let window else { return }
@@ -134,12 +129,20 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
     private func onboardingChanged() {
         if onboarding?.isFinished == true {
-            window?.contentView = settingsContent
+            showSettingsContent()
             refresh()
             selectPage(.general)
             applyDisplayOptions(.current)
         }
         refreshPermissionsVisibility()
+    }
+
+    private func showSettingsContent() {
+        guard let window else { return }
+        let size = window.contentLayoutRect.size
+        settingsContent.view.setFrameSize(size)
+        window.contentViewController = settingsContent
+        window.setContentSize(size)
     }
 
     func windowWillClose(_ notification: Notification) {
@@ -334,80 +337,44 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             .permissions: permissions,
             .help: helpPage
         ]
-        let root = SettingsBackground()
-        settingsContent = root
-        window?.contentView = root
-        let sidebar = SettingsGlass(radius: 16)
-        sidebar.translatesAutoresizingMaskIntoConstraints = false
-        root.addSubview(sidebar)
-        let brand = Self.brandHeader()
-        let navigation = SettingsLayout.stack(spacing: 4)
-        SettingsLayout.add(brand, to: navigation)
-        navigation.setCustomSpacing(20, after: brand)
-        for button in pageButtons {
-            button.target = self
-            button.action = #selector(pageClicked(_:))
-            button.heightAnchor.constraint(equalToConstant: 32).isActive = true
-            SettingsLayout.add(button, to: navigation)
-        }
-        navigation.setCustomSpacing(16, after: pageButtons[SettingsPage.meetings.rawValue])
-        navigation.translatesAutoresizingMaskIntoConstraints = false
-        sidebar.content.addSubview(navigation)
-        NSLayoutConstraint.activate([
-            sidebar.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 10),
-            sidebar.topAnchor.constraint(equalTo: root.topAnchor, constant: 10),
-            sidebar.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -10),
-            sidebar.widthAnchor.constraint(equalToConstant: 210),
-            navigation.leadingAnchor.constraint(equalTo: sidebar.content.leadingAnchor, constant: 12),
-            navigation.trailingAnchor.constraint(equalTo: sidebar.content.trailingAnchor, constant: -12),
-            navigation.topAnchor.constraint(equalTo: sidebar.content.topAnchor, constant: 24)
-        ])
+        let root = pageContainer
         pages = contents.mapValues(SettingsLayout.scroll)
-        for scroll in pages.values {
-            scroll.translatesAutoresizingMaskIntoConstraints = false
-            root.addSubview(scroll)
-            NSLayoutConstraint.activate([
-                scroll.leadingAnchor.constraint(equalTo: sidebar.trailingAnchor, constant: 2),
-                scroll.trailingAnchor.constraint(equalTo: root.trailingAnchor),
-                scroll.topAnchor.constraint(equalTo: root.topAnchor),
-                scroll.bottomAnchor.constraint(equalTo: root.bottomAnchor)
-            ])
+        if let general = pages[.general] { SettingsLayout.fill(general, in: root) }
+        let detail = NSViewController()
+        detail.view = root
+        let sidebarItem = NSSplitViewItem(sidebarWithViewController: sidebar)
+        sidebarItem.canCollapse = false
+        sidebarItem.minimumThickness = 210
+        sidebarItem.maximumThickness = 260
+        sidebarItem.holdingPriority = .defaultHigh
+        let detailItem = NSSplitViewItem(viewController: detail)
+        detailItem.minimumThickness = 400
+        settingsContent.splitView.isVertical = true
+        settingsContent.splitView.dividerStyle = .thin
+        settingsContent.addSplitViewItem(sidebarItem)
+        settingsContent.addSplitViewItem(detailItem)
+        showSettingsContent()
+        sidebar.onSelect = { [weak self] page in
+            guard let self, selectedPage != page else { return }
+            selectPage(page)
         }
         window?.initialFirstResponder = launchAtLogin
         selectPage(.general)
         applyDisplayOptions(.current)
     }
 
-    /// The app icon, the name, and the tagline at the top of the sidebar.
-    private static func brandHeader() -> NSView {
-        let icon = NSImageView(image: NSApp.applicationIconImage)
-        icon.setAccessibilityElement(false)
-        icon.widthAnchor.constraint(equalToConstant: 36).isActive = true
-        icon.heightAnchor.constraint(equalToConstant: 36).isActive = true
-        let name = SettingsLayout.label("Mysli")
-        name.font = .systemFont(ofSize: 15, weight: .semibold)
-        let words = SettingsLayout.stack([name, SettingsLayout.label("A daily mix of Mac tools", size: 11, secondary: true)], spacing: 1)
-        let header = NSStackView(views: [icon, words])
-        header.spacing = 8
-        return header
-    }
-
-    @objc private func pageClicked(_ sender: NSButton) {
-        guard let page = SettingsPage(rawValue: sender.tag) else { return }
-        selectPage(page)
-    }
-
     private func selectPage(_ page: SettingsPage) {
+        let changed = selectedPage != page
         selectedPage = page
-        for (candidate, scroll) in pages { scroll.isHidden = candidate != page }
-        for button in pageButtons {
-            let selected = button.tag == page.rawValue
-            button.state = selected ? .on : .off
-            button.isBordered = selected
-            button.contentTintColor = selected ? .controlAccentColor : .labelColor
+        for (candidate, scroll) in pages {
+            scroll.isHidden = candidate != page
+            if candidate != page { scroll.removeFromSuperview() }
         }
+        if let scroll = pages[page], scroll.superview !== pageContainer { SettingsLayout.fill(scroll, in: pageContainer) }
+        if changed { applyDisplayOptions(.current) }
+        sidebar.select(page)
         updateKeyViewLoop()
-        window?.makeFirstResponder(pageButtons[page.rawValue])
+        window?.makeFirstResponder(sidebar.tableView)
         refreshPermissionsVisibility()
     }
 
@@ -422,8 +389,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         case .permissions: permissionsPage.controls
         case .help: helpPage.controls
         }
-        let keyViews: [NSView] = pageButtons + controls + (guides[selectedPage]?.buttons ?? [])
-        for (control, next) in zip(keyViews, keyViews.dropFirst() + [pageButtons[0]]) { control.nextKeyView = next }
+        let keyViews: [NSView] = [sidebar.tableView] + controls + (guides[selectedPage]?.buttons ?? [])
+        for (control, next) in zip(keyViews, keyViews.dropFirst() + [sidebar.tableView]) { control.nextKeyView = next }
     }
 
     func applyDisplayOptions(_ options: SettingsDisplayOptions) {
@@ -432,7 +399,6 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             (view as? SettingsGlass)?.apply(options)
             for child in view.subviews { apply(in: child) }
         }
-        for button in pageButtons { button.bezelStyle = options.reduceTransparency ? .push : .glass }
         if let root = window?.contentView { apply(in: root) }
     }
 

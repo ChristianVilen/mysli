@@ -76,6 +76,24 @@ final class OnboardingWindowTests: XCTestCase {
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         controller = makeController(model)
         controller.show()
+        func capture(_ view: NSView, in window: NSWindow, name: String) throws {
+            window.orderFront(nil)
+            for (appearanceName, appearance, size) in [
+                ("light", NSAppearance.Name.aqua, NSSize(width: 760, height: 700)),
+                ("dark", .darkAqua, NSSize(width: 760, height: 700)),
+                ("dark-compact", .darkAqua, NSSize(width: 640, height: 420))
+            ] {
+                window.appearance = NSAppearance(named: appearance)
+                window.setContentSize(size)
+                view.layoutSubtreeIfNeeded()
+                let bitmap = try XCTUnwrap(view.bitmapImageRepForCachingDisplay(in: view.bounds))
+                window.appearance?.performAsCurrentDrawingAppearance {
+                    view.cacheDisplay(in: view.bounds, to: bitmap)
+                }
+                let data = try XCTUnwrap(bitmap.representation(using: .png, properties: [:]))
+                try data.write(to: folder.appendingPathComponent("\(name)-\(appearanceName).png"))
+            }
+        }
         for step in Onboarding.Step.allCases {
             if step == .permissions {
                 controller.close()
@@ -84,24 +102,16 @@ final class OnboardingWindowTests: XCTestCase {
             }
             let window = try XCTUnwrap(controller.window)
             let view = try XCTUnwrap(controller.onboardingView)
-            window.orderFront(nil)
-            for (name, appearance, size) in [
-                ("light", NSAppearance.Name.aqua, NSSize(width: 760, height: 700)),
-                ("dark-compact", .darkAqua, NSSize(width: 640, height: 420))
-            ] {
-                window.appearance = NSAppearance(named: appearance)
-                window.setContentSize(size)
-                view.renderPermissions(.init(accessibility: true, screenRecording: true, microphone: .notDetermined,
-                                              calendar: .notDetermined, notifications: .notDetermined))
-                view.layoutSubtreeIfNeeded()
-                let bitmap = try XCTUnwrap(view.bitmapImageRepForCachingDisplay(in: view.bounds))
-                window.appearance?.performAsCurrentDrawingAppearance {
-                    view.cacheDisplay(in: view.bounds, to: bitmap)
-                }
-                let data = try XCTUnwrap(bitmap.representation(using: .png, properties: [:]))
-                try data.write(to: folder.appendingPathComponent("onboarding-\(step.rawValue)-\(name).png"))
-            }
+            controller.renderPermissions(.init(accessibility: true, screenRecording: true, microphone: .notDetermined,
+                                               calendar: .notDetermined, notifications: .notDetermined))
+            try capture(view, in: window, name: "onboarding-\(step.rawValue)")
             if step != .permissions { view.nextButton.performClick(nil) }
+        }
+        try XCTUnwrap(controller.onboardingView).nextButton.performClick(nil)
+        for page in SettingsPage.allCases {
+            controller.show(page)
+            let window = try XCTUnwrap(controller.window)
+            try capture(try XCTUnwrap(window.contentView), in: window, name: "settings-\(page.title.lowercased().replacingOccurrences(of: " ", with: "-"))")
         }
     }
 }

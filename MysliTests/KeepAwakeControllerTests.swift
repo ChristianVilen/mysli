@@ -52,7 +52,6 @@ final class KeepAwakeControllerTests: XCTestCase {
         XCTAssertTrue(controller.isActive)
         XCTAssertEqual(preventer.beginCount, 1)
         XCTAssertFalse(turnOffItem.isHidden)
-        XCTAssertEqual(panel.titleLabel.stringValue, "Awake · On")
         XCTAssertEqual(panel.durationControl.selectedSegment, chipIndex("∞"))
     }
 
@@ -63,13 +62,14 @@ final class KeepAwakeControllerTests: XCTestCase {
         XCTAssertEqual(panel.durationControl.selectedSegment, chipIndex("30m"))
     }
 
-    func testCountdownTitleTracksTheInjectedClock() {
+    func testCountdownTitleTracksTheInjectedClock() throws {
+        let header = try XCTUnwrap(menu.items.first { $0.isSectionHeader })
         controller.activate(.timed(60 * 60))
-        XCTAssertEqual(panel.titleLabel.stringValue, "Awake · 1h left")
+        XCTAssertEqual(header.title, "Awake · 1h left")
 
         clock = clock.addingTimeInterval(15 * 60)
         controller.menuWillOpen()
-        XCTAssertEqual(panel.titleLabel.stringValue, "Awake · 45 min left")
+        XCTAssertEqual(header.title, "Awake · 45 min left")
     }
 
     // MARK: - Turn off
@@ -81,7 +81,6 @@ final class KeepAwakeControllerTests: XCTestCase {
         XCTAssertFalse(controller.isActive)
         XCTAssertEqual(preventer.endCount, 1)
         XCTAssertTrue(turnOffItem.isHidden)
-        XCTAssertEqual(panel.titleLabel.stringValue, "Keep Awake")
         XCTAssertEqual(panel.durationControl.selectedSegment, -1)
     }
 

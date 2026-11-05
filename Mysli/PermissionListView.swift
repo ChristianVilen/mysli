@@ -36,10 +36,22 @@ final class PermissionRowView: NSView {
         grantButton.bezelStyle = .rounded
         grantButton.setContentHuggingPriority(.required, for: .horizontal)
         grantButton.setContentCompressionResistancePriority(.required, for: .horizontal)
-        let row = NSStackView(views: [statusIcon, copy, grantButton])
-        row.distribution = .fill
-        row.alignment = .top
-        row.spacing = 10
+        grantButton.widthAnchor.constraint(equalToConstant: 84).isActive = true
+        let row = NSView()
+        for child in [statusIcon, copy, grantButton] {
+            child.translatesAutoresizingMaskIntoConstraints = false
+            row.addSubview(child)
+        }
+        NSLayoutConstraint.activate([
+            statusIcon.leadingAnchor.constraint(equalTo: row.leadingAnchor),
+            statusIcon.centerYAnchor.constraint(equalTo: heading.centerYAnchor),
+            copy.leadingAnchor.constraint(equalTo: statusIcon.trailingAnchor, constant: 12),
+            copy.topAnchor.constraint(equalTo: row.topAnchor, constant: 4),
+            copy.bottomAnchor.constraint(equalTo: row.bottomAnchor, constant: -4),
+            copy.trailingAnchor.constraint(equalTo: grantButton.leadingAnchor, constant: -16),
+            grantButton.trailingAnchor.constraint(equalTo: row.trailingAnchor),
+            grantButton.firstBaselineAnchor.constraint(equalTo: heading.firstBaselineAnchor)
+        ])
         SettingsLayout.fill(row, in: self)
         setStatus(.missing)
     }
@@ -81,7 +93,7 @@ final class PermissionListView: NSView {
     let rows: [(permission: MysliPermission, view: PermissionRowView)]
     var controls: [NSButton] { rows.filter { !$0.view.isHidden }.map { $0.view.grantButton } }
 
-    init(actions: PermissionActions, spacing: CGFloat = 14, inset: CGFloat = 10) {
+    init(actions: PermissionActions, spacing: CGFloat = 8, inset: CGFloat = 14) {
         rows = MysliPermission.allCases.map { permission in
             let grant: () -> Void = switch permission {
             case .accessibility: actions.accessibility

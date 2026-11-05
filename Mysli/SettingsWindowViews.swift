@@ -201,14 +201,26 @@ enum SettingsLayout {
 
     static func row(_ title: String, detail: String? = nil, control: NSView) -> NSView {
         let copy = stack(spacing: 4)
-        add(label(title), to: copy)
+        let heading = label(title)
+        add(heading, to: copy)
         if let detail { add(label(detail, size: 11, secondary: true), to: copy) }
         copy.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         copy.setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)
-        let row = NSStackView(views: [copy, control])
-        row.distribution = .fill
-        row.spacing = 12
-        row.alignment = .centerY
+        let row = NSView()
+        for child in [copy, control] {
+            child.translatesAutoresizingMaskIntoConstraints = false
+            row.addSubview(child)
+        }
+        NSLayoutConstraint.activate([
+            copy.leadingAnchor.constraint(equalTo: row.leadingAnchor),
+            copy.topAnchor.constraint(equalTo: row.topAnchor, constant: 4),
+            copy.bottomAnchor.constraint(equalTo: row.bottomAnchor, constant: -4),
+            copy.trailingAnchor.constraint(equalTo: control.leadingAnchor, constant: -12),
+            control.trailingAnchor.constraint(equalTo: row.trailingAnchor),
+            control.centerYAnchor.constraint(equalTo: heading.centerYAnchor),
+            control.topAnchor.constraint(greaterThanOrEqualTo: row.topAnchor),
+            control.bottomAnchor.constraint(lessThanOrEqualTo: row.bottomAnchor)
+        ])
         control.setContentHuggingPriority(.required, for: .horizontal)
         control.setContentCompressionResistancePriority(.required, for: .horizontal)
         (control as? NSStackView)?.setHuggingPriority(.required, for: .horizontal)
@@ -226,7 +238,7 @@ enum SettingsLayout {
             }
             add(row, to: stack)
         }
-        fill(stack, in: glass.content, inset: 10)
+        fill(stack, in: glass.content, inset: 14)
         return glass
     }
 
@@ -243,6 +255,7 @@ enum SettingsLayout {
         title.font = .systemFont(ofSize: 13, weight: .semibold)
         let row = NSStackView(views: [icon, title])
         row.spacing = 9
+        row.alignment = .centerY
         return row
     }
 

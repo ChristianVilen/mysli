@@ -1,7 +1,6 @@
 import Cocoa
 
 final class KeepAwakePanelView: NSView {
-    let titleLabel = NSTextField(labelWithString: "Keep Awake")
     let durationControl: NSSegmentedControl
     private let durations: [WakeDuration]
 
@@ -13,27 +12,18 @@ final class KeepAwakePanelView: NSView {
         durationControl = NSSegmentedControl(labels: presets.map(\.chip), trackingMode: .selectOne, target: nil, action: nil)
         super.init(frame: .zero)
 
-        titleLabel.font = .menuFont(ofSize: 13)
-        titleLabel.textColor = .secondaryLabelColor
-
         durationControl.target = self
         durationControl.action = #selector(durationClicked(_:))
         durationControl.controlSize = .small
         durationControl.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
 
-        let title = NSStackView(views: [ToolMenuHeaderView.iconView(.keepAwake), titleLabel])
-        title.spacing = 6
-        let stack = NSStackView(views: [title, durationControl])
-        stack.orientation = .vertical
-        stack.alignment = .leading
-        stack.spacing = 6
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(stack)
+        durationControl.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(durationControl)
         NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: topAnchor, constant: 4),
-            stack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -6),
-            stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 14),
-            stack.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -14),
+            durationControl.topAnchor.constraint(equalTo: topAnchor, constant: 4),
+            durationControl.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -6),
+            durationControl.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 14),
+            durationControl.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -14),
         ])
         frame.size = fittingSize
     }

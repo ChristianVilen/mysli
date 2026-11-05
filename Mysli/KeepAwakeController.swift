@@ -16,6 +16,7 @@ final class KeepAwakeController: NSObject {
     private let notifier: Notifying
 
     let panelView: KeepAwakePanelView
+    private let headerItem: NSMenuItem
     private let turnOffItem: NSMenuItem
     private let displayAwakeItem: NSMenuItem
 
@@ -34,6 +35,7 @@ final class KeepAwakeController: NSObject {
         self.now = now
         self.notifier = notifier
         panelView = KeepAwakePanelView(presets: Self.presets)
+        headerItem = .toolHeader(.keepAwake)
         turnOffItem = NSMenuItem(title: "Turn Off", action: #selector(turnOff(_:)), keyEquivalent: "")
         displayAwakeItem = NSMenuItem(title: "Keep screen on", action: #selector(toggleDisplayAwake), keyEquivalent: "")
         super.init()
@@ -57,6 +59,7 @@ final class KeepAwakeController: NSObject {
     }
 
     func buildMenuSection(into menu: NSMenu) {
+        menu.addItem(headerItem)
         let panelItem = NSMenuItem()
         panelItem.view = panelView
         menu.addItem(panelItem)
@@ -117,12 +120,12 @@ final class KeepAwakeController: NSObject {
 
         if let session {
             if let remaining = session.remaining(now: now()) {
-                panelView.titleLabel.stringValue = "Awake · \(Self.formatRemaining(remaining))"
+                headerItem.title = "Awake · \(Self.formatRemaining(remaining))"
             } else {
-                panelView.titleLabel.stringValue = "Awake · On"
+                headerItem.title = "Awake · On"
             }
         } else {
-            panelView.titleLabel.stringValue = "Keep Awake"
+            headerItem.title = "Keep Awake"
         }
 
         panelView.showSelection(session?.duration)

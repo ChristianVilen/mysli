@@ -410,7 +410,7 @@ The menu has one group for each enabled tool, with the tool's colored icon. A to
 
 ## Settings
 
-Open **Settings…** in the menu to change preferences and find setup or help. The sidebar has a page for General, one page for each tool, then Permissions and Help:
+Open **Settings…** in the menu to change preferences and find setup or help. The native AppKit sidebar can be resized. With the sidebar focused, use Up and Down to select a page. It has General, one page for each tool, then Permissions and Help:
 
 - **General** has Launch at login.
 - **Screenshots**, **Clipboard**, **Windows**, **Keep Awake**, and **Meetings** each hold the tool's switch and settings, its keyboard shortcuts, and a guide that you can open.
@@ -447,6 +447,7 @@ Mysli/
 ├── main.swift           # App entry point
 ├── AppDelegate.swift    # Menu bar setup, wires hotkey → overlay → capture → thumbnail → editor
 ├── SettingsWindowController.swift # Native Settings form and actions
+├── SettingsSidebarController.swift # Native AppKit sidebar and page selection
 ├── Onboarding.swift     # Setup choices, saved progress, and launch destination
 ├── OnboardingView.swift # Welcome, tool choices, and access steps
 ├── RequiredPermissions.swift # Access needed by enabled tools and reminder choice

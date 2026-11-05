@@ -27,6 +27,7 @@ Keep this file short. Add a rule only when an agent would break it without being
 
 ## App-wide rules
 
+- Use native AppKit controls for standard navigation and menu section headers.
 - Show every ordinary window through `OrdinaryWindowActivation`, so Mysli stays a regular app until the last one closes.
 - Key equivalents come only from `StatusMenu.applicationMenu()`. No window handles one itself.
 - Launch, opening a window, and a refresh never write a preference. Only a user action writes one.

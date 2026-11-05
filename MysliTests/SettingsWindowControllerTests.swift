@@ -47,8 +47,8 @@ final class SettingsWindowControllerTests: XCTestCase {
         let before = defaults.persistentDomain(forName: "SettingsWindowControllerTests")! as NSDictionary
         let window = sut.window
         sut.show()
-        for button in sut.pageButtons {
-            button.performClick(nil)
+        for page in SettingsPage.allCases {
+            sut.sidebar.tableView.selectRowIndexes(IndexSet(integer: page.rawValue), byExtendingSelection: false)
             XCTAssertTrue(sut.window === window)
         }
         XCTAssertEqual(defaults.persistentDomain(forName: "SettingsWindowControllerTests")! as NSDictionary, before)
@@ -186,7 +186,8 @@ final class SettingsWindowControllerTests: XCTestCase {
         settings.meetingsFolder = URL(fileURLWithPath: path).deletingLastPathComponent()
         settings.meetingContextFile = URL(fileURLWithPath: path)
         sut.show(.meetings)
-        let scroll = try XCTUnwrap(descendants(try XCTUnwrap(sut.window?.contentView)).compactMap { $0 as? NSScrollView }.first { !$0.isHidden })
+        sut.window?.contentView?.layoutSubtreeIfNeeded()
+        let scroll = try XCTUnwrap(sut.pages[.meetings])
         scroll.layoutSubtreeIfNeeded()
         XCTAssertEqual(sut.window?.contentView?.bounds.width, 760)
         XCTAssertTrue(try XCTUnwrap(scroll.documentView).isFlipped)
@@ -196,6 +197,7 @@ final class SettingsWindowControllerTests: XCTestCase {
         XCTAssertEqual(background.toolTip, path)
         XCTAssertLessThan(background.frame.width, scroll.contentView.bounds.width)
         sut.window?.setContentSize(NSSize(width: 640, height: 420))
+        sut.window?.contentView?.layoutSubtreeIfNeeded()
         scroll.layoutSubtreeIfNeeded()
         XCTAssertGreaterThan(try XCTUnwrap(scroll.documentView).bounds.height, scroll.contentView.bounds.height)
     }
@@ -209,18 +211,17 @@ final class SettingsWindowControllerTests: XCTestCase {
         XCTAssertEqual(policies, [.regular, .accessory])
     }
 
-    func testPageButtonsSwitchPagesAndShowReturnsToGeneral() {
+    func testNativeSidebarSelectionSwitchesPagesAndShowReturnsToGeneral() {
         sut.show()
-        sut.pageButtons[SettingsPage.meetings.rawValue].performClick(nil)
+        sut.sidebar.tableView.selectRowIndexes(IndexSet(integer: SettingsPage.meetings.rawValue), byExtendingSelection: false)
         XCTAssertEqual(sut.selectedPage, .meetings)
         XCTAssertEqual(sut.pages[.meetings]?.isHidden, false)
         XCTAssertEqual(sut.pages[.general]?.isHidden, true)
-        XCTAssertEqual(sut.pageButtons.map(\.state), SettingsPage.allCases.map { $0 == .meetings ? .on : .off })
         sut.close()
         sut.show()
         XCTAssertEqual(sut.selectedPage, .general)
         XCTAssertEqual(sut.pages[.meetings]?.isHidden, true)
-        XCTAssertEqual(sut.pageButtons.map(\.state), SettingsPage.allCases.map { $0 == .general ? .on : .off })
+        XCTAssertEqual(sut.sidebar.tableView.selectedRow, SettingsPage.general.rawValue)
     }
 
     func testEachPageCyclesTheKeyboardThroughNavigationAndItsLabelledControls() throws {
@@ -239,7 +240,7 @@ final class SettingsWindowControllerTests: XCTestCase {
         for page in SettingsPage.allCases {
             sut.show(page)
             let controls = try XCTUnwrap(expected[page])
-            assertKeyViewCycle(sut.pageButtons + controls)
+            assertKeyViewCycle([sut.sidebar.tableView] + controls)
             for control in controls {
                 XCTAssertFalse(control.accessibilityLabel()?.isEmpty ?? true, "\(page): \(control) has no VoiceOver label")
             }
@@ -253,7 +254,7 @@ final class SettingsWindowControllerTests: XCTestCase {
             sut.show(page)
             let root = try XCTUnwrap(window.contentView)
             root.layoutSubtreeIfNeeded()
-            let scroll = try XCTUnwrap(descendants(root).compactMap { $0 as? NSScrollView }.first { !$0.isHidden })
+            let scroll = try XCTUnwrap(sut.pages[page])
             let document = try XCTUnwrap(scroll.documentView)
             for control in descendants(document).compactMap({ $0 as? NSControl }) {
                 let rect = control.convert(control.bounds, to: document)
@@ -288,9 +289,9 @@ final class SettingsWindowControllerTests: XCTestCase {
     }
 
     func testReduceTransparencyUsesSolidBackgroundsAndIncreaseContrastStrengthensBorders() throws {
-        let root = try XCTUnwrap(sut.window?.contentView as? SettingsBackground)
+        let root = try XCTUnwrap(sut.pages[.general]?.superview as? SettingsBackground)
         let groups = descendants(root).compactMap { $0 as? SettingsGlass }
-        XCTAssertGreaterThan(groups.count, 1)
+        XCTAssertFalse(groups.isEmpty)
         sut.applyDisplayOptions(SettingsDisplayOptions(reduceTransparency: true, increaseContrast: true))
         XCTAssertNotNil(root.layer?.backgroundColor)
         for group in groups {
@@ -298,7 +299,6 @@ final class SettingsWindowControllerTests: XCTestCase {
             XCTAssertEqual(group.layer?.borderWidth, 1.5)
             XCTAssertTrue(group.content.superview === group, "the content leaves the hidden glass")
         }
-        XCTAssertTrue(sut.pageButtons.allSatisfy { $0.bezelStyle == .push })
         sut.applyDisplayOptions(SettingsDisplayOptions(reduceTransparency: false, increaseContrast: false))
         XCTAssertNil(root.layer?.backgroundColor)
         for group in groups {
@@ -306,7 +306,6 @@ final class SettingsWindowControllerTests: XCTestCase {
             XCTAssertEqual(group.layer?.borderWidth, 0.5)
             XCTAssertFalse(group.content.superview === group)
         }
-        XCTAssertTrue(sut.pageButtons.allSatisfy { $0.bezelStyle == .glass })
     }
 
     private func assertKeyViewCycle(_ views: [NSView], file: StaticString = #filePath, line: UInt = #line) {

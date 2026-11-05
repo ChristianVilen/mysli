@@ -150,16 +150,24 @@ final class OnboardingView: NSView {
         let title = SettingsLayout.label("Welcome to Mysli", size: 28)
         title.font = .systemFont(ofSize: 28, weight: .bold)
         content.addArrangedSubview(title)
-        content.addArrangedSubview(SettingsLayout.label("A daily mix of Mac tools.", secondary: true))
+        let tagline = SettingsLayout.label("A daily mix of Mac tools.", secondary: true)
+        content.addArrangedSubview(tagline)
+        content.setCustomSpacing(6, after: title)
+        content.setCustomSpacing(28, after: tagline)
         let icons = NSStackView()
-        icons.spacing = 24
+        icons.spacing = 12
+        icons.distribution = .fillEqually
+        icons.widthAnchor.constraint(equalToConstant: 440).isActive = true
         for tool in MysliTool.allCases {
             let square = NSImageView(image: tool.icon(size: 36))
+            square.widthAnchor.constraint(equalToConstant: 36).isActive = true
+            square.heightAnchor.constraint(equalToConstant: 36).isActive = true
             let column = SettingsLayout.stack([square, SettingsLayout.label(tool.title, size: 11)], spacing: 8)
             column.alignment = .centerX
             icons.addArrangedSubview(column)
         }
         content.addArrangedSubview(icons)
+        content.setCustomSpacing(24, after: icons)
         let detail = SettingsLayout.label("Choose the tools you want. Mysli asks only for the permissions those tools need. You can change everything later in Settings.")
         detail.alignment = .center
         content.addArrangedSubview(detail)
@@ -200,14 +208,12 @@ final class OnboardingView: NSView {
         let reminders = choiceRow(title: "Calendar reminders", detail: "Offers to record when a calendar event starts. Mysli never records by itself.",
                                   needs: "Calendar, Notifications",
                                   icon: MysliTool.neutralIcon(symbolName: "calendar", size: 28, description: "Calendar reminders"),
-                                  button: remindersButton)
-        let inset = NSView()
-        SettingsLayout.fill(reminders, in: inset, inset: 8)
-        rows.append(inset)
+                                  button: remindersButton, indent: 24)
+        rows.append(reminders)
         SettingsLayout.add(SettingsLayout.group(rows), to: tools)
     }
 
-    private func choiceRow(title: String, detail: String, needs: String, icon: NSImage, button: NSButton) -> NSView {
+    private func choiceRow(title: String, detail: String, needs: String, icon: NSImage, button: NSButton, indent: CGFloat = 0) -> NSView {
         let heading = SettingsLayout.label(title)
         heading.font = .systemFont(ofSize: 13, weight: .semibold)
         let copy = SettingsLayout.stack(spacing: 2)
@@ -216,12 +222,24 @@ final class OnboardingView: NSView {
             SettingsLayout.add(label, to: copy)
         }
         let image = NSImageView(image: icon)
-        image.widthAnchor.constraint(equalToConstant: icon.size.width).isActive = true
-        image.heightAnchor.constraint(equalToConstant: icon.size.height).isActive = true
-        let row = NSStackView(views: [image, copy, button])
-        row.distribution = .fill
-        row.spacing = 12
-        row.alignment = .centerY
+        image.imageScaling = .scaleProportionallyDown
+        image.widthAnchor.constraint(equalToConstant: 32).isActive = true
+        image.heightAnchor.constraint(equalToConstant: 32).isActive = true
+        let row = NSView()
+        for child in [image, copy, button] {
+            child.translatesAutoresizingMaskIntoConstraints = false
+            row.addSubview(child)
+        }
+        NSLayoutConstraint.activate([
+            image.leadingAnchor.constraint(equalTo: row.leadingAnchor, constant: indent),
+            image.topAnchor.constraint(equalTo: copy.topAnchor),
+            copy.leadingAnchor.constraint(equalTo: image.trailingAnchor, constant: 12),
+            copy.topAnchor.constraint(equalTo: row.topAnchor, constant: 8),
+            copy.bottomAnchor.constraint(equalTo: row.bottomAnchor, constant: -8),
+            copy.trailingAnchor.constraint(equalTo: button.leadingAnchor, constant: -16),
+            button.trailingAnchor.constraint(equalTo: row.trailingAnchor),
+            button.centerYAnchor.constraint(equalTo: heading.centerYAnchor)
+        ])
         copy.setHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)
         copy.setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)
         copy.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)

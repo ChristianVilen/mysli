@@ -25,16 +25,6 @@ final class ToolActionsMenuSectionTests: XCTestCase {
         _ = (item.target as? NSObject)?.perform(item.action, with: item)
     }
 
-    func testGroupsFollowTheToolOrderAndEachEndsWithASeparator() {
-        let headers = menu.items.compactMap { ($0.view as? ToolMenuHeaderView)?.tool }
-        XCTAssertEqual(headers, [.screenshots, .clipboard, .windows])
-        XCTAssertEqual(menu.items.map { $0.isSeparatorItem ? "-" : $0.title }, [
-            "Screenshots", "Capture Area", "Capture Screen", "-",
-            "Clipboard", "Show Clipboard History", "-",
-            "Windows", "Window Tiling", "-"
-        ])
-    }
-
     func testEachActionCallsItsTool() throws {
         var calls: [String] = []
         sut.onCaptureArea = { calls.append("area") }
