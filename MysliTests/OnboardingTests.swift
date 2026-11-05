@@ -44,18 +44,18 @@ final class OnboardingTests: XCTestCase {
         XCTAssertFalse(settings.calendarRecordingRemindersEnabled)
     }
 
-    func testContinuingAppliesToolsAndSavesAccessStepBeforeRequestingReminders() {
+    func testContinuingSavesAccessStepBeforeSendingChoicesToApply() {
         sut.advance()
         for tool in [MysliTool.screenshots, .windows, .keepAwake] { sut.setTool(tool, enabled: false) }
         sut.setCalendarReminders(true)
-        var applied: [Bool] = []
-        sut.onApplyChoices = { reminders in
+        var applied: [ToolSelection] = []
+        sut.onApplyChoices = { selection in
             XCTAssertEqual(self.reload().step, .permissions)
-            XCTAssertEqual(self.settings.enabledTools, [.clipboard, .meetings])
-            applied.append(reminders)
+            applied.append(selection)
         }
         sut.advance()
-        XCTAssertEqual(applied, [true])
+        XCTAssertEqual(applied, [ToolSelection(tools: [.clipboard, .meetings], calendarReminders: true)])
+        XCTAssertEqual(settings.enabledTools, Set(MysliTool.allCases), "the model does not apply tool preferences")
         XCTAssertFalse(settings.calendarRecordingRemindersEnabled, "only the reminder controller writes this preference")
         XCTAssertEqual(sut.requiredPermissions.permissions, [.accessibility, .screenRecording, .microphone, .calendar, .notifications])
         XCTAssertTrue(reload().wasResumed)
@@ -72,7 +72,7 @@ final class OnboardingTests: XCTestCase {
         XCTAssertFalse(sut.calendarReminders)
     }
 
-    func testBackKeepsDraftChoicesWithoutChangingAppliedTools() {
+    func testBackKeepsDraftChoicesWithoutApplyingThem() {
         sut.advance()
         sut.setTool(.clipboard, enabled: false)
         sut.back()
@@ -80,7 +80,7 @@ final class OnboardingTests: XCTestCase {
         sut.advance()
         XCTAssertFalse(sut.selectedTools.contains(.clipboard))
         sut.advance()
-        XCTAssertFalse(settings.clipboardHistoryEnabled)
+        XCTAssertTrue(settings.clipboardHistoryEnabled)
         sut.back()
         XCTAssertEqual(reload().step, .tools)
     }
@@ -91,13 +91,13 @@ final class OnboardingTests: XCTestCase {
         sut.setTool(.meetings, enabled: false)
         sut.setTool(.meetings, enabled: true)
         sut.setCalendarReminders(true)
-        var applied: [Bool] = []
+        var applied: [ToolSelection] = []
         sut.onApplyChoices = { applied.append($0) }
         sut.skip()
         XCTAssertTrue(reload().isFinished)
         XCTAssertEqual(defaults.object(forKey: "onboardingFinished") as? Bool, true)
-        XCTAssertEqual(settings.enabledTools, Set(MysliTool.allCases))
-        XCTAssertEqual(applied, [false])
+        XCTAssertFalse(settings.screenshotShortcutsEnabled)
+        XCTAssertEqual(applied, [ToolSelection(tools: Set(MysliTool.allCases), calendarReminders: false)])
     }
 
     func testFinishAllowsMissingAccessAndLaterLaunchUsesEnabledTools() {
@@ -109,6 +109,7 @@ final class OnboardingTests: XCTestCase {
         sut.advance()
         sut.advance()
         XCTAssertTrue(reload().isFinished)
+        for tool in MysliTool.allCases where tool != .keepAwake { settings.setEnabled(tool, enabled: false) }
         XCTAssertEqual(reload().launchDestination(for: missing), .none)
         settings.meetingsEnabled = true
         XCTAssertEqual(reload().launchDestination(for: missing), .permissions)

@@ -62,7 +62,10 @@ final class ToolActionsMenuSectionTests: XCTestCase {
 
     func testWindowTilingAsksForTheOppositeOfTheCurrentChoice() throws {
         var asked: [Bool] = []
-        sut.onWindowTilingChanged = { asked.append($0) }
+        sut.onToolChanged = { tool, enabled in
+            XCTAssertEqual(tool, .windows)
+            asked.append(enabled)
+        }
         click(try item("Window Tiling"))
         tilingOn = false
         click(try item("Window Tiling"))

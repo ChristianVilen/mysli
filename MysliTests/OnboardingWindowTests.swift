@@ -23,8 +23,10 @@ final class OnboardingWindowTests: XCTestCase {
     }
 
     private func makeController(_ model: Onboarding) -> SettingsWindowController {
-        SettingsWindowController(settings: settings, onboarding: model, present: { _ in },
-                                 activation: .fake(), isWindowVisible: { _ in true })
+        let tools = ToolController(settings: settings, applyEffect: { _, _ in }, setCalendarReminders: { _ in })
+        model.onApplyChoices = { tools.apply($0) }
+        return SettingsWindowController(settings: settings, onboarding: model, present: { _ in },
+                                        activation: .fake(), isWindowVisible: { _ in true })
     }
 
     func testSetupAndNormalPagesShareOneWindowAndPollOnlyOnTheAccessStep() throws {

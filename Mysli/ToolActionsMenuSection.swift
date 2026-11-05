@@ -6,7 +6,7 @@ final class ToolActionsMenuSection: NSObject, NSMenuItemValidation, MenuSection 
     var onCaptureArea: (() -> Void)?
     var onCaptureScreen: (() -> Void)?
     var onShowClipboardHistory: (() -> Void)?
-    var onWindowTilingChanged: ((Bool) -> Void)?
+    var onToolChanged: ((MysliTool, Bool) -> Void)?
 
     private let screenshotsOn: () -> Bool
     private let clipboardOn: () -> Bool
@@ -67,5 +67,5 @@ final class ToolActionsMenuSection: NSObject, NSMenuItemValidation, MenuSection 
     @objc private func captureArea() { onCaptureArea?() }
     @objc private func captureScreen() { onCaptureScreen?() }
     @objc private func showClipboardHistory() { onShowClipboardHistory?() }
-    @objc private func toggleTiling() { onWindowTilingChanged?(!tilingOn()) }
+    @objc private func toggleTiling() { onToolChanged?(.windows, !tilingOn()) }
 }

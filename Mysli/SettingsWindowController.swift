@@ -51,11 +51,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     let permissionsPage: SettingsPermissionsView
     let helpPage: SettingsHelpView
     private var displayObserver: NSObjectProtocol?
-    var onScreenshotsChanged: ((Bool) -> Void)?
-    var onTilingChanged: ((Bool) -> Void)?
-    var onClipboardChanged: ((Bool) -> Void)?
-    var onKeepAwakeChanged: ((Bool) -> Void)?
-    var onMeetingsChanged: ((Bool) -> Void)?
+    var onToolChanged: ((MysliTool, Bool) -> Void)?
     var onKeepScreenOnChanged: ((Bool) -> Void)?
     var onPermissionsVisibilityChanged: ((Bool) -> Void)?
     var onMeetingsFolderChanged: ((URL) -> Void)?
@@ -448,9 +444,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     }
 
     @objc private func screenshotsChanged() {
-        settings.screenshotShortcutsEnabled = screenshotShortcuts.state == .on
-        refreshPermissionRequirements()
-        onScreenshotsChanged?(settings.screenshotShortcutsEnabled)
+        onToolChanged?(.screenshots, screenshotShortcuts.state == .on)
     }
 
     @objc private func keepScreenOnChanged() {
@@ -459,27 +453,19 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     }
 
     @objc private func keepAwakeChanged() {
-        settings.keepAwakeEnabled = keepAwakeEnabled.state == .on
-        onKeepAwakeChanged?(settings.keepAwakeEnabled)
+        onToolChanged?(.keepAwake, keepAwakeEnabled.state == .on)
     }
 
     @objc private func meetingsChanged() {
-        settings.meetingsEnabled = meetingsEnabled.state == .on
-        refreshPermissionRequirements()
-        calendarReminders.isEnabled = settings.meetingsEnabled
-        onMeetingsChanged?(settings.meetingsEnabled)
+        onToolChanged?(.meetings, meetingsEnabled.state == .on)
     }
 
     @objc private func tilingChanged() {
-        settings.windowTilingEnabled = windowTiling.state == .on
-        refreshPermissionRequirements()
-        onTilingChanged?(settings.windowTilingEnabled)
+        onToolChanged?(.windows, windowTiling.state == .on)
     }
 
     @objc private func clipboardChanged() {
-        settings.clipboardHistoryEnabled = clipboardHistory.state == .on
-        refreshPermissionRequirements()
-        onClipboardChanged?(settings.clipboardHistoryEnabled)
+        onToolChanged?(.clipboard, clipboardHistory.state == .on)
     }
 
     @objc private func calendarChanged() {

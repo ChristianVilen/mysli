@@ -73,6 +73,16 @@ final class Settings {
         return tools
     }
 
+    func setEnabled(_ tool: MysliTool, enabled: Bool) {
+        switch tool {
+        case .screenshots: screenshotShortcutsEnabled = enabled
+        case .clipboard: clipboardHistoryEnabled = enabled
+        case .windows: windowTilingEnabled = enabled
+        case .keepAwake: keepAwakeEnabled = enabled
+        case .meetings: meetingsEnabled = enabled
+        }
+    }
+
     var requiredPermissions: RequiredPermissions {
         RequiredPermissions(tools: enabledTools, calendarReminders: calendarRecordingRemindersEnabled)
     }

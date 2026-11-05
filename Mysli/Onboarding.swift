@@ -9,7 +9,7 @@ final class Onboarding {
     private(set) var calendarReminders: Bool
     private(set) var isFinished: Bool
     let wasResumed: Bool
-    var onApplyChoices: ((Bool) -> Void)?
+    var onApplyChoices: ((ToolSelection) -> Void)?
     private let settings: Settings
     private let defaults: UserDefaults
 
@@ -34,9 +34,8 @@ final class Onboarding {
         case .welcome:
             saveStep(.tools)
         case .tools:
-            applyTools()
             saveStep(.permissions)
-            onApplyChoices?(calendarReminders)
+            onApplyChoices?(ToolSelection(tools: selectedTools, calendarReminders: calendarReminders))
         case .permissions:
             finish()
         }
@@ -69,22 +68,13 @@ final class Onboarding {
         selectedTools = Set(MysliTool.allCases)
         calendarReminders = settings.calendarRecordingRemindersEnabled
         saveChoices()
-        applyTools()
         finish()
-        onApplyChoices?(calendarReminders)
+        onApplyChoices?(ToolSelection(tools: selectedTools, calendarReminders: calendarReminders))
     }
 
     func launchDestination(for snapshot: PermissionSnapshot) -> LaunchDestination {
         if !isFinished { return .onboarding }
         return settings.requiredPermissions.allGranted(in: snapshot) ? .none : .permissions
-    }
-
-    private func applyTools() {
-        settings.screenshotShortcutsEnabled = selectedTools.contains(.screenshots)
-        settings.clipboardHistoryEnabled = selectedTools.contains(.clipboard)
-        settings.windowTilingEnabled = selectedTools.contains(.windows)
-        settings.keepAwakeEnabled = selectedTools.contains(.keepAwake)
-        settings.meetingsEnabled = selectedTools.contains(.meetings)
     }
 
     private func saveChoices() {

@@ -4,13 +4,13 @@ The integration is off by default. Eligible events offer **Start Recording**, th
 
 ## Settings and onboarding
 
-`AppDelegate.calendarReminders` exposes the app-owned `CalendarReminderController?` on the main actor. It becomes available when production launch begins its resume task. XCTest and `--uitesting` do not construct this controller. Settings and onboarding use the same controller, EventKit source, and notification delegate.
+`AppDelegate.calendarReminders` exposes the app-owned `CalendarReminderController?` on the main actor. Production launch assigns it before starting its resume task. XCTest and `--uitesting` do not construct this controller. Settings and onboarding use the same controller, EventKit source, and notification delegate.
 
-The switch reads `Settings.calendarRecordingRemindersEnabled`, whose default is false. Its action awaits `calendarReminders?.setEnabled(newValue)`. Writing the defaults key alone does not enable reminders or request access.
+The switch reads `Settings.calendarRecordingRemindersEnabled`, whose default is false. Its action sends the choice to `ToolController`. That owner applies the tool flags first, then awaits `calendarReminders?.setEnabled(newValue)`. Writing the defaults key alone does not enable reminders or request access.
 
 Meetings must be on. Turning Meetings off calls `setEnabled(false)` and disables the reminder switch. Turning Meetings back on leaves reminders off. The controller also refuses an enable request while `Settings.meetingsEnabled` is false.
 
-Onboarding offers reminders as an unchecked choice under Meetings. Continue applies that choice through `setEnabled(_:)` when it differs from the saved preference. `Onboarding` saves the Allow access step before the callback can show permission prompts. Skip setup keeps the saved reminder setting and does not apply an unsubmitted choice.
+Onboarding offers reminders as an unchecked choice under Meetings. Continue sends a `ToolSelection` to the same `ToolController`. It applies the reminder choice through `setEnabled(_:)` when it differs from the saved preference. A choice replaced before its task starts is not applied. `Onboarding` saves the Allow access step before the callback can show permission prompts. Skip setup keeps the saved reminder setting and does not apply an unsubmitted choice.
 
 `AppDelegate` owns `controller.onStatusChange`. The callback runs on the main actor and updates the Meetings status line and permission snapshots. Views do not replace it. The status cases are `off`, `requestingAccess`, `ready`, `calendarAccessRequired`, `notificationsRequired`, and `readFailed`.
 

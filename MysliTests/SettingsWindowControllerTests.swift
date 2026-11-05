@@ -10,6 +10,8 @@ final class SettingsWindowControllerTests: XCTestCase {
     private var picked: URL?
     private var policies: [NSApplication.ActivationPolicy] = []
     private var activations = 0
+    private var tools: ToolController!
+    private var toolEffects: [Bool] = []
 
     override func setUp() {
         super.setUp()
@@ -26,11 +28,17 @@ final class SettingsWindowControllerTests: XCTestCase {
             present: { _ in },
             activation: .fake(setPolicy: { [unowned self] in policies.append($0) },
                               activateApp: { [unowned self] in activations += 1 }))
+        toolEffects = []
+        tools = ToolController(settings: settings, applyEffect: { [unowned self] _, enabled in toolEffects.append(enabled) },
+                               setCalendarReminders: { _ in })
+        tools.onChange = { [unowned self] in sut.refresh() }
+        sut.onToolChanged = { [unowned self] in tools.setEnabled($0, enabled: $1) }
     }
 
     override func tearDown() {
         sut.close()
         sut = nil
+        tools = nil
         defaults.removePersistentDomain(forName: "SettingsWindowControllerTests")
         super.tearDown()
     }
@@ -49,9 +57,6 @@ final class SettingsWindowControllerTests: XCTestCase {
     func testSwitchesSavePreferencesAndApplyTypedEffects() {
         var effects: [Bool] = []
         var calendar: [Bool] = []
-        sut.onScreenshotsChanged = { effects.append($0) }
-        sut.onTilingChanged = { effects.append($0) }
-        sut.onClipboardChanged = { effects.append($0) }
         sut.onKeepScreenOnChanged = { effects.append($0) }
         sut.onCalendarRemindersChanged = { calendar.append($0) }
         sut.show()
@@ -65,24 +70,20 @@ final class SettingsWindowControllerTests: XCTestCase {
         XCTAssertFalse(settings.clipboardHistoryEnabled)
         XCTAssertFalse(settings.keepDisplayAwake)
         XCTAssertTrue(settings.teamsSpeakerNamesEnabled)
-        XCTAssertEqual(effects, [false, false, false, false])
+        XCTAssertEqual(toolEffects, [false, false, false])
+        XCTAssertEqual(effects, [false])
         XCTAssertEqual(calendar, [true])
         XCTAssertNil(defaults.object(forKey: "calendarRecordingRemindersEnabled"),
                      "only CalendarReminderController.setEnabled saves the calendar choice")
     }
 
     func testToolSwitchesSaveAndReportChoicesAndMeetingsControlsReminders() {
-        var awake: [Bool] = []
-        var meetings: [Bool] = []
-        sut.onKeepAwakeChanged = { awake.append($0) }
-        sut.onMeetingsChanged = { meetings.append($0) }
         sut.show()
         sut.keepAwakeEnabled.performClick(nil)
         sut.meetingsEnabled.performClick(nil)
         XCTAssertFalse(settings.keepAwakeEnabled)
         XCTAssertFalse(settings.meetingsEnabled)
-        XCTAssertEqual(awake, [false])
-        XCTAssertEqual(meetings, [false])
+        XCTAssertEqual(toolEffects, [false, false])
         XCTAssertFalse(sut.calendarReminders.isEnabled)
         sut.meetingsEnabled.performClick(nil)
         XCTAssertTrue(sut.calendarReminders.isEnabled)

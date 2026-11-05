@@ -20,12 +20,14 @@ final class SettingsPreviewAppDelegate: NSObject, NSApplicationDelegate {
             settings: settings, permissionActions: .inert, openURL: { _ in },
             present: present, activation: activation)
         super.init()
+        let tools = ToolController(settings: settings, applyEffect: { [keepAwake] tool, enabled in
+            if tool == .keepAwake && !enabled { keepAwake.deactivate() }
+        }, setCalendarReminders: { _ in })
+        tools.onChange = { [weak settingsWindow] in settingsWindow?.refresh() }
+        settingsWindow.onToolChanged = { tool, enabled in tools.setEnabled(tool, enabled: enabled) }
         statusMenu.onShowSettings = { [weak self] in self?.settingsWindow.show() }
         keepAwake.onDisplayAwakeChanged = { settings.keepDisplayAwake = $0 }
         settingsWindow.onKeepScreenOnChanged = { [keepAwake] in keepAwake.setDisplayAwake($0) }
-        settingsWindow.onKeepAwakeChanged = { [keepAwake] enabled in
-            if !enabled { keepAwake.deactivate() }
-        }
         settingsWindow.renderPermissions(.init(accessibility: true, screenRecording: false, microphone: .notDetermined,
                                                calendar: .notDetermined, notifications: .notDetermined))
     }
