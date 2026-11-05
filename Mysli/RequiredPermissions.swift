@@ -10,6 +10,16 @@ enum MysliPermission: CaseIterable {
         case .notifications: "Notifications"
         }
     }
+
+    var explanation: String {
+        switch self {
+        case .accessibility: "Move windows and paste items from clipboard history."
+        case .screenRecording: "Take screenshots and record Mac audio for meeting notes. macOS may ask you to quit and reopen Mysli. Unfinished setup returns to its saved step."
+        case .microphone: "Record your voice for meeting notes."
+        case .calendar: "Read event titles and times for calendar reminders. Mysli never changes your calendar."
+        case .notifications: "Show calendar reminders when an event starts or ends."
+        }
+    }
 }
 
 struct RequiredPermissions {

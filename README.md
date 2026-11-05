@@ -450,6 +450,8 @@ Mysli/
 ├── Onboarding.swift     # Setup choices, saved progress, and launch destination
 ├── OnboardingView.swift # Welcome, tool choices, and access steps
 ├── RequiredPermissions.swift # Access needed by enabled tools and reminder choice
+├── PermissionListView.swift # Shared permission rows, status, and grant actions
+├── ToolController.swift  # Applies tool choices and their runtime effects
 ├── OrdinaryWindowActivation.swift # Shared activation while ordinary windows are open
 ├── HotkeyManager.swift  # Desired shortcuts, feature toggles, retry and wake recovery
 ├── HotkeyShortcut.swift # Shortcut definitions and registration failures

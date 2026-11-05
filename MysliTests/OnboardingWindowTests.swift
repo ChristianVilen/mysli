@@ -44,7 +44,7 @@ final class OnboardingWindowTests: XCTestCase {
         XCTAssertFalse(settings.clipboardHistoryEnabled)
         controller.renderPermissions(.init(accessibility: true, screenRecording: true, microphone: .granted,
                                            calendar: .notDetermined, notifications: .notDetermined))
-        XCTAssertFalse(view.permissionRows.first { $0.permission == .microphone }!.view.grantButton.isEnabled)
+        XCTAssertFalse(try XCTUnwrap(view.permissionList.rows.first { $0.permission == .microphone }).view.grantButton.isEnabled)
         view.nextButton.performClick(nil)
         XCTAssertTrue(model.isFinished)
         XCTAssertTrue(controller.window === window)

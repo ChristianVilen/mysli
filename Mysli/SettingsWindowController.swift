@@ -163,7 +163,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
     func renderPermissions(_ snapshot: PermissionSnapshot) {
         refreshPermissionRequirements()
-        permissionsPage.render(snapshot)
+        permissionsPage.permissionList.render(snapshot)
         onboardingView?.renderPermissions(snapshot)
     }
 

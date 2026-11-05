@@ -8,7 +8,7 @@ final class OnboardingView: NSView {
     let skipButton = NSButton(title: "Skip setup", target: nil, action: nil)
     private(set) var toolButtons: [MysliTool: NSButton] = [:]
     let remindersButton = NSButton(checkboxWithTitle: "", target: nil, action: nil)
-    private(set) var permissionRows: [(permission: MysliPermission, view: PermissionRowView)] = []
+    let permissionList: PermissionListView
     var onChange: (() -> Void)?
 
     private let welcome = NSView()
@@ -20,18 +20,17 @@ final class OnboardingView: NSView {
     private let progressLabel = SettingsLayout.label("", size: 12, secondary: true)
     private let resumed = SettingsLayout.label("Welcome back. Your setup progress was saved. Continue here.", size: 12)
     private let resumedBanner = NSView()
-    private let permissionList = SettingsLayout.stack(spacing: 12)
-    private let permissionGlass = SettingsGlass()
     private var snapshot = PermissionSnapshot(accessibility: false, screenRecording: false, microphone: .notDetermined,
                                                calendar: .notDetermined, notifications: .notDetermined)
 
     init(model: Onboarding, actions: PermissionActions) {
         self.model = model
+        permissionList = PermissionListView(actions: actions, spacing: 12, inset: 14)
         super.init(frame: .zero)
         SettingsLayout.fill(SettingsBackground(), in: self)
         buildWelcome()
         buildTools()
-        buildAccess(actions)
+        buildAccess()
         let footer = NSView()
         addSubview(footer)
         footer.translatesAutoresizingMaskIntoConstraints = false
@@ -108,8 +107,7 @@ final class OnboardingView: NSView {
             MysliTool.allCases.compactMap { toolButtons[$0] }
                 + (remindersButton.isEnabled ? [remindersButton] : []) + [backButton, nextButton]
         case .permissions:
-            permissionRows.filter { !$0.view.isHidden && $0.view.grantButton.isEnabled }.map { $0.view.grantButton }
-                + [backButton, nextButton]
+            permissionList.controls.filter(\.isEnabled) + [backButton, nextButton]
         }
     }
 
@@ -232,7 +230,7 @@ final class OnboardingView: NSView {
         return row
     }
 
-    private func buildAccess(_ actions: PermissionActions) {
+    private func buildAccess() {
         resumed.textColor = .controlAccentColor
         let resumeIcon = NSImageView(image: NSImage(systemSymbolName: "arrow.clockwise", accessibilityDescription: nil)!)
         resumeIcon.contentTintColor = .controlAccentColor
@@ -251,20 +249,7 @@ final class OnboardingView: NSView {
         progressRow.spacing = 12
         progressLabel.setContentHuggingPriority(.required, for: .horizontal)
         SettingsLayout.add(progressRow, to: access)
-        let descriptions: [(MysliPermission, String, () -> Void)] = [
-            (.accessibility, "For Clipboard and Windows. Paste items and move windows.", actions.accessibility),
-            (.screenRecording, "For Screenshots and Meetings. macOS may ask you to quit and reopen Mysli. Mysli opens this step again.", actions.screenRecording),
-            (.microphone, "For Meetings. Record your voice.", actions.microphone),
-            (.calendar, "For calendar reminders. Read event titles and times.", actions.calendar),
-            (.notifications, "For calendar reminders. Show reminders when an event starts or ends.", actions.notifications)
-        ]
-        for (permission, detail, action) in descriptions {
-            let row = PermissionRowView(title: permission.title, explanation: detail, grant: action)
-            permissionRows.append((permission, row))
-            SettingsLayout.add(row, to: permissionList)
-        }
-        SettingsLayout.fill(permissionList, in: permissionGlass.content, inset: 14)
-        SettingsLayout.add(permissionGlass, to: access)
+        SettingsLayout.add(permissionList, to: access)
         SettingsLayout.add(SettingsLayout.label("You can finish now and allow the rest later. Settings shows what is missing on its Permissions page.", size: 12, secondary: true), to: access)
     }
 
@@ -272,11 +257,8 @@ final class OnboardingView: NSView {
         resumedBanner.isHidden = !model.wasResumed
         resumedBanner.layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(0.08).cgColor
         let required = model.requiredPermissions.permissions
-        for row in permissionRows {
-            row.view.isHidden = !required.contains(row.permission)
-            row.view.setStatus(snapshot.status(for: row.permission))
-        }
-        permissionGlass.isHidden = required.isEmpty
+        permissionList.showRequired(model.requiredPermissions)
+        permissionList.render(snapshot)
         let allowed = required.filter { snapshot.status(for: $0) == .granted }.count
         progress.maxValue = Double(max(1, required.count))
         progress.doubleValue = Double(required.isEmpty ? 1 : allowed)

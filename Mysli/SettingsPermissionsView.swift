@@ -1,116 +1,19 @@
 import Cocoa
 
-struct PermissionActions {
-    let accessibility: () -> Void
-    let screenRecording: () -> Void
-    let microphone: () -> Void
-    let calendar: () -> Void
-    let notifications: () -> Void
-    let keyboardSettings: () -> Void
-
-    static let inert = Self(accessibility: {}, screenRecording: {}, microphone: {}, calendar: {}, notifications: {}, keyboardSettings: {})
-}
-
-final class PermissionRowView: NSView {
-    let grantButton = NSButton(title: "Grant", target: nil, action: nil)
-    private let statusIcon = NSImageView()
-    private let name: String
-    private let grant: () -> Void
-    private var shownStatus: PermissionSnapshot.Status?
-
-    init(title: String, explanation: String, grant: @escaping () -> Void) {
-        name = title
-        self.grant = grant
-        super.init(frame: .zero)
-        let copy = SettingsLayout.stack(spacing: 4)
-        let heading = SettingsLayout.label(title)
-        heading.font = .systemFont(ofSize: 13, weight: .semibold)
-        SettingsLayout.add(heading, to: copy)
-        SettingsLayout.add(SettingsLayout.label(explanation, size: 12, secondary: true), to: copy)
-        copy.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        copy.setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)
-        statusIcon.widthAnchor.constraint(equalToConstant: 18).isActive = true
-        statusIcon.heightAnchor.constraint(equalToConstant: 18).isActive = true
-        grantButton.target = self
-        grantButton.action = #selector(grantClicked)
-        grantButton.bezelStyle = .rounded
-        grantButton.setContentHuggingPriority(.required, for: .horizontal)
-        grantButton.setContentCompressionResistancePriority(.required, for: .horizontal)
-        let row = NSStackView(views: [statusIcon, copy, grantButton])
-        row.distribution = .fill
-        row.alignment = .top
-        row.spacing = 10
-        SettingsLayout.fill(row, in: self)
-        setStatus(.missing)
-    }
-
-    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
-
-    func setStatus(_ status: PermissionSnapshot.Status) {
-        guard status != shownStatus else { return }
-        shownStatus = status
-        let text: String
-        let symbol: String
-        switch status {
-        case .granted:
-            symbol = "checkmark.circle.fill"
-            statusIcon.contentTintColor = .systemGreen
-            grantButton.title = "Allowed"
-            text = "Allowed"
-        case .missing:
-            symbol = "xmark.circle"
-            statusIcon.contentTintColor = .systemRed
-            grantButton.title = "Grant"
-            text = "Not granted"
-        case .notAsked:
-            symbol = "minus.circle"
-            statusIcon.contentTintColor = .secondaryLabelColor
-            grantButton.title = "Allow"
-            text = "Not asked yet"
-        }
-        statusIcon.image = NSImage(systemSymbolName: symbol, accessibilityDescription: "\(name): \(text)")
-        grantButton.setAccessibilityLabel("\(grantButton.title) \(name)")
-        grantButton.isEnabled = status != .granted
-    }
-
-    @objc private func grantClicked() { grant() }
-}
-
 final class SettingsPermissionsView: NSStackView {
-    let accessibilityRow: PermissionRowView
-    let screenRecordingRow: PermissionRowView
-    let microphoneRow: PermissionRowView
-    let calendarRow: PermissionRowView
-    let notificationsRow: PermissionRowView
+    let permissionList: PermissionListView
     let keyboardSettings = NSButton(title: "Open Keyboard Settings…", target: nil, action: nil)
     private let shortcutText = SettingsLayout.label("", size: 12)
     private let keyboardAction: () -> Void
     private let shortcutGroup: SettingsGlass
     private let shortcutHeading = SettingsLayout.heading("Screenshot shortcuts", symbol: "keyboard", color: .systemOrange)
-    private let permissionGroup: SettingsGlass
-
-    var rows: [(permission: MysliPermission, view: PermissionRowView)] {
-        [(.accessibility, accessibilityRow), (.screenRecording, screenRecordingRow),
-         (.microphone, microphoneRow), (.calendar, calendarRow), (.notifications, notificationsRow)]
-    }
 
     var controls: [NSView] {
-        rows.filter { !$0.view.isHidden }.map { $0.view.grantButton }
-            + (shortcutGroup.isHidden ? [] : [keyboardSettings])
+        permissionList.controls + (shortcutGroup.isHidden ? [] : [keyboardSettings])
     }
 
     init(actions: PermissionActions) {
-        accessibilityRow = PermissionRowView(title: "Accessibility", explanation: "Move windows and paste items from clipboard history.", grant: actions.accessibility)
-        screenRecordingRow = PermissionRowView(title: "Screen Recording", explanation: "Take screenshots and record Mac audio for meeting notes. After you grant access, macOS may ask you to restart Mysli.", grant: actions.screenRecording)
-        microphoneRow = PermissionRowView(title: "Microphone", explanation: "Record your voice for meeting notes.", grant: actions.microphone)
-        calendarRow = PermissionRowView(title: "Calendar", explanation: "Read event titles and times for calendar reminders. Mysli never changes your calendar.", grant: actions.calendar)
-        notificationsRow = PermissionRowView(title: "Notifications", explanation: "Show reminders when a calendar meeting starts or ends.", grant: actions.notifications)
-        permissionGroup = SettingsGlass()
-        let permissionRows = SettingsLayout.stack(spacing: 14)
-        for row in [accessibilityRow, screenRecordingRow, microphoneRow, calendarRow, notificationsRow] {
-            SettingsLayout.add(row, to: permissionRows)
-        }
-        SettingsLayout.fill(permissionRows, in: permissionGroup.content, inset: 10)
+        permissionList = PermissionListView(actions: actions)
         keyboardAction = actions.keyboardSettings
         shortcutGroup = SettingsLayout.group([shortcutText, keyboardSettings])
         super.init(frame: .zero)
@@ -118,7 +21,7 @@ final class SettingsPermissionsView: NSStackView {
         alignment = .leading
         spacing = 16
         SettingsLayout.add(SettingsLayout.page(title: "Permissions", subtitle: "Allow access for the features you use. Status updates while this page is open."), to: self)
-        SettingsLayout.add(permissionGroup, to: self)
+        SettingsLayout.add(permissionList, to: self)
         SettingsLayout.add(SettingsLayout.label("Turn on more tools to see their permissions.", size: 12, secondary: true), to: self)
         SettingsLayout.add(shortcutHeading, to: self)
         SettingsLayout.add(shortcutGroup, to: self)
@@ -126,22 +29,13 @@ final class SettingsPermissionsView: NSStackView {
         keyboardSettings.bezelStyle = .rounded
         keyboardSettings.target = self
         keyboardSettings.action = #selector(openKeyboardSettings)
-        render(.init(accessibility: false, screenRecording: false, microphone: .notDetermined,
-                     calendar: .notDetermined, notifications: .notDetermined))
         showShortcutConflicts([])
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
-    func render(_ snapshot: PermissionSnapshot) {
-        for row in rows { row.view.setStatus(snapshot.status(for: row.permission)) }
-    }
-
     func showRequired(_ required: RequiredPermissions, screenshotShortcuts: Bool) {
-        for row in rows {
-            row.view.isHidden = !required.permissions.contains(row.permission)
-        }
-        permissionGroup.isHidden = required.permissions.isEmpty
+        permissionList.showRequired(required)
         shortcutGroup.isHidden = !screenshotShortcuts
         shortcutHeading.isHidden = !screenshotShortcuts
     }

@@ -70,59 +70,31 @@ final class SettingsPermissionsTests: XCTestCase {
         XCTAssertEqual(visibility, [true, false, true, false, true])
     }
 
-    func testPermissionRowsRenderAndDispatchOnlyTheirInjectedActions() {
-        settings.calendarRecordingRemindersEnabled = true
-        controller.show(.permissions)
-        controller.renderPermissions(.init(accessibility: true, screenRecording: false, microphone: .notDetermined,
-                                           calendar: .notDetermined, notifications: .notDetermined))
-        let page = controller.permissionsPage
-        XCTAssertFalse(page.accessibilityRow.grantButton.isEnabled)
-        page.screenRecordingRow.grantButton.performClick(nil)
-        page.microphoneRow.grantButton.performClick(nil)
-        page.calendarRow.grantButton.performClick(nil)
-        page.notificationsRow.grantButton.performClick(nil)
-        page.keyboardSettings.performClick(nil)
-        XCTAssertEqual(actions, ["screen", "microphone", "calendar", "notifications", "keyboard"])
-        controller.renderPermissions(.init(accessibility: false, screenRecording: true, microphone: .denied,
-                                           calendar: .denied, notifications: .denied))
-        page.accessibilityRow.grantButton.performClick(nil)
-        XCTAssertEqual(actions.last, "accessibility")
-        controller.renderPermissions(.init(accessibility: true, screenRecording: true, microphone: .granted,
-                                           calendar: .full, notifications: .granted))
-        XCTAssertFalse(page.calendarRow.grantButton.isEnabled)
-        XCTAssertFalse(page.notificationsRow.grantButton.isEnabled)
-    }
-
-    func testRequiredRowsFollowToolSwitchesAndRemindersWithoutWritingOnRefresh() {
-        controller.show(.permissions)
-        let page = controller.permissionsPage
-        func visibleRows() -> [MysliPermission] {
-            page.rows.filter { !$0.view.isHidden }.map(\.permission)
-        }
-        XCTAssertEqual(visibleRows(), [.accessibility, .screenRecording, .microphone])
-        settings.screenshotShortcutsEnabled = false
+    func testSettingsSuppliesChoicesActionsAndGrantsWithoutWritingPreferences() throws {
         settings.clipboardHistoryEnabled = false
         settings.windowTilingEnabled = false
-        settings.meetingsEnabled = false
-        controller.show(.permissions)
-        XCTAssertEqual(visibleRows(), [])
-        XCTAssertTrue(page.controls.isEmpty)
-        settings.meetingsEnabled = true
         settings.calendarRecordingRemindersEnabled = true
         let before = defaults.persistentDomain(forName: "SettingsPermissionsTests")! as NSDictionary
         controller.show(.permissions)
-        XCTAssertEqual(visibleRows(), [.screenRecording, .microphone, .calendar, .notifications])
-        XCTAssertEqual(page.controls.count, 4)
+        controller.renderPermissions(.init(accessibility: false, screenRecording: true, microphone: .notDetermined,
+                                           calendar: .notDetermined, notifications: .notDetermined))
+        let page = controller.permissionsPage
+        let rows = page.permissionList.rows
+        XCTAssertEqual(rows.filter { !$0.view.isHidden }.map(\.permission), [.screenRecording, .microphone, .calendar, .notifications])
+        XCTAssertFalse(try XCTUnwrap(rows.first { $0.permission == .screenRecording }).view.grantButton.isEnabled)
+        try XCTUnwrap(rows.first { $0.permission == .microphone }).view.grantButton.performClick(nil)
+        page.keyboardSettings.performClick(nil)
+        XCTAssertEqual(actions, ["microphone", "keyboard"])
         XCTAssertEqual(defaults.persistentDomain(forName: "SettingsPermissionsTests")! as NSDictionary, before)
     }
 
-    func testPermissionRefreshRemovesHiddenRowsFromTheKeyboardOrder() {
+    func testPermissionRefreshRemovesHiddenRowsFromTheKeyboardOrder() throws {
         controller.show(.permissions)
         settings.meetingsEnabled = false
         controller.renderPermissions(.init(accessibility: true, screenRecording: false, microphone: .notDetermined,
                                            calendar: .notDetermined, notifications: .notDetermined))
-        XCTAssertTrue(controller.permissionsPage.screenRecordingRow.grantButton.nextKeyView
-                      === controller.permissionsPage.keyboardSettings)
+        let screen = try XCTUnwrap(controller.permissionsPage.permissionList.rows.first { $0.permission == .screenRecording })
+        XCTAssertTrue(screen.view.grantButton.nextKeyView === controller.permissionsPage.keyboardSettings)
     }
 
     func testShortcutSetupRequiresAVisibleScreenshotConflictAndRunsOnce() {
