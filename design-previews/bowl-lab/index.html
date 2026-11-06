@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Mysli / Motion studies</title>
+  <style>
+    *{box-sizing:border-box}html,body{margin:0;height:100%;background:#ebedec;color:#262b2c;font:14px/1.4 -apple-system,BlinkMacSystemFont,sans-serif}button,a{font:inherit;color:inherit}button{cursor:pointer}button:focus-visible,a:focus-visible{outline:2px solid #b72d48;outline-offset:4px}header{background:#fff;border-bottom:1px solid #d9dddc;padding:13px 26px;display:flex;align-items:center;gap:25px;flex-wrap:wrap;min-height:78px}.identity{font-size:12px;letter-spacing:.01em;min-width:150px}.identity b{display:block;font-size:17px;letter-spacing:-.7px;font-weight:650}.identity span{color:#777d80;font-size:11px}nav{display:flex;gap:22px;align-items:center;flex:1}nav button{position:relative;padding:11px 0;border:0;background:transparent;font-weight:500;white-space:nowrap;color:#6b7174}nav button[aria-pressed=true]{color:#262b2c}nav button[aria-pressed=true]::after{content:'';position:absolute;left:0;right:0;bottom:2px;height:2px;background:#b72d48;border-radius:100% 70% 20% 50%;transform:rotate(-1deg)}.actions{display:flex;align-items:center;gap:20px;font-size:12px}.actions button{border:0;background:transparent;padding:8px 0}.actions a{color:#6b7174;text-underline-offset:4px}iframe{display:block;width:100%;height:calc(100vh - 78px);border:0;background:#f7f7f5} @media(max-width:750px){header{padding:12px 18px;gap:6px 16px;min-height:115px}.identity{min-width:0;flex:1}.identity span{display:none}nav{order:3;flex-basis:100%;gap:18px}nav button{font-size:12px}.actions{gap:14px}iframe{height:calc(100vh - 115px)}}
+  </style>
+</head>
+<body>
+  <header><div class="identity"><b>Mysli / Motion studies</b><span>Three hand-drawn directions</span></div><nav aria-label="Prototype options"><button type="button" data-view="living" aria-pressed="true">The living bowl</button><button type="button" data-view="mix" aria-pressed="false">Mix your own</button><button type="button" data-view="story" aria-pressed="false">Five good things</button></nav><div class="actions"><button type="button" id="replay">Replay</button><a id="separate" href="living.html" target="_blank" rel="noopener">Open separately</a></div></header>
+  <iframe id="prototype" src="living.html" title="The living bowl prototype"></iframe>
+  <script>
+    const frame = document.getElementById('prototype');
+    const separate = document.getElementById('separate');
+    const names = {living:'The living bowl',mix:'Mix your own',story:'Five good things'};
+    let active = 'living';
+    function select(view) {
+      if (!Object.hasOwn(names, view)) return;
+      active = view;
+      frame.src = view + '.html';
+      frame.title = names[view] + ' prototype';
+      separate.href = view + '.html';
+      document.querySelectorAll('[data-view]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.view === view)));
+      history.replaceState(null, '', '?view=' + view);
+    }
+    document.querySelectorAll('[data-view]').forEach(button => button.addEventListener('click',()=>select(button.dataset.view)));
+    document.getElementById('replay').addEventListener('click',()=>{frame.src=active+'.html?replay='+Date.now();});
+    const requested = new URLSearchParams(location.search).get('view');
+    if (requested && Object.hasOwn(names, requested)) select(requested);
+  </script>
+</body></html>

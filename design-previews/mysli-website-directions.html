@@ -1,0 +1,299 @@
+<meta charset="utf-8">
+<style>
+  #mysli-directions .mysli-page {
+    color-scheme: light dark;
+    --m-paper: light-dark(#F8F8FA, #141416);
+    --m-panel: light-dark(#FFFFFF, #222226);
+    --m-soft: light-dark(#EDEDF1, #1C1C20);
+    --m-line: light-dark(#DCDCE3, #39393F);
+    --m-ink: light-dark(#202024, #F4F4F6);
+    --m-muted: light-dark(#60606C, #B5B5C0);
+    --m-berry: light-dark(#B4233C, #E5566B);
+    --m-button-ink: light-dark(#FFFFFF, #17171B);
+    --m-shadow: light-dark(#14141821, #00000050);
+    background: var(--m-paper); color: var(--m-ink);
+    font: 14px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    min-height: 1640px; display: flex; flex-direction: column;
+  }
+  #mysli-directions .mysli-page * { box-sizing: border-box; }
+  #mysli-directions .mysli-page [hidden] { display: none !important; }
+  #mysli-directions .mysli-page h1,
+  #mysli-directions .mysli-page h2,
+  #mysli-directions .mysli-page h3,
+  #mysli-directions .mysli-page p { margin: 0; }
+  #mysli-directions .mysli-page button,
+  #mysli-directions .mysli-page textarea { font: inherit; }
+  #mysli-directions .mysli-page button { color: inherit; }
+  #mysli-directions .mysli-page a { color: inherit; text-decoration: none; }
+  #mysli-directions .m-wrap { padding-inline: clamp(20px, 5.5%, 58px); }
+  #mysli-directions .m-nav { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding-block: 19px; }
+  #mysli-directions .m-brand { display: flex; align-items: center; gap: 9px; font-size: 21px; font-weight: 650; letter-spacing: -.7px; }
+  #mysli-directions .m-logo { width: 36px; height: 36px; background: #F5F5F7; border-radius: 10px; }
+  #mysli-directions .m-navlinks { display: flex; align-items: center; gap: 22px; font-size: 12px; }
+  #mysli-directions .m-link { text-decoration: underline !important; text-underline-offset: 4px; }
+  #mysli-directions .m-cta { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 11px 18px; background: var(--m-berry); color: var(--m-button-ink) !important; border: 0; border-radius: 9px; font-weight: 600; }
+  #mysli-directions .m-nav .m-cta { padding: 8px 13px; }
+  #mysli-directions .m-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 18px; margin-top: 25px; font-size: 13px; }
+  #mysli-directions .m-meta { margin-top: 15px !important; color: var(--m-muted); font-size: 11px; }
+  #mysli-directions .m-deck { color: var(--m-muted); font-size: 15px; line-height: 1.7; max-width: 38em; }
+  #mysli-directions .m-showcase-hero { display: grid; grid-template-columns: 1.05fr 1fr; gap: 34px; align-items: center; padding-block: 64px 55px; }
+  #mysli-directions .m-showcase-hero h1 { font-size: clamp(38px, 6.2vw, 66px); font-weight: 650; letter-spacing: -.055em; line-height: 1.06; margin-bottom: 22px; }
+  #mysli-directions .m-desktop { position: relative; min-height: 326px; background: var(--m-soft); border-radius: 20px; padding: 13px; }
+  #mysli-directions .m-menubar { display: flex; align-items: center; justify-content: flex-end; gap: 14px; font-size: 10px; color: var(--m-muted); padding: 0 6px 12px; }
+  #mysli-directions .m-menubar img { width: 22px; height: 22px; }
+  #mysli-directions .m-menu { background: var(--m-panel); padding: 9px 13px; border: 1px solid var(--m-line); border-radius: 12px; box-shadow: 0 12px 32px var(--m-shadow); width: 100%; }
+  #mysli-directions .m-menu-group { padding: 7px 0; border-bottom: 1px solid var(--m-line); }
+  #mysli-directions .m-menu-group:last-child { border: 0; }
+  #mysli-directions .m-menu-title { font-weight: 650; font-size: 10px; color: var(--m-muted); margin-bottom: 3px !important; }
+  #mysli-directions .m-menu-item { display: flex; align-items: center; justify-content: space-between; gap: 9px; font-size: 11px; padding-block: 3px; }
+  #mysli-directions .m-menu-item span:last-child { color: var(--m-muted); white-space: nowrap; }
+  #mysli-directions .m-pill { margin: 14px 3px 0; display: flex; align-items: center; gap: 8px; padding: 9px 11px; background: var(--m-panel); border: 1px solid var(--m-line); border-radius: 22px; font-size: 10px; }
+  #mysli-directions .m-record-dot { background: var(--m-berry); width: 7px; height: 7px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+  #mysli-directions .m-pill-end { margin-left: auto; display: flex; align-items: center; gap: 13px; }
+  #mysli-directions .m-pause { display: inline-flex; justify-content: space-between; width: 7px; height: 9px; }
+  #mysli-directions .m-pause::before,
+  #mysli-directions .m-pause::after { content: ''; width: 2px; height: 9px; background: currentColor; border-radius: 1px; }
+  #mysli-directions .m-stop { display: inline-block; width: 8px; height: 8px; background: currentColor; border-radius: 1px; }
+  #mysli-directions .m-radio { display: inline-block; width: 8px; height: 8px; border: 1px solid currentColor; border-radius: 50%; }
+  #mysli-directions .m-intro { padding-block: 30px 15px; }
+  #mysli-directions .m-intro h2,
+  #mysli-directions .m-comparison h2,
+  #mysli-directions .m-install h2 { font-size: 29px; line-height: 1.16; letter-spacing: -1px; font-weight: 600; }
+  #mysli-directions .m-intro p { margin-top: 8px; color: var(--m-muted); }
+  #mysli-directions .m-tool-row { display: grid; grid-template-columns: 38px 1fr 130px; align-items: center; gap: 15px; padding-block: 21px; border-bottom: 1px solid var(--m-line); }
+  #mysli-directions .m-tool-row h3 { font-size: 16px; font-weight: 600; letter-spacing: -.3px; }
+  #mysli-directions .m-tool-row p { color: var(--m-muted); font-size: 12px; margin-top: 4px; }
+  #mysli-directions .m-tool-row .m-shortcut { text-align: right; font-size: 12px; color: var(--m-muted); }
+  #mysli-directions .m-tool-icon { display: grid; place-items: center; width: 36px; height: 36px; background: var(--m-soft); color: var(--m-berry); border-radius: 10px; }
+  #mysli-directions .m-tool-icon svg { width: 19px; height: 19px; }
+  #mysli-directions .m-comparison { padding-block: 46px; }
+  #mysli-directions .m-comparison > p { color: var(--m-muted); margin-top: 9px; max-width: 42em; }
+  #mysli-directions .m-compare-table { border-collapse: collapse; margin-top: 22px; width: 100%; font-size: 12px; }
+  #mysli-directions .m-compare-table th { color: var(--m-muted); font-weight: 500; text-align: left; }
+  #mysli-directions .m-compare-table th,
+  #mysli-directions .m-compare-table td { padding: 9px 10px 9px 0; border-bottom: 1px solid var(--m-line); vertical-align: top; }
+  #mysli-directions .m-compare-table td:first-child { font-weight: 600; width: 30%; }
+  #mysli-directions .m-install { background: var(--m-soft); padding-block: 32px; display: grid; grid-template-columns: 1fr 1.2fr; gap: 26px; align-items: center; }
+  #mysli-directions .m-install p { margin-top: 10px; color: var(--m-muted); font-size: 12px; }
+  #mysli-directions .m-install code { display: block; white-space: normal; overflow-wrap: anywhere; font: 11px/1.8 ui-monospace, SFMono-Regular, monospace; padding: 17px; background: var(--m-panel); border-radius: 10px; }
+  #mysli-directions .m-footer { margin-top: auto; padding-block: 24px; display: flex; flex-wrap: wrap; gap: 10px 20px; justify-content: space-between; color: var(--m-muted); font-size: 11px; }
+  #mysli-directions .m-lab-hero { text-align: center; padding-block: 26px 28px; }
+  #mysli-directions .m-lab-hero .m-logo { width: 78px; height: 78px; border-radius: 23px; margin: 0 auto 13px; }
+  #mysli-directions .m-lab-hero h1 { font-size: clamp(39px, 6.2vw, 64px); font-weight: 650; letter-spacing: -.055em; line-height: 1.07; }
+  #mysli-directions .m-lab-hero .m-deck { margin: 17px auto 0; max-width: 32em; }
+  #mysli-directions .m-lab-hero .m-actions { justify-content: center; margin-top: 20px; }
+  #mysli-directions .m-playground { padding-block: 12px 24px; }
+  #mysli-directions .m-picker { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; margin-bottom: 14px; }
+  #mysli-directions .m-picker button { border: 0; border-radius: 9px; padding: 9px 11px; background: transparent; font-size: 12px; }
+  #mysli-directions .m-picker button[aria-pressed="true"] { background: var(--m-ink); color: var(--m-paper); }
+  #mysli-directions .m-demo { background: var(--m-soft); border-radius: 20px; padding: 22px; min-height: 296px; display: flex; flex-direction: column; justify-content: center; }
+  #mysli-directions .m-demo-caption { margin-top: 12px !important; text-align: center; color: var(--m-muted); font-size: 12px; }
+  #mysli-directions .m-capture { position: relative; width: 100%; max-width: 440px; min-height: 175px; margin: 0 auto; background: var(--m-panel); border: 1px solid var(--m-line); border-radius: 12px; padding: 21px; }
+  #mysli-directions .m-capture h3 { font-size: 20px; font-weight: 600; letter-spacing: -.5px; }
+  #mysli-directions .m-capture p { font-size: 12px; color: var(--m-muted); margin-top: 9px; }
+  #mysli-directions .m-capture-target { border: 1px dashed var(--m-muted); padding: 15px; border-radius: 4px; }
+  #mysli-directions .m-capture-target[data-captured="true"] { border: 2px solid var(--m-berry); padding: 14px; }
+  #mysli-directions .m-demo-controls { display: flex; flex-wrap: wrap; gap: 9px; align-items: center; justify-content: center; margin-top: 15px; }
+  #mysli-directions .m-small-button { background: var(--m-panel); border: 1px solid var(--m-line); border-radius: 8px; padding: 7px 12px; font-size: 12px !important; }
+  #mysli-directions .m-demo-result { color: var(--m-muted); font-size: 12px; }
+  #mysli-directions .m-demo-pane { width: 100%; max-width: 450px; margin: 0 auto; }
+  #mysli-directions .m-history { display: grid; gap: 7px; }
+  #mysli-directions .m-history button { text-align: left; background: var(--m-panel); border: 1px solid var(--m-line); border-radius: 8px; padding: 10px 13px; font-size: 12px; }
+  #mysli-directions .m-history button[aria-pressed="true"] { border-color: var(--m-berry); }
+  #mysli-directions .m-paste { padding: 12px 0 0; color: var(--m-muted); font-size: 12px; }
+  #mysli-directions .m-window-screen { height: 170px; background: var(--m-paper); border-radius: 10px; padding: 10px; display: flex; align-items: stretch; }
+  #mysli-directions .m-tile-window { background: var(--m-panel); border: 1px solid var(--m-line); border-radius: 8px; width: 50%; display: flex; align-items: center; justify-content: center; color: var(--m-muted); font-size: 13px; }
+  #mysli-directions .m-awake { text-align: center; }
+  #mysli-directions .m-awake strong { display: block; font-size: 42px; font-weight: 500; letter-spacing: -2px; }
+  #mysli-directions .m-awake p { font-size: 12px; color: var(--m-muted); margin: 7px 0 16px; }
+  #mysli-directions .m-meeting { background: var(--m-panel); border: 1px solid var(--m-line); border-radius: 13px; padding: 15px; font-size: 12px; }
+  #mysli-directions .m-meeting-head { display: flex; justify-content: space-between; gap: 10px; border-bottom: 1px solid var(--m-line); padding-bottom: 10px; }
+  #mysli-directions .m-transcript { padding: 10px 0; }
+  #mysli-directions .m-transcript p { margin-block: 7px; }
+  #mysli-directions .m-transcript b { color: var(--m-berry); font-weight: 500; }
+  #mysli-directions .m-note { width: 100%; resize: vertical; min-height: 50px; padding: 9px; color: var(--m-ink); background: var(--m-paper); border: 1px solid var(--m-line); border-radius: 7px; font-size: 12px !important; }
+  #mysli-directions .m-lab-tools { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 30px; }
+  #mysli-directions .m-lab-tools .m-tool-row { grid-template-columns: 30px 1fr; gap: 11px; padding-block: 16px; }
+  #mysli-directions .m-lab-tools .m-tool-icon { width: 30px; height: 30px; }
+  #mysli-directions .m-lab-tools .m-shortcut { display: none; }
+  #mysli-directions .m-lab-tools .m-tool-row:last-child { grid-column: 1 / -1; }
+  #mysli-directions .m-story { color: var(--m-muted); text-align: center; padding-block: 24px 0; font-size: 12px; }
+  @media (max-width: 560px) {
+    #mysli-directions .mysli-page { min-height: 2350px; }
+    #mysli-directions .m-navlinks { gap: 14px; }
+    #mysli-directions .m-navlinks .m-nav-tools { display: none; }
+    #mysli-directions .m-showcase-hero { grid-template-columns: 1fr; gap: 30px; padding-block: 34px; }
+    #mysli-directions .m-showcase-hero h1 { max-width: 8em; font-size: 48px; }
+    #mysli-directions .m-desktop { max-width: 350px; width: 100%; margin-inline: auto; }
+    #mysli-directions .m-tool-row { grid-template-columns: 34px 1fr; gap: 12px; }
+    #mysli-directions .m-tool-row .m-shortcut { display: none; }
+    #mysli-directions .m-install { grid-template-columns: 1fr; gap: 18px; }
+    #mysli-directions .m-lab-hero h1 { font-size: 45px; }
+    #mysli-directions .m-lab-tools { grid-template-columns: 1fr; }
+    #mysli-directions .m-demo { padding: 16px; min-height: 320px; }
+    #mysli-directions .m-capture { padding: 14px; }
+    #mysli-directions .m-picker button { font-size: 11px; padding: 9px; }
+    #mysli-directions .m-compare-table td:first-child { width: 34%; }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    #mysli-directions .m-tile-window { transition: width .22s ease, margin .22s ease; }
+  }
+  @media (pointer: coarse) {
+    #mysli-directions .mysli-page button { min-height: 44px; }
+    #mysli-directions .m-note { font-size: 16px !important; }
+  }
+</style>
+<div id="mysli-directions" class="viz-carousel" aria-label="Mysli website directions">
+  <section data-variant="Product showcase" aria-label="Product showcase website">
+    <div class="mysli-page m-showcase" aria-label="Mysli product showcase">
+      <nav class="m-nav m-wrap" aria-label="Showcase navigation">
+        <a class="m-brand" href="#mysli-showcase-top"><img class="m-logo" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjEwMCAxMDAgODI0IDgyNCI+CiAgPHJlY3QgeD0iMTgwIiB5PSI0OTUiIHdpZHRoPSI2NjQiIGhlaWdodD0iNDAiIHJ4PSIyMCIgZmlsbD0iIzJFMjExOCIvPgogIDxwYXRoIGQ9Ik0gMjA0IDUyMCBIIDgyMCBDIDgxNiA2NjUgNjg0IDc2NSA1MTIgNzY1IEMgMzQwIDc2NSAyMDggNjY1IDIwNCA1MjAgWiIgZmlsbD0iIzJFMjExOCIvPgoKICA8Y2lyY2xlIGN4PSI2MTgiIGN5PSIzMzUiIHI9Ijc2IiBmaWxsPSIjQjQyMzNDIi8+CgogIDxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDQyMCAzNDUpIHJvdGF0ZSgtMTApIj4KICAgIDxyZWN0IHg9Ii03MCIgeT0iLTcwIiB3aWR0aD0iNjQiIGhlaWdodD0iMTQwIiByeD0iMjAiIGZpbGw9IiNEOUE0NDEiLz4KICAgIDxyZWN0IHg9IjYiIHk9Ii03MCIgd2lkdGg9IjY0IiBoZWlnaHQ9IjE0MCIgcng9IjIwIiBmaWxsPSIjRDlBNDQxIi8+CiAgPC9nPgoKICA8ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg3MTIgNDYzKSByb3RhdGUoMTApIj4KICAgIDxyZWN0IHg9Ii02OCIgeT0iLTY4IiB3aWR0aD0iMTM2IiBoZWlnaHQ9IjEzNiIgcng9IjI2IiBmaWxsPSIjRTJCMDdBIi8+CiAgICA8cGF0aCBkPSJNIC00MiAtMTQgViAtNDIgSCAtMTQgTSAxNCAtNDIgSCA0MiBWIC0xNCBNIDQyIDE0IFYgNDIgSCAxNCBNIC0xNCA0MiBIIC00MiBWIDE0IiBzdHJva2U9IiMyRTIxMTgiIHN0cm9rZS13aWR0aD0iMTQiIGZpbGw9Im5vbmUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgogIDwvZz4KCiAgPGVsbGlwc2UgY3g9IjUxMiIgY3k9IjQ4MCIgcng9IjkyIiByeT0iNTYiIHRyYW5zZm9ybT0icm90YXRlKC0xMCA1MTIgNDgwKSIgZmlsbD0iI0Q0QjA3MCIvPgogIDxlbGxpcHNlIGN4PSI1NDgiIGN5PSI0NDUiIHJ4PSI5MiIgcnk9IjU2IiB0cmFuc2Zvcm09InJvdGF0ZSg4IDU0OCA0NDUpIiBmaWxsPSIjRTlDRTk2Ii8+CgogIDxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDMzMCA0NjMpIHJvdGF0ZSgtMjApIj4KICAgIDxlbGxpcHNlIHJ4PSIxMDAiIHJ5PSI2OCIgZmlsbD0iIzVBM0EyNCIvPgogICAgPHBhdGggZD0iTSAtNzQgMCBDIC0zMCAtMjQgMzAgMjQgNzQgMCIgc3Ryb2tlPSIjOEM1RTNDIiBzdHJva2Utd2lkdGg9IjE0IiBmaWxsPSJub25lIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICA8L2c+Cjwvc3ZnPg==" alt="" />Mysli</a>
+        <div class="m-navlinks"><a class="m-nav-tools" href="#mysli-showcase-tools">The tools</a><a href="https://github.com/ChristianVilen/mysli">GitHub</a><a class="m-cta" href="#mysli-showcase-install">Get Mysli</a></div>
+      </nav>
+      <header id="mysli-showcase-top" class="m-showcase-hero m-wrap">
+        <div>
+          <h1>A daily mix<br />of Mac tools.</h1>
+          <p class="m-deck">Screenshots, clipboard history, window tiling, Keep Awake and private meeting notes, in one menu bar app.</p>
+          <div class="m-actions"><a class="m-cta" href="#mysli-showcase-install">Get Mysli for Mac</a><a class="m-link" href="#mysli-showcase-tools">Meet the tools</a></div>
+          <p class="m-meta">Free and open source. For macOS 26 or later.</p>
+        </div>
+        <div class="m-desktop" aria-label="Illustrative Mysli menu and recording controls">
+          <div class="m-menubar"><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjEwMCAxMDAgODI0IDgyNCI+CiAgPHJlY3QgeD0iMTgwIiB5PSI0OTUiIHdpZHRoPSI2NjQiIGhlaWdodD0iNDAiIHJ4PSIyMCIgZmlsbD0iIzJFMjExOCIvPgogIDxwYXRoIGQ9Ik0gMjA0IDUyMCBIIDgyMCBDIDgxNiA2NjUgNjg0IDc2NSA1MTIgNzY1IEMgMzQwIDc2NSAyMDggNjY1IDIwNCA1MjAgWiIgZmlsbD0iIzJFMjExOCIvPgoKICA8Y2lyY2xlIGN4PSI2MTgiIGN5PSIzMzUiIHI9Ijc2IiBmaWxsPSIjQjQyMzNDIi8+CgogIDxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDQyMCAzNDUpIHJvdGF0ZSgtMTApIj4KICAgIDxyZWN0IHg9Ii03MCIgeT0iLTcwIiB3aWR0aD0iNjQiIGhlaWdodD0iMTQwIiByeD0iMjAiIGZpbGw9IiNEOUE0NDEiLz4KICAgIDxyZWN0IHg9IjYiIHk9Ii03MCIgd2lkdGg9IjY0IiBoZWlnaHQ9IjE0MCIgcng9IjIwIiBmaWxsPSIjRDlBNDQxIi8+CiAgPC9nPgoKICA8ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg3MTIgNDYzKSByb3RhdGUoMTApIj4KICAgIDxyZWN0IHg9Ii02OCIgeT0iLTY4IiB3aWR0aD0iMTM2IiBoZWlnaHQ9IjEzNiIgcng9IjI2IiBmaWxsPSIjRTJCMDdBIi8+CiAgICA8cGF0aCBkPSJNIC00MiAtMTQgViAtNDIgSCAtMTQgTSAxNCAtNDIgSCA0MiBWIC0xNCBNIDQyIDE0IFYgNDIgSCAxNCBNIC0xNCA0MiBIIC00MiBWIDE0IiBzdHJva2U9IiMyRTIxMTgiIHN0cm9rZS13aWR0aD0iMTQiIGZpbGw9Im5vbmUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgogIDwvZz4KCiAgPGVsbGlwc2UgY3g9IjUxMiIgY3k9IjQ4MCIgcng9IjkyIiByeT0iNTYiIHRyYW5zZm9ybT0icm90YXRlKC0xMCA1MTIgNDgwKSIgZmlsbD0iI0Q0QjA3MCIvPgogIDxlbGxpcHNlIGN4PSI1NDgiIGN5PSI0NDUiIHJ4PSI5MiIgcnk9IjU2IiB0cmFuc2Zvcm09InJvdGF0ZSg4IDU0OCA0NDUpIiBmaWxsPSIjRTlDRTk2Ii8+CgogIDxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDMzMCA0NjMpIHJvdGF0ZSgtMjApIj4KICAgIDxlbGxpcHNlIHJ4PSIxMDAiIHJ5PSI2OCIgZmlsbD0iIzVBM0EyNCIvPgogICAgPHBhdGggZD0iTSAtNzQgMCBDIC0zMCAtMjQgMzAgMjQgNzQgMCIgc3Ryb2tlPSIjOEM1RTNDIiBzdHJva2Utd2lkdGg9IjE0IiBmaWxsPSJub25lIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICA8L2c+Cjwvc3ZnPg==" alt="Mysli" /><span>Thu 10:24</span></div>
+          <div class="m-menu">
+            <div class="m-menu-group"><p class="m-menu-title">Screenshots</p><div class="m-menu-item">Capture Full Screen <span>&#x21E7;&#x2318;3</span></div><div class="m-menu-item">Capture Area <span>&#x21E7;&#x2318;4</span></div></div>
+            <div class="m-menu-group"><p class="m-menu-title">Clipboard</p><div class="m-menu-item">Clipboard History <span>&#x21E7;&#x2318;C</span></div></div>
+            <div class="m-menu-group"><p class="m-menu-title">Windows</p><div class="m-menu-item">Tile Left <span>&#x2303;&#x2325;&#x2190;</span></div><div class="m-menu-item">Tile Right <span>&#x2303;&#x2325;&#x2192;</span></div></div>
+            <div class="m-menu-group"><p class="m-menu-title">Keep Awake</p><div class="m-menu-item">For 1 Hour <span class="m-radio" aria-hidden="true"></span></div></div>
+            <div class="m-menu-group"><p class="m-menu-title">Meetings</p><div class="m-menu-item">Start Recording Meeting <span class="m-record-dot" aria-hidden="true"></span></div></div>
+          </div>
+          <div class="m-pill"><span class="m-record-dot"></span><span>Recording</span><span>12:34</span><span class="m-pill-end"><span class="m-pause" role="img" aria-label="Pause"></span><span class="m-stop" role="img" aria-label="Stop"></span><span>Notes</span></span></div>
+        </div>
+      </header>
+      <section id="mysli-showcase-tools" class="m-wrap">
+        <div class="m-intro"><h2>Five tools. One small home.</h2><p>Turn on the tools you want. Leave the rest off.</p></div>
+        <div data-tool-list></div>
+      </section>
+      <section class="m-comparison m-wrap" data-comparison></section>
+      <section id="mysli-showcase-install" class="m-install m-wrap" data-install></section>
+      <footer class="m-footer m-wrap"><span>Mysli is Finnish for muesli: a mix of good things.</span><a href="https://github.com/ChristianVilen/mysli">Made by Christian Vilen</a></footer>
+    </div>
+  </section>
+  <section data-variant="Tool playground" aria-label="Tool playground website" hidden>
+    <div class="mysli-page m-playful" aria-label="Mysli tool playground">
+      <nav class="m-nav m-wrap" aria-label="Playground navigation">
+        <a class="m-brand" href="#mysli-playground-top"><img class="m-logo" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjEwMCAxMDAgODI0IDgyNCI+CiAgPHJlY3QgeD0iMTgwIiB5PSI0OTUiIHdpZHRoPSI2NjQiIGhlaWdodD0iNDAiIHJ4PSIyMCIgZmlsbD0iIzJFMjExOCIvPgogIDxwYXRoIGQ9Ik0gMjA0IDUyMCBIIDgyMCBDIDgxNiA2NjUgNjg0IDc2NSA1MTIgNzY1IEMgMzQwIDc2NSAyMDggNjY1IDIwNCA1MjAgWiIgZmlsbD0iIzJFMjExOCIvPgoKICA8Y2lyY2xlIGN4PSI2MTgiIGN5PSIzMzUiIHI9Ijc2IiBmaWxsPSIjQjQyMzNDIi8+CgogIDxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDQyMCAzNDUpIHJvdGF0ZSgtMTApIj4KICAgIDxyZWN0IHg9Ii03MCIgeT0iLTcwIiB3aWR0aD0iNjQiIGhlaWdodD0iMTQwIiByeD0iMjAiIGZpbGw9IiNEOUE0NDEiLz4KICAgIDxyZWN0IHg9IjYiIHk9Ii03MCIgd2lkdGg9IjY0IiBoZWlnaHQ9IjE0MCIgcng9IjIwIiBmaWxsPSIjRDlBNDQxIi8+CiAgPC9nPgoKICA8ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg3MTIgNDYzKSByb3RhdGUoMTApIj4KICAgIDxyZWN0IHg9Ii02OCIgeT0iLTY4IiB3aWR0aD0iMTM2IiBoZWlnaHQ9IjEzNiIgcng9IjI2IiBmaWxsPSIjRTJCMDdBIi8+CiAgICA8cGF0aCBkPSJNIC00MiAtMTQgViAtNDIgSCAtMTQgTSAxNCAtNDIgSCA0MiBWIC0xNCBNIDQyIDE0IFYgNDIgSCAxNCBNIC0xNCA0MiBIIC00MiBWIDE0IiBzdHJva2U9IiMyRTIxMTgiIHN0cm9rZS13aWR0aD0iMTQiIGZpbGw9Im5vbmUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgogIDwvZz4KCiAgPGVsbGlwc2UgY3g9IjUxMiIgY3k9IjQ4MCIgcng9IjkyIiByeT0iNTYiIHRyYW5zZm9ybT0icm90YXRlKC0xMCA1MTIgNDgwKSIgZmlsbD0iI0Q0QjA3MCIvPgogIDxlbGxpcHNlIGN4PSI1NDgiIGN5PSI0NDUiIHJ4PSI5MiIgcnk9IjU2IiB0cmFuc2Zvcm09InJvdGF0ZSg4IDU0OCA0NDUpIiBmaWxsPSIjRTlDRTk2Ii8+CgogIDxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDMzMCA0NjMpIHJvdGF0ZSgtMjApIj4KICAgIDxlbGxpcHNlIHJ4PSIxMDAiIHJ5PSI2OCIgZmlsbD0iIzVBM0EyNCIvPgogICAgPHBhdGggZD0iTSAtNzQgMCBDIC0zMCAtMjQgMzAgMjQgNzQgMCIgc3Ryb2tlPSIjOEM1RTNDIiBzdHJva2Utd2lkdGg9IjE0IiBmaWxsPSJub25lIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICA8L2c+Cjwvc3ZnPg==" alt="" />Mysli</a>
+        <div class="m-navlinks"><a class="m-nav-tools" href="#mysli-playground-tools">Try the tools</a><a href="https://github.com/ChristianVilen/mysli">GitHub</a><a class="m-cta" href="#mysli-playground-install">Get Mysli</a></div>
+      </nav>
+      <header id="mysli-playground-top" class="m-lab-hero m-wrap">
+        <img class="m-logo" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjEwMCAxMDAgODI0IDgyNCI+CiAgPHJlY3QgeD0iMTgwIiB5PSI0OTUiIHdpZHRoPSI2NjQiIGhlaWdodD0iNDAiIHJ4PSIyMCIgZmlsbD0iIzJFMjExOCIvPgogIDxwYXRoIGQ9Ik0gMjA0IDUyMCBIIDgyMCBDIDgxNiA2NjUgNjg0IDc2NSA1MTIgNzY1IEMgMzQwIDc2NSAyMDggNjY1IDIwNCA1MjAgWiIgZmlsbD0iIzJFMjExOCIvPgoKICA8Y2lyY2xlIGN4PSI2MTgiIGN5PSIzMzUiIHI9Ijc2IiBmaWxsPSIjQjQyMzNDIi8+CgogIDxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDQyMCAzNDUpIHJvdGF0ZSgtMTApIj4KICAgIDxyZWN0IHg9Ii03MCIgeT0iLTcwIiB3aWR0aD0iNjQiIGhlaWdodD0iMTQwIiByeD0iMjAiIGZpbGw9IiNEOUE0NDEiLz4KICAgIDxyZWN0IHg9IjYiIHk9Ii03MCIgd2lkdGg9IjY0IiBoZWlnaHQ9IjE0MCIgcng9IjIwIiBmaWxsPSIjRDlBNDQxIi8+CiAgPC9nPgoKICA8ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg3MTIgNDYzKSByb3RhdGUoMTApIj4KICAgIDxyZWN0IHg9Ii02OCIgeT0iLTY4IiB3aWR0aD0iMTM2IiBoZWlnaHQ9IjEzNiIgcng9IjI2IiBmaWxsPSIjRTJCMDdBIi8+CiAgICA8cGF0aCBkPSJNIC00MiAtMTQgViAtNDIgSCAtMTQgTSAxNCAtNDIgSCA0MiBWIC0xNCBNIDQyIDE0IFYgNDIgSCAxNCBNIC0xNCA0MiBIIC00MiBWIDE0IiBzdHJva2U9IiMyRTIxMTgiIHN0cm9rZS13aWR0aD0iMTQiIGZpbGw9Im5vbmUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgogIDwvZz4KCiAgPGVsbGlwc2UgY3g9IjUxMiIgY3k9IjQ4MCIgcng9IjkyIiByeT0iNTYiIHRyYW5zZm9ybT0icm90YXRlKC0xMCA1MTIgNDgwKSIgZmlsbD0iI0Q0QjA3MCIvPgogIDxlbGxpcHNlIGN4PSI1NDgiIGN5PSI0NDUiIHJ4PSI5MiIgcnk9IjU2IiB0cmFuc2Zvcm09InJvdGF0ZSg4IDU0OCA0NDUpIiBmaWxsPSIjRTlDRTk2Ii8+CgogIDxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDMzMCA0NjMpIHJvdGF0ZSgtMjApIj4KICAgIDxlbGxpcHNlIHJ4PSIxMDAiIHJ5PSI2OCIgZmlsbD0iIzVBM0EyNCIvPgogICAgPHBhdGggZD0iTSAtNzQgMCBDIC0zMCAtMjQgMzAgMjQgNzQgMCIgc3Ryb2tlPSIjOEM1RTNDIiBzdHJva2Utd2lkdGg9IjE0IiBmaWxsPSJub25lIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICA8L2c+Cjwvc3ZnPg==" alt="Mysli bowl icon" />
+        <h1>A daily mix of Mac tools.</h1>
+        <p class="m-deck">Screenshots, clipboard history, window tiling, Keep Awake and private meeting notes, in one menu bar app.</p>
+        <div class="m-actions"><a class="m-cta" href="#mysli-playground-install">Get Mysli for Mac</a><a class="m-link" href="#mysli-playground-tools">Try a little of each</a></div>
+        <p class="m-meta">Free and open source. For macOS 26 or later.</p>
+      </header>
+      <section id="mysli-playground-tools" class="m-playground m-wrap" aria-label="Interactive tool previews">
+        <div class="m-picker" role="group" aria-label="Choose a tool preview">
+          <button type="button" class="cursor-interaction" data-tool="screenshots" aria-pressed="true">Screenshots</button>
+          <button type="button" class="cursor-interaction" data-tool="clipboard" aria-pressed="false">Clipboard</button>
+          <button type="button" class="cursor-interaction" data-tool="windows" aria-pressed="false">Windows</button>
+          <button type="button" class="cursor-interaction" data-tool="awake" aria-pressed="false">Keep Awake</button>
+          <button type="button" class="cursor-interaction" data-tool="meetings" aria-pressed="false">Meetings</button>
+        </div>
+        <div class="m-demo">
+          <div class="m-demo-pane" data-pane="screenshots">
+            <div class="m-capture"><div class="m-capture-target" data-captured="false"><h3>A good idea, captured.</h3><p>Select a region. Keep the useful part. Copy it straight to your clipboard.</p></div></div>
+            <div class="m-demo-controls"><button class="m-small-button cursor-interaction" type="button" data-capture>Capture this</button><span class="m-demo-result" data-capture-result aria-live="polite">&#x21E7;&#x2318;4 on your Mac</span></div>
+          </div>
+          <div class="m-demo-pane" data-pane="clipboard" hidden>
+            <div class="m-history" role="group" aria-label="Example clipboard history"><button class="cursor-interaction" type="button" data-copy-item aria-pressed="false">Let's ship the simpler version.</button><button class="cursor-interaction" type="button" data-copy-item aria-pressed="false">https://github.com/ChristianVilen/mysli</button><button class="cursor-interaction" type="button" data-copy-item aria-pressed="false">Remember to bring the headphones.</button></div>
+            <p class="m-paste" data-paste-result aria-live="polite">Pick something you copied earlier.</p>
+          </div>
+          <div class="m-demo-pane" data-pane="windows" hidden>
+            <div class="m-window-screen"><div class="m-tile-window" data-tile-window>Your window</div></div>
+            <div class="m-demo-controls"><button type="button" class="m-small-button cursor-interaction" data-snap="left" aria-pressed="true">Left half</button><button type="button" class="m-small-button cursor-interaction" data-snap="right" aria-pressed="false">Right half</button><button type="button" class="m-small-button cursor-interaction" data-snap="full" aria-pressed="false">Full screen</button></div>
+          </div>
+          <div class="m-demo-pane m-awake" data-pane="awake" hidden><strong data-awake-time>1 hour</strong><p data-awake-status aria-live="polite">Let the long build finish.</p><button type="button" class="m-cta cursor-interaction" data-awake aria-pressed="false">Keep Awake</button></div>
+          <div class="m-demo-pane" data-pane="meetings" hidden>
+            <div class="m-meeting"><div class="m-meeting-head"><span><span class="m-record-dot"></span> Recording 12:34</span><span>Notes</span></div><div class="m-transcript"><p><b>Me &#183; 12:10</b><br />Let's ship the simpler version.</p><p><b>Them &#183; 12:18</b><br />Agreed. I'll update the design today.</p></div><label for="mysli-preview-note">Your notes</label><textarea id="mysli-preview-note" class="m-note" spellcheck="false">12:25  Ship the simpler version.</textarea></div>
+          </div>
+        </div>
+        <p class="m-demo-caption" data-tool-caption aria-live="polite">Capture, crop and copy. Keep the familiar shortcuts.</p>
+      </section>
+      <section class="m-wrap"><div class="m-intro"><h2>Pick your daily mix.</h2><p>Turn on the tools you want. Leave the rest off.</p></div><div class="m-lab-tools" data-tool-list></div></section>
+      <section class="m-comparison m-wrap" data-comparison></section>
+      <section id="mysli-playground-install" class="m-install m-wrap" data-install></section>
+      <footer class="m-footer m-wrap"><span>Mysli is Finnish for muesli: a mix of good things.</span><a href="https://github.com/ChristianVilen/mysli">Made by Christian Vilen</a></footer>
+    </div>
+  </section>
+</div>
+<script>
+  (() => {
+    const root = document.getElementById('mysli-directions');
+    const tools = [
+      {name: 'Screenshots', icon: 'scan', text: 'Capture a screen, a window or a region. Crop, draw and copy.', key: '&#x21E7;&#x2318;3  /  &#x21E7;&#x2318;4', limit: 'Freehand drawing and crop; no full image editor.'},
+      {name: 'Clipboard history', icon: 'clipboard', text: 'Find text and images you copied earlier. Paste them again.', key: '&#x21E7;&#x2318;C', limit: 'In memory only. History clears when you quit.'},
+      {name: 'Window tiling', icon: 'panels-left-bottom', text: 'Put a window on either half of the screen, or fill it.', key: '&#x2303;&#x2325;&#x2190;  /  &#x2303;&#x2325;&#x2192;', limit: 'A small set of fixed layouts and shortcuts.'},
+      {name: 'Keep Awake', icon: 'coffee', text: 'Keep your Mac awake while a long task finishes.', key: '30 min to 4 hours', limit: 'A timer or until you turn it off.'},
+      {name: 'Meeting notes', icon: 'notebook-pen', text: 'Record a call. Write notes. Get a transcript and a summary.', key: 'From the menu bar', limit: 'Local transcription. AI summaries use an external provider.'}
+    ];
+    root.querySelectorAll('[data-tool-list]').forEach(list => {
+      list.innerHTML = tools.map(tool => '<article class="m-tool-row"><span class="m-tool-icon"><i data-lucide="' + tool.icon + '" aria-hidden="true"></i></span><div><h3>' + tool.name + '</h3><p>' + tool.text + '</p></div><span class="m-shortcut">' + tool.key + '</span></article>').join('');
+    });
+    root.querySelectorAll('[data-comparison]').forEach(section => {
+      section.innerHTML = '<h2>One app instead of five.</h2><p>A few useful tools together, with clear limits.</p><table class="m-compare-table"><thead><tr><th scope="col">The tool</th><th scope="col">What to expect</th></tr></thead><tbody>' + tools.map(tool => '<tr><td>' + tool.name + '</td><td>' + tool.limit + '</td></tr>').join('') + '</tbody></table>';
+    });
+    root.querySelectorAll('[data-install]').forEach(section => {
+      section.innerHTML = '<div><h2>Make yourself at home.</h2><p>Install with Homebrew or <a class="m-link" href="https://github.com/ChristianVilen/mysli/releases/latest">download the latest release</a>.</p><p>Setup helps you choose your tools and allow the access they need.</p></div><code>brew tap ChristianVilen/mysli<br />brew trust --cask christianvilen/mysli/mysli<br />brew install --cask mysli</code>';
+    });
+    const captions = {
+      screenshots: 'Capture, crop and copy. Keep the familiar shortcuts.',
+      clipboard: 'Your recent copies, kept on this Mac and in memory only.',
+      windows: 'A few useful layouts, one shortcut away.',
+      awake: 'Keep the Mac awake for a task. Let it rest when you are done.',
+      meetings: 'Transcribe on your Mac. Send text to your chosen AI summary provider.'
+    };
+    root.querySelectorAll('[data-tool]').forEach(button => button.addEventListener('click', () => {
+      const selected = button.dataset.tool;
+      root.querySelectorAll('[data-tool]').forEach(item => item.setAttribute('aria-pressed', String(item === button)));
+      root.querySelectorAll('[data-pane]').forEach(pane => { pane.hidden = pane.dataset.pane !== selected; });
+      root.querySelector('[data-tool-caption]').textContent = captions[selected];
+    }));
+    root.querySelector('[data-capture]').addEventListener('click', event => {
+      const target = root.querySelector('[data-captured]');
+      const captured = target.dataset.captured !== 'true';
+      target.dataset.captured = String(captured);
+      event.currentTarget.textContent = captured ? 'Try again' : 'Capture this';
+      root.querySelector('[data-capture-result]').textContent = captured ? 'Preview captured. Ready to crop or copy.' : '\u21E7\u23184 on your Mac';
+    });
+    root.querySelectorAll('[data-copy-item]').forEach(button => button.addEventListener('click', () => {
+      root.querySelectorAll('[data-copy-item]').forEach(item => item.setAttribute('aria-pressed', String(item === button)));
+      root.querySelector('[data-paste-result]').textContent = 'Ready to paste: ' + button.textContent;
+    }));
+    root.querySelectorAll('[data-snap]').forEach(button => button.addEventListener('click', () => {
+      const windowPreview = root.querySelector('[data-tile-window]');
+      windowPreview.style.width = button.dataset.snap === 'full' ? '100%' : '50%';
+      windowPreview.style.marginLeft = button.dataset.snap === 'right' ? 'auto' : '0';
+      root.querySelectorAll('[data-snap]').forEach(item => item.setAttribute('aria-pressed', String(item === button)));
+    }));
+    root.querySelector('[data-awake]').addEventListener('click', event => {
+      const button = event.currentTarget;
+      const active = button.getAttribute('aria-pressed') !== 'true';
+      button.setAttribute('aria-pressed', String(active));
+      button.textContent = active ? 'Turn off' : 'Keep Awake';
+      root.querySelector('[data-awake-time]').textContent = active ? '1:00:00' : '1 hour';
+      root.querySelector('[data-awake-status]').textContent = active ? 'Awake for one hour in this preview.' : 'Let the long build finish.';
+    });
+    if (globalThis.lucide) globalThis.lucide.createIcons({ attrs: { width: 19, height: 19 } });
+    if (globalThis.Tweak) {
+      root.querySelectorAll('.mysli-page').forEach(page => {
+        const state = { accent: '#B4233C', space: 5.5 };
+        const tweak = new Tweak({ container: page, onChange: () => {
+          page.style.setProperty('--m-berry', state.accent);
+          page.querySelectorAll('.m-wrap').forEach(section => { section.style.paddingInline = state.space + '%'; });
+        }});
+        tweak.addColorPicker(state, 'accent', { label: 'Lingonberry accent', reference: '--m-berry' });
+        tweak.addSlider(state, 'space', { label: 'Page margin', min: 3, max: 9, step: .5, unit: '%' });
+      });
+    }
+  })();
+</script>

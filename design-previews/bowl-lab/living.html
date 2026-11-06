@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mysli / The living bowl</title><link rel="stylesheet" href="common.css"><link rel="stylesheet" href="living.css"></head>
+<body class="living-page">
+  <div class="grain" aria-hidden="true"></div>
+  <header class="living-nav"><a class="wordmark" href="living.html">mysli<span class="wordmark-dot">.</span></a><span class="nav-note">Little tools. Good company.</span><a class="nav-install" href="https://github.com/ChristianVilen/mysli/releases/latest" target="_blank" rel="noopener">Get Mysli for Mac</a></header>
+  <main>
+    <div class="living-layout">
+      <div class="copy-column">
+        <div class="intro-copy" id="intro">
+          <p class="handwritten intro-note">A little of everything you need.</p>
+          <h1>A daily mix<br>of Mac tools<span class="full-stop">.</span></h1>
+          <svg class="headline-mark" viewBox="0 0 300 20" aria-hidden="true"><path d="M4 12C67 3 148 5 296 8M36 17c93-6 175-5 236-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          <p class="intro-body">Screenshots. Things you copied. Windows in the right places. A Mac that stays awake. And good meeting notes.</p>
+          <p class="intro-body second">Five useful things, happily together in your menu bar.</p>
+          <div class="intro-actions"><a class="main-button" href="https://github.com/ChristianVilen/mysli/releases/latest" target="_blank" rel="noopener">Make room for Mysli</a><button class="quiet-button" type="button" id="meet-mix">Meet the mix</button></div>
+          <p class="small-print">Free &amp; open source. macOS 26 or later.</p>
+        </div>
+        <section class="feature-sheet" id="feature-sheet" aria-live="polite" aria-label="Selected tool" hidden></section>
+      </div>
+      <div class="bowl-column">
+        <div class="bowl-stage" id="bowl-stage" aria-label="Explore Mysli's five tools">
+          <div class="stage-wash" aria-hidden="true"></div>
+          <svg class="scribbles" viewBox="0 0 640 500" aria-hidden="true"><g fill="none" stroke="#667F8E" stroke-width="1.1" stroke-linecap="round"><path d="M125 84c5 14 25 19 38 31m-11-3 11 3-1-10"/><path d="M520 83c-4 23-20 35-38 41m12-1-12 1 5-10"/><path d="M86 252c-13-5-18-17-17-26m-5 8 5-8 6 6"/><path d="M529 354c18-6 24-17 22-29m-5 8 5-8 6 8"/></g><g stroke="#A7AFAE" stroke-width="1.2" fill="none"><path d="m116 344 8 8m-9 0 10-8m415-226 8 8m-8 0 8-8"/><path d="M577 231q8-11 13 0-5 8-13 0M163 56l1 7m-5-4 8-1"/></g></svg>
+          <p class="handwritten scene-note scene-note-left">a few everyday<br>favourites</p>
+          <p class="handwritten scene-note scene-note-right">pick a piece!</p>
+          <div class="bowl-art" id="bowl-back" aria-hidden="true"></div>
+          <div class="ingredient-layer" id="ingredients"></div>
+          <div class="bowl-art bowl-lip" id="bowl-lip" aria-hidden="true"></div>
+          <div class="selected-orbit" aria-hidden="true"><svg viewBox="0 0 200 160"><path d="M24 96C-8 30 112-8 176 41c60 44-22 130-97 99-30-13-51-37-49-62" fill="none" stroke="#B72D48" stroke-width="1.2" stroke-dasharray="3 6"/></svg></div>
+          <div class="bowl-caption"><span class="handwritten">A mix of good things.</span><button id="replay-mix" type="button" aria-label="Replay the bowl assembly">Mix again <span aria-hidden="true">&#x21BB;</span></button></div>
+        </div>
+      </div>
+    </div>
+    <section class="ingredient-index" aria-label="Choose a tool" id="ingredient-index"></section>
+    <footer class="living-footer"><span>One small home for your everyday tools.</span><span class="handwritten">Made for the way you work.</span><a href="https://github.com/ChristianVilen/mysli" target="_blank" rel="noopener">Take a peek at the code</a></footer>
+  </main>
+  <script type="module" src="living.js"></script>
+</body></html>

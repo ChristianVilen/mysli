@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#f7f7f5">
+    <title>Mysli · Mix your own</title>
+    <link rel="stylesheet" href="./common.css">
+    <link rel="stylesheet" href="./mix.css">
+  </head>
+  <body class="mix-page">
+    <header class="masthead">
+      <a class="wordmark" href="./mix.html" aria-label="Mysli home"><svg viewBox="0 0 42 36" aria-hidden="true"><path d="M4 15q17-6 34 0M5 15q1 16 16 17t16-17M12 8l2-4m7 3 1-5m7 7 3-4"/></svg>Mysli<span>little tools for your Mac</span></a>
+      <a class="download" href="https://github.com/ChristianVilen/mysli/releases/latest" target="_blank" rel="noopener">Get Mysli <span aria-hidden="true">↗</span></a>
+    </header>
+
+    <main>
+      <section class="introduction" aria-labelledby="title">
+        <div class="title-block"><p class="handwritten intro-note">A good day starts with a good mix.</p><h1 id="title">Your Mac.<br>Your mix.</h1></div>
+        <div class="introduction-copy"><p>Screenshots, clipboard, windows, meetings.<br> A few useful things, all in one little menu bar app.</p><p class="handwritten instruction">Pick a few. See what goes in.</p><svg class="instruction-arrow" viewBox="0 0 140 70" aria-hidden="true"><path d="M7 4q100-6 111 53m-17-10 18 14 9-23"/></svg></div>
+      </section>
+
+      <section class="workbench" aria-label="Mix your Mysli tools">
+        <div class="pantry">
+          <div class="pantry-heading"><h2>The good stuff</h2><span class="handwritten">tap to add</span></div>
+          <div class="ingredient-list" id="ingredient-list"></div>
+        </div>
+
+        <div class="bowl-station">
+          <div class="bowl-scene" id="bowl-scene">
+            <div class="bowl-shadow" aria-hidden="true"></div>
+            <div class="bowl-art" id="bowl-art" aria-hidden="true"></div>
+            <div class="bowl-slots" id="bowl-slots" aria-label="Tools in your mix"></div>
+            <div class="empty-bowl-note handwritten" id="empty-bowl-note">A little room for<br>whatever helps.</div>
+            <span class="bowl-name handwritten">made for your everyday</span>
+          </div>
+          <div class="mix-controls"><button class="whole-mix" id="whole-mix" type="button"><span aria-hidden="true">✳</span> Add the whole mix</button><button class="reset" id="reset" type="button">Start fresh</button></div>
+          <p class="no-setup">Just a little taste. Your Mac settings stay as they are.</p>
+        </div>
+
+        <aside class="receipt-wrap" aria-labelledby="receipt-title">
+          <div class="receipt"><span class="tape" aria-hidden="true"></span><div class="receipt-brand">mysli</div><h2 id="receipt-title">Your daily mix</h2><p class="receipt-date">Prepared just for you</p><div class="receipt-rule" aria-hidden="true"></div><ul id="receipt-items" class="receipt-items"></ul><p class="receipt-empty" id="receipt-empty">Choose a tool.<br>We saved you a bowl.</p><div class="receipt-total"><span>Good things</span><strong><span id="mix-count">0</span><small> / 5</small></strong></div><p class="receipt-footer handwritten" id="receipt-footer">Every mix starts somewhere.</p><div class="receipt-stamp" aria-hidden="true">One little<br>Mac app</div></div>
+          <p class="receipt-caption handwritten">Keep the things you love.</p>
+        </aside>
+      </section>
+
+      <footer class="page-foot"><p>Small tools. A little more room to think.</p><span>Made for macOS</span></footer>
+      <p id="announcement" class="visually-hidden" role="status" aria-live="polite"></p>
+    </main>
+    <script type="module" src="./mix.js"></script>
+  </body>
+</html>

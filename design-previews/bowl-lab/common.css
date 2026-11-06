@@ -1,0 +1,81 @@
+@import url("https://fonts.googleapis.com/css2?family=Caveat:wght@400;500;600;700&family=DM+Sans:wght@400;450;500;550;600;650;700;750&display=swap");
+
+:root {
+	color-scheme: light;
+	--paper: #f7f7f5;
+	--ink: #272b2c;
+	--muted: #686e71;
+	--berry: #b72d48;
+	--line: #d9dddc;
+	--blue: #577d97;
+	--hand: "Caveat", "Bradley Hand", "Comic Sans MS", cursive;
+	--sans: "DM Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+}
+* {
+	box-sizing: border-box;
+}
+html {
+	font-family: var(--sans);
+	color: var(--ink);
+	background: var(--paper);
+}
+body {
+	margin: 0;
+	-webkit-font-smoothing: antialiased;
+}
+button,
+input,
+textarea {
+	font: inherit;
+}
+button,
+a {
+	-webkit-tap-highlight-color: transparent;
+}
+button {
+	cursor: pointer;
+}
+a {
+	color: inherit;
+}
+button:focus-visible,
+a:focus-visible {
+	outline: 2px solid var(--berry);
+	outline-offset: 5px;
+}
+button:disabled {
+	cursor: default;
+}
+::selection {
+	background: #b72d4826;
+}
+svg {
+	display: block;
+	max-width: 100%;
+}
+[hidden] {
+	display: none !important;
+}
+.grain {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	opacity: 0.16;
+	background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.79' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Cpath fill='%23808080' filter='url(%23n)' opacity='.42' d='M0 0h180v180H0z'/%3E%3C/svg%3E");
+	mix-blend-mode: multiply;
+}
+.paper-piece {
+	filter: drop-shadow(1px 7px 3px #202c3020);
+}
+@media (prefers-reduced-motion: reduce) {
+	html {
+		scroll-behavior: auto !important;
+	}
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+	}
+}
