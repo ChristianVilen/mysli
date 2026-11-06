@@ -1,10 +1,10 @@
 ---
-import { appIcon, home } from "../data/site";
+import Brand from "./Brand.astro";
 ---
 <footer class="site-footer">
 	<div class="footer-inner page-width">
 		<div class="footer-brand">
-			<a href={`${home}#top`} class="brand brand-small"><img class="brand-icon" src={appIcon} width="32" height="32" alt="" /><span>Mysli<span class="brand-dot" aria-hidden="true">.</span></span></a>
+			<Brand small />
 			<p class="hand footer-note">Mysli is Finnish for muesli: a mix of good things.</p>
 		</div>
 		<div class="footer-links">
@@ -14,3 +14,44 @@ import { appIcon, home } from "../data/site";
 		</div>
 	</div>
 </footer>
+
+<style>
+	.site-footer {
+		padding-block: 2.25rem 2.75rem;
+		border-top: 1px solid var(--rule);
+	}
+	.footer-inner {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: 1.25rem 2rem;
+	}
+	.footer-brand {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.5rem 1.25rem;
+	}
+	.footer-note {
+		font-size: 1.35rem;
+		line-height: 1.2;
+		color: var(--pencil);
+		transform: rotate(-2deg);
+	}
+	.footer-links {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem 1.5rem;
+		font-size: 0.9rem;
+		color: var(--ink-soft);
+	}
+	.footer-links a {
+		text-underline-offset: 0.3em;
+	}
+	.footer-links a:hover {
+		color: var(--ink);
+		text-decoration: underline;
+		text-decoration-color: var(--berry);
+	}
+</style>

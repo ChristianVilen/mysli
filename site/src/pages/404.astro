@@ -1,27 +1,22 @@
 ---
-import { bowlArt } from "../art/pieces";
-import Footer from "../components/Footer.astro";
-import Nav from "../components/Nav.astro";
+import Bowl from "../components/Bowl.astro";
 import { home } from "../data/site";
 import Layout from "../layouts/Layout.astro";
 ---
 <Layout title="Page not found - Mysli" noindex>
-  <div id="top"></div>
-  <a class="skip-link" href="#content">Skip to content</a>
-  <Nav />
-  <main id="content" class="lost page-width">
+  <div class="lost page-width">
     <div class="lost-stage" aria-hidden="true">
-      <div class="bowl-art" set:html={bowlArt("back")} />
-      <svg class="lost-crumbs" viewBox="0 0 640 500" focusable="false">
-        <g stroke="#303333" stroke-linejoin="round">
-          <path d="M262 266l6-17 21-4-5 11 9 7z" fill="#e6bf64" stroke-width="1.6" />
-          <path d="M268 262v-9h9" fill="none" stroke-width="2.6" stroke-linecap="round" />
-          <path d="M338 270l4-5 6 2-1 6z" fill="#e6bf64" stroke-width="1.2" />
-          <path d="M372 262c4-6 13-6 15 0-4 4-11 4-15 0z" fill="#8da876" stroke-width="1.2" />
-          <path d="M309 274l3-3 4 2-2 3z" fill="#855c43" stroke-width="1" />
-        </g>
-      </svg>
-      <div class="bowl-art bowl-front" set:html={bowlArt("front")} />
+      <Bowl>
+        <svg class="lost-crumbs" viewBox="0 0 640 500" focusable="false">
+          <g stroke="#303333" stroke-linejoin="round">
+            <path d="M262 266l6-17 21-4-5 11 9 7z" fill="#e6bf64" stroke-width="1.6" />
+            <path d="M268 262v-9h9" fill="none" stroke-width="2.6" stroke-linecap="round" />
+            <path d="M338 270l4-5 6 2-1 6z" fill="#e6bf64" stroke-width="1.2" />
+            <path d="M372 262c4-6 13-6 15 0-4 4-11 4-15 0z" fill="#8da876" stroke-width="1.2" />
+            <path d="M309 274l3-3 4 2-2 3z" fill="#855c43" stroke-width="1" />
+          </g>
+        </svg>
+      </Bowl>
       <p class="hand lost-note">all gone!</p>
     </div>
     <p class="hand kicker">nothing here but crumbs</p>
@@ -31,6 +26,76 @@ import Layout from "../layouts/Layout.astro";
       <a class="button-primary" href={home}>Back to Mysli</a>
       <a class="text-button" href={`${home}#tools`}>See the five tools</a>
     </div>
-  </main>
-  <Footer />
+  </div>
 </Layout>
+
+<style>
+  .lost {
+    display: grid;
+    justify-items: center;
+    padding-block: clamp(1.5rem, 5vw, 3.5rem) var(--section-space);
+    text-align: center;
+  }
+  /* The empty bowl rocks once, as if someone just showed it to you. */
+  .lost-stage {
+    position: relative;
+    width: min(100%, 30rem);
+    aspect-ratio: 640 / 500;
+    margin-top: -10%;
+    transform-origin: 50% 90%;
+    animation: show-empty 0.9s 0.3s cubic-bezier(0.3, 0.7, 0.3, 1) both;
+  }
+  @keyframes show-empty {
+    from {
+      transform: rotate(0);
+    }
+    35% {
+      transform: translateY(-4px) rotate(-3deg);
+    }
+    70% {
+      transform: rotate(1deg);
+    }
+    to {
+      transform: rotate(0);
+    }
+  }
+  .lost-crumbs {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    width: 100%;
+    height: 100%;
+  }
+  .lost-note {
+    position: absolute;
+    right: 3%;
+    top: 25%;
+    z-index: 7;
+    font-size: 1.6rem;
+    color: var(--berry);
+    transform: rotate(8deg);
+  }
+  .kicker {
+    margin-top: 1.25rem;
+  }
+  h1 {
+    font-size: clamp(2.2rem, 5vw, 3.4rem);
+    font-weight: 650;
+    line-height: 1.05;
+    letter-spacing: -0.05em;
+    text-wrap: balance;
+  }
+  .lost-text {
+    margin-top: 1rem;
+    font-size: 1.1rem;
+    color: var(--ink-soft);
+  }
+  .lost-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem 1.75rem;
+    margin-top: 2rem;
+  }
+</style>

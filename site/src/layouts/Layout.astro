@@ -1,20 +1,22 @@
 ---
 import { Font } from "astro:assets";
 import "../styles/global.css";
+import { grain } from "../art/paper";
+import Footer from "../components/Footer.astro";
+import Nav from "../components/Nav.astro";
+import { description, tagline } from "../data/copy";
 import { appIcon, home, shareCard, touchIcon } from "../data/site";
 
 interface Props {
 	title?: string;
 	noindex?: boolean;
 }
-const { title = "Mysli - A daily mix of Mac tools.", noindex = false } = Astro.props;
-const description =
-	"Screenshots, clipboard history, window tiling, Keep Awake and private meeting notes, in one menu bar app.";
+const { title = `Mysli - ${tagline}`, noindex = false } = Astro.props;
 const pageUrl = new URL(home, Astro.site);
 const shareImage = new URL(shareCard, Astro.site);
 ---
 <!doctype html>
-<html lang="en">
+<html lang="en" style={`--grain: ${grain}`}>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -40,7 +42,13 @@ const shareImage = new URL(shareCard, Astro.site);
     <title>{title}</title>
   </head>
   <body>
-    <slot />
+    <div id="top"></div>
+    <a class="skip-link" href="#content">Skip to content</a>
+    <Nav />
+    <main id="content">
+      <slot />
+    </main>
+    <Footer />
     <script>
       import '../scripts/copy.ts';
     </script>

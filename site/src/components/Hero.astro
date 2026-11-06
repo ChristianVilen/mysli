@@ -1,15 +1,16 @@
 ---
-import { bowlArt, pieceArt, restingPlaces } from "../art/pieces";
+import { pieceArt, restingPlaces } from "../art/pieces";
+import { description, headline } from "../data/copy";
 import { tools } from "../data/tools";
-import Keys from "./Keys.astro";
-import ToolDemo from "./ToolDemo.astro";
+import Bowl from "./Bowl.astro";
+import ToolSheet from "./ToolSheet.astro";
 ---
 <section class="bowl-hero page-width" aria-labelledby="hero-heading" data-bowl>
-	<div class="hero-intro" data-intro>
+	<div class="hero-intro">
 		<p class="hand hero-note">A little of everything you need.</p>
-		<h1 id="hero-heading">A daily mix<br />of Mac tools<span class="full-stop">.</span></h1>
+		<h1 id="hero-heading">{headline[0]}<br />{headline[1]}<span class="full-stop">.</span></h1>
 		<svg class="headline-mark" viewBox="0 0 300 20" aria-hidden="true" focusable="false"><path data-pencil d="M4 12C67 3 148 5 296 8M36 17c93-6 175-5 236-4" /></svg>
-		<p class="hero-description">Screenshots, clipboard history, window tiling, Keep Awake and private meeting notes, in one menu bar app.</p>
+		<p class="hero-description">{description}</p>
 		<div class="hero-actions">
 			<a class="button-primary" href="#install">Get Mysli for Mac</a>
 			<button class="text-button needs-js" type="button" data-start="screenshots">Meet the mix</button>
@@ -27,29 +28,29 @@ import ToolDemo from "./ToolDemo.astro";
 			</svg>
 			<p class="hand scene-note scene-note-left" aria-hidden="true">a few everyday<br />favourites</p>
 			<p class="hand scene-note scene-note-right needs-js" aria-hidden="true">pick a piece!</p>
-			<div class="bowl-art" data-bowl-art set:html={bowlArt("back")} />
-			<div class="piece-layer">
-				{tools.map((tool) => {
-					const home = restingPlaces[tool.id];
-					return (
-						<button
-							type="button"
-							class="piece"
-							tabindex="-1"
-							aria-hidden="true"
-							data-piece={tool.id}
-							data-left={home.left}
-							data-top={home.top}
-							data-turn={home.turn}
-							style={`left: ${home.left}%; top: ${home.top}%; --turn: ${home.turn}deg`}
-						>
-							<Fragment set:html={pieceArt(tool.id)} />
-							<span class="hand piece-label">{tool.name}</span>
-						</button>
-					);
-				})}
-			</div>
-			<div class="bowl-art bowl-front" data-bowl-art set:html={bowlArt("front")} />
+			<Bowl>
+				<div class="piece-layer">
+					{tools.map((tool) => {
+						const home = restingPlaces[tool.id];
+						return (
+							<button
+								type="button"
+								class="piece"
+								tabindex="-1"
+								aria-hidden="true"
+								data-piece={tool.id}
+								data-left={home.left}
+								data-top={home.top}
+								data-turn={home.turn}
+								style={`left: ${home.left}%; top: ${home.top}%; --turn: ${home.turn}deg`}
+							>
+								<Fragment set:html={pieceArt(tool.id)} />
+								<span class="hand piece-label">{tool.name}</span>
+							</button>
+						);
+					})}
+				</div>
+			</Bowl>
 			<svg class="selected-orbit" viewBox="0 0 200 160" aria-hidden="true" focusable="false"><path d="M24 96C-8 30 112-8 176 41c60 44-22 130-97 99-30-13-51-37-49-62" /></svg>
 			<div class="bowl-caption">
 				<span class="hand">A mix of good things.</span>
@@ -64,21 +65,441 @@ import ToolDemo from "./ToolDemo.astro";
 		))}
 	</div>
 
-	{tools.map((tool) => (
-		<section class="tool-sheet" id={`sheet-${tool.id}`} data-sheet={tool.id} aria-labelledby={`sheet-${tool.id}-title`} hidden>
-			<button type="button" class="sheet-back" data-close><span aria-hidden="true">←</span> Back to the whole mix</button>
-			<h2 id={`sheet-${tool.id}-title`} tabindex="-1">{tool.name}</h2>
-			<p class="hand sheet-note">{tool.note}</p>
-			<p class="sheet-pitch">{tool.pitch}</p>
-			<ToolDemo id={tool.id} />
-			<div class="sheet-facts">
-				<Keys tool={tool} />
-				<a class="sheet-more" href={`#tool-${tool.id}`}>See it in the tool list</a>
-			</div>
-		</section>
-	))}
+	{tools.map((tool) => <ToolSheet tool={tool} />)}
 </section>
 
 <script>
 	import "../scripts/bowl.ts";
 </script>
+
+<style>
+	.hero-note {
+		display: inline-block;
+		margin-bottom: 1.1rem;
+		font-size: 1.65rem;
+		line-height: 1.1;
+		color: var(--pencil);
+		transform: rotate(-3deg);
+		transform-origin: left bottom;
+	}
+	h1 {
+		font-size: clamp(3rem, 5.4vw, 4.6rem);
+		font-weight: 650;
+		line-height: 0.98;
+		letter-spacing: -0.06em;
+	}
+	.full-stop {
+		color: var(--berry);
+	}
+	.headline-mark {
+		width: min(17.5rem, 72%);
+		height: 1.25rem;
+		margin: 0.75rem 0 1.5rem 0.2rem;
+		color: var(--berry);
+		transform: rotate(-1deg);
+		overflow: visible;
+	}
+	.headline-mark path {
+		fill: none;
+		stroke: currentColor;
+		stroke-width: 2;
+		stroke-linecap: round;
+	}
+	.hero-description {
+		max-width: 26em;
+		font-size: clamp(1.05rem, 1.35vw, 1.2rem);
+		line-height: 1.7;
+		color: var(--ink-soft);
+	}
+	.hero-actions {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.75rem 1.75rem;
+		margin-top: 2rem;
+	}
+	.bowl-column {
+		min-width: 0;
+	}
+
+	/* The stage */
+
+	.bowl-stage {
+		--wash: light-dark(#8cabb321, #8cabb312);
+		position: relative;
+		aspect-ratio: 640 / 500;
+		isolation: isolate;
+	}
+	.stage-wash {
+		position: absolute;
+		inset: 15% 1% 5%;
+		z-index: -2;
+		background: radial-gradient(ellipse, var(--wash) 0%, transparent 70%);
+	}
+	.scribbles {
+		position: absolute;
+		inset: 0;
+		z-index: 0;
+		width: 100%;
+		height: 100%;
+		overflow: visible;
+		pointer-events: none;
+	}
+	.scribbles path {
+		fill: none;
+		stroke-linecap: round;
+	}
+	.scribble-arrows {
+		stroke: var(--pencil);
+		stroke-width: 1.1;
+	}
+	.scribble-marks {
+		stroke: var(--rule-strong);
+		stroke-width: 1.2;
+	}
+	.scene-note {
+		position: absolute;
+		z-index: 2;
+		font-size: clamp(1.3rem, 1.9vw, 1.6rem);
+		line-height: 0.95;
+		color: var(--pencil);
+		pointer-events: none;
+		transition: opacity 0.25s ease;
+	}
+	.scene-note-left {
+		left: 8%;
+		top: 8%;
+		transform: rotate(-8deg);
+	}
+	.scene-note-right {
+		right: 7%;
+		top: 10%;
+		color: var(--berry);
+		transform: rotate(8deg);
+	}
+	.has-sheet .scene-note-right {
+		opacity: 0;
+	}
+	.selected-orbit {
+		position: absolute;
+		top: 4%;
+		left: 30%;
+		z-index: 2;
+		width: 40%;
+		overflow: visible;
+		opacity: 0;
+		pointer-events: none;
+		transition: opacity 0.25s ease;
+	}
+	.selected-orbit path {
+		fill: none;
+		stroke: var(--berry);
+		stroke-width: 1.2;
+		stroke-dasharray: 3 6;
+	}
+	.has-sheet .selected-orbit {
+		opacity: 0.8;
+	}
+	.bowl-caption {
+		position: absolute;
+		left: 15%;
+		right: 10%;
+		bottom: -1%;
+		z-index: 7;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 1rem;
+	}
+	.bowl-caption .hand {
+		font-size: clamp(1.3rem, 1.9vw, 1.6rem);
+		color: var(--pencil);
+		transform: rotate(-3deg);
+	}
+	.replay-button {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35rem;
+		min-height: 2.25rem;
+		font-size: 0.85rem;
+		color: var(--ink-soft);
+		white-space: nowrap;
+		cursor: pointer;
+		border-bottom: 1px dotted var(--rule-strong);
+		transition: color 0.2s ease;
+	}
+	.replay-button:hover {
+		color: var(--ink);
+	}
+	.replay-button span {
+		display: inline-block;
+		font-size: 1rem;
+		transition: transform 0.45s ease;
+	}
+	.replay-button:hover span {
+		transform: rotate(200deg);
+	}
+
+	/* The pieces */
+
+	.piece-layer {
+		position: absolute;
+		inset: 0;
+		pointer-events: none;
+	}
+	.piece {
+		position: absolute;
+		z-index: 4;
+		width: 23%;
+		aspect-ratio: 1;
+		pointer-events: none;
+		transform: translate(-50%, -50%) rotate(var(--turn));
+		filter: drop-shadow(3px 8px 4px var(--shadow));
+		transition: filter 0.2s ease;
+		-webkit-tap-highlight-color: transparent;
+		touch-action: manipulation;
+	}
+	.piece :global(svg) {
+		width: 100%;
+		height: 100%;
+		overflow: visible;
+		pointer-events: none;
+	}
+	:global(html.js) .piece {
+		cursor: pointer;
+	}
+	:global(html.js) .piece :global(svg :is(path, circle, ellipse)) {
+		pointer-events: visiblePainted;
+	}
+	:global(html.js) .bowl-stage:not(.is-live) .piece {
+		visibility: hidden;
+		animation: show-pieces 0s 2.5s forwards;
+	}
+	@keyframes show-pieces {
+		to {
+			visibility: visible;
+		}
+	}
+	.piece.is-lifted {
+		filter: drop-shadow(4px 14px 5px var(--shadow));
+	}
+	.piece.is-selected {
+		z-index: 12;
+		filter: drop-shadow(7px 21px 7px var(--shadow));
+	}
+	.piece-label {
+		position: absolute;
+		left: 50%;
+		top: -4px;
+		padding: 0.15rem 0.5rem;
+		font-size: 1.35rem;
+		line-height: 1;
+		white-space: nowrap;
+		color: var(--ink-soft);
+		background: color-mix(in srgb, var(--paper) 92%, transparent);
+		border-radius: 3px;
+		opacity: 0;
+		transform: translate(-50%, -70%) rotate(calc(-1 * var(--turn) - 2deg));
+		transition: opacity 0.18s ease;
+		pointer-events: none;
+	}
+	.piece.is-lifted .piece-label {
+		opacity: 1;
+	}
+
+	/* The tool picker */
+
+	.tool-picker {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: center;
+		gap: 0.25rem 2rem;
+		margin-top: 1.75rem;
+		padding-top: 0.9rem;
+		border-top: 1px solid var(--rule);
+	}
+	.tool-picker button {
+		position: relative;
+		display: inline-flex;
+		align-items: center;
+		gap: 0.55rem;
+		min-height: 2.75rem;
+		padding-inline: 0.15rem;
+		color: var(--ink-soft);
+		font-size: 0.95rem;
+		font-weight: 500;
+		cursor: pointer;
+		transition: color 0.2s ease;
+	}
+	.tool-picker button::before {
+		content: "";
+		width: 0.6rem;
+		height: 0.6rem;
+		border-radius: 50%;
+		background: var(--tool-color);
+		transition: transform 0.25s ease;
+	}
+	.tool-picker button:hover,
+	.tool-picker button[aria-expanded="true"] {
+		color: var(--ink);
+	}
+	.tool-picker button:hover::before,
+	.tool-picker button[aria-expanded="true"]::before {
+		transform: scale(1.35);
+	}
+	.tool-picker button[aria-expanded="true"]::after {
+		content: "";
+		position: absolute;
+		left: 1.25rem;
+		right: 0;
+		bottom: 0.4rem;
+		height: 2px;
+		border-radius: 2px;
+		background: var(--berry);
+		transform: rotate(-1.5deg);
+	}
+
+	/* Two columns: the open sheet takes the place of the intro, beside the bowl. */
+	@media (min-width: 901px) {
+		.bowl-hero {
+			display: grid;
+			grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.25fr);
+			grid-template-areas:
+				"copy bowl"
+				"picker picker";
+			column-gap: clamp(1rem, 3vw, 3rem);
+			align-items: center;
+			padding-top: clamp(0.5rem, 2vw, 1.5rem);
+		}
+		.hero-intro,
+		.bowl-hero > :global(.tool-sheet) {
+			grid-area: copy;
+		}
+		.bowl-hero > :global(.tool-sheet) {
+			align-self: center;
+			justify-self: start;
+		}
+		.bowl-column {
+			grid-area: bowl;
+		}
+		.tool-picker {
+			grid-area: picker;
+		}
+		/* Closed sheets keep their space, so the hero keeps its height when the visitor changes tools. */
+		:global(html.js) .bowl-hero > :global(.tool-sheet:not(.is-open)) {
+			visibility: hidden;
+		}
+		.hero-intro {
+			transition:
+				opacity 0.26s ease-out,
+				transform 0.26s ease-out;
+		}
+		.has-sheet .hero-intro {
+			visibility: hidden;
+			opacity: 0;
+			transform: translateY(7px);
+			transition: none;
+		}
+	}
+
+	/* Stacked: the headline and the whole bowl fit on the first screen, and the sheet opens below the picker. */
+	@media (max-width: 900px) {
+		.bowl-hero {
+			display: flex;
+			flex-direction: column;
+			align-items: flex-start;
+			padding-top: 1.25rem;
+		}
+		.hero-intro {
+			display: contents;
+		}
+		/* Above the stage, so the arriving pieces fall behind the headline. */
+		.hero-note,
+		h1,
+		.headline-mark {
+			position: relative;
+			z-index: 8;
+		}
+		.hero-note {
+			order: 1;
+		}
+		h1 {
+			order: 2;
+		}
+		.headline-mark {
+			order: 3;
+			margin-bottom: 0;
+		}
+		.bowl-column {
+			order: 4;
+			align-self: center;
+			width: 100%;
+			max-width: 36rem;
+		}
+		.hero-description {
+			order: 5;
+			margin-top: 2rem;
+		}
+		.hero-actions {
+			order: 6;
+		}
+		.fine-print {
+			order: 7;
+		}
+		.tool-picker {
+			order: 8;
+			align-self: stretch;
+			gap: 0 1.25rem;
+			margin-top: 1.75rem;
+		}
+		.bowl-hero > :global(.tool-sheet) {
+			order: 9;
+			align-self: center;
+			margin-top: 1.5rem;
+			scroll-margin-block: 1rem;
+		}
+		:global(html.js) .bowl-hero > :global(.tool-sheet:not(.is-open)) {
+			display: none;
+		}
+		.has-sheet .scene-note {
+			opacity: 0;
+		}
+	}
+	@media (max-width: 760px) {
+		h1 {
+			font-size: clamp(2.8rem, 11.5vw, 4rem);
+		}
+		.hero-note {
+			margin-bottom: 0.75rem;
+			font-size: 1.45rem;
+		}
+		.hero-actions {
+			margin-top: 1.4rem;
+		}
+	}
+	@media (max-width: 480px) {
+		.bowl-caption {
+			left: 6%;
+			right: 3%;
+			bottom: -5%;
+		}
+		.bowl-caption .hand {
+			font-size: 1.2rem;
+			white-space: nowrap;
+		}
+		.scene-note-left {
+			left: 3%;
+		}
+		.scene-note-right {
+			right: 3%;
+		}
+	}
+	@media (pointer: coarse) {
+		.replay-button {
+			min-height: 2.75rem;
+		}
+		.piece-label {
+			display: none;
+		}
+	}
+</style>

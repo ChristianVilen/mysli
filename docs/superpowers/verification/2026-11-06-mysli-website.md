@@ -37,7 +37,21 @@ Not checked: Safari, Firefox, a real phone, VoiceOver, real system reduced motio
 - The navigation is above the hero, so the arriving pieces pass behind it.
 - Copy shows a handwritten "copied!" note. Assistive technology does not read it, and the button name stays "Copied ✓". A second click no longer resets the label early.
 
-Chrome showed the page not found, the copy note with a stubbed clipboard, and a piece passing behind "Get Mysli". The build has both pages and the expected tags. Not checked: the preview in Slack, iMessage, or X, the icon on an iPhone home screen, and the page not found on GitHub Pages.
+Chrome showed the page not found, the copy note with a stubbed clipboard, and a piece passing behind "Get Mysli".
+
+## Phone layout after a real iPhone check
+
+On an iPhone in Safari, the user saw that the bowl was below the first screen, and that the pieces started in the middle of the screen. At 900 pixels and less, the hero now shows the note, the headline, and the bowl first. The description, the buttons, and the tool picker come after the bowl. Each piece starts above the top of the window, and the headline is above the stage, so the pieces fall behind it. In Chrome frames of the visible Safari area, the bowl caption ends at 529 of 660 pixels (iPhone 15 size) and at 514 of 548 pixels (iPhone SE size). A tapped piece still opens its sheet, scrolls it into view, and focuses its heading. Not checked again on the real iPhone.
+
+## Code structure after review
+
+A strict code review asked for the styles and the demos to live with their components. Each component now has its own styles, and `global.css` keeps only the shared parts. Each demo is a component under `site/src/components/demos/` with its own markup, styles, and script. The bowl tells a sheet when it opens and closes, and the demo resets itself. The entrance is in `entrance.ts`. The headline, the description, and the paper grain each have one source, which the share card script also uses. The behaviour is the same, with three small intended changes:
+
+- The footer logo no longer grows on phones.
+- The recording dot in the meeting demo pulses when its sheet opens, not while it is hidden.
+- An opened sheet that is partly outside the window always scrolls into view.
+
+Biome and the build passed. Chrome showed all five demos, their reset on close, Escape with focus return, the intro fade, light and dark appearance, the phone frame, the page without JavaScript, the page not found, and the copy note. The build has both pages and the expected tags. Not checked: the preview in Slack, iMessage, or X, the icon on an iPhone home screen, and the page not found on GitHub Pages.
 
 ## Build and source checks
 

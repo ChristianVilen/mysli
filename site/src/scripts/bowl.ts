@@ -1,18 +1,14 @@
-import { type Demo, setUpDemo } from "./demos";
-import { move, type Pose } from "./spring";
+import { playEntrance } from "./entrance";
+import { SHEET_CLOSED, SHEET_OPENED } from "./sheet-events";
+import { move, type Pose, reduceMotion } from "./spring";
 
 type Piece = { id: string; element: HTMLElement; left: number; top: number; turn: number };
 
-const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
-// Keep in step with the breakpoint in global.css where the tool sheet moves below the bowl.
-const stacked = matchMedia("(max-width: 900px)");
-
 const hero = document.querySelector<HTMLElement>("[data-bowl]");
 const stage = hero?.querySelector<HTMLElement>("[data-stage]");
-const intro = hero?.querySelector<HTMLElement>("[data-intro]");
-if (hero && stage && intro) setUpBowl(hero, stage, intro);
+if (hero && stage) setUpBowl(hero, stage);
 
-function setUpBowl(hero: HTMLElement, stage: HTMLElement, intro: HTMLElement) {
+function setUpBowl(hero: HTMLElement, stage: HTMLElement) {
 	const pieces: Piece[] = [...hero.querySelectorAll<HTMLElement>("[data-piece]")].map(
 		(element) => ({
 			id: element.dataset.piece ?? "",
@@ -34,21 +30,13 @@ function setUpBowl(hero: HTMLElement, stage: HTMLElement, intro: HTMLElement) {
 			sheet,
 		]),
 	);
-	const demos = new Map<string, Demo>();
-	for (const [id, sheet] of sheets) {
-		// Without the script the sheets stay hidden. With it, the is-open class shows one.
-		sheet.hidden = false;
-		const root = sheet.querySelector<HTMLElement>("[data-demo]");
-		if (root) demos.set(id, setUpDemo(root));
-	}
 
 	let selected: string | null = null;
 	let lifted: string | null = null;
 	let returnFocus: HTMLElement | null = null;
-	let run = 0;
 	let size = { width: 0, height: 0 };
 	let sheetAnimation: Animation | undefined;
-	let pencil: Animation[] = [];
+	let stopEntrance = () => {};
 
 	function pose(piece: Piece): Pose {
 		if (selected === piece.id) {
@@ -84,11 +72,9 @@ function setUpBowl(hero: HTMLElement, stage: HTMLElement, intro: HTMLElement) {
 		for (const piece of pieces) if (piece.id === before || piece.id === id) place(piece);
 	}
 
-	function showSheet(id: string, switching: boolean) {
-		const sheet = sheets.get(id);
-		if (!sheet) return;
+	function showSheet(sheet: HTMLElement, switching: boolean) {
 		sheet.classList.add("is-open");
-		demos.get(id)?.open();
+		sheet.dispatchEvent(new Event(SHEET_OPENED));
 		sheetAnimation?.cancel();
 		const still = reduceMotion.matches;
 		sheetAnimation = sheet.animate(
@@ -109,12 +95,13 @@ function setUpBowl(hero: HTMLElement, stage: HTMLElement, intro: HTMLElement) {
 
 	function hideSheet(id: string) {
 		const sheet = sheets.get(id);
-		sheet?.classList.remove("is-open");
-		demos.get(id)?.close();
+		if (!sheet) return;
+		sheet.classList.remove("is-open");
+		sheet.dispatchEvent(new Event(SHEET_CLOSED));
 	}
 
 	function open(id: string, trigger: HTMLElement) {
-		run++;
+		stopEntrance();
 		if (selected === id) {
 			close();
 			return;
@@ -127,15 +114,10 @@ function setUpBowl(hero: HTMLElement, stage: HTMLElement, intro: HTMLElement) {
 		lifted = null;
 		// Pieces are hidden from assistive technology, so focus returns to the matching picker.
 		returnFocus = trigger.dataset.piece ? (pickers.get(id) ?? null) : trigger;
-		showSheet(id, switching);
+		showSheet(sheet, switching);
 		layout();
 		sheet.querySelector<HTMLElement>("h2")?.focus({ preventScroll: true });
-		if (stacked.matches) {
-			sheet.scrollIntoView({
-				block: "nearest",
-				behavior: reduceMotion.matches ? "auto" : "smooth",
-			});
-		}
+		sheet.scrollIntoView({ block: "nearest", behavior: reduceMotion.matches ? "auto" : "smooth" });
 	}
 
 	function close() {
@@ -146,17 +128,6 @@ function setUpBowl(hero: HTMLElement, stage: HTMLElement, intro: HTMLElement) {
 		sheetAnimation?.cancel();
 		hideSheet(previous);
 		layout();
-		if (!stacked.matches) {
-			intro.animate(
-				reduceMotion.matches
-					? [{ opacity: 0.4 }, { opacity: 1 }]
-					: [
-							{ opacity: 0, transform: "translateY(7px)" },
-							{ opacity: 1, transform: "none" },
-						],
-				{ duration: 260, easing: "ease-out" },
-			);
-		}
 		if (hadFocus) {
 			const target = returnFocus?.isConnected ? returnFocus : pickers.get(previous);
 			target?.focus({ preventScroll: true });
@@ -165,58 +136,11 @@ function setUpBowl(hero: HTMLElement, stage: HTMLElement, intro: HTMLElement) {
 
 	function assemble() {
 		close();
-		const current = ++run;
-		for (const animation of pencil) animation.cancel();
-		pencil = [];
+		stopEntrance();
 		lifted = null;
 		stage.classList.add("is-live");
-		if (reduceMotion.matches) {
-			layout(true);
-			return;
-		}
-		hero.querySelectorAll<SVGPathElement>("[data-pencil]").forEach((path, index) => {
-			const length = path.getTotalLength();
-			path.style.strokeDasharray = String(length);
-			pencil.push(
-				path.animate([{ strokeDashoffset: length }, { strokeDashoffset: 0 }], {
-					duration: 650,
-					delay: 240 + index * 27,
-					easing: "cubic-bezier(.22,.7,.25,1)",
-					fill: "backwards",
-				}),
-			);
-		});
-		pieces.forEach((piece, index) => {
-			move(
-				piece.element,
-				{
-					x: (index - 2) * size.width * 0.15,
-					y: -size.width * 0.52 - 60,
-					r: piece.turn + (index % 2 ? 40 : -30),
-					s: 0.75,
-				},
-				{ immediate: true },
-			);
-			window.setTimeout(
-				() => {
-					if (current === run) place(piece);
-				},
-				80 + index * 95,
-			);
-		});
-		window.setTimeout(() => {
-			if (current !== run) return;
-			for (const art of hero.querySelectorAll<HTMLElement>("[data-bowl-art]")) {
-				art.animate(
-					[
-						{ transform: "translateY(0) rotate(0)" },
-						{ transform: "translateY(2px) rotate(.25deg)", offset: 0.4 },
-						{ transform: "translateY(0) rotate(0)" },
-					],
-					{ duration: 360, easing: "ease-out" },
-				);
-			}
-		}, 1050);
+		if (reduceMotion.matches) layout(true);
+		else stopEntrance = playEntrance(hero, stage, pieces, (piece) => place(piece));
 	}
 
 	function measure() {
@@ -262,8 +186,7 @@ function setUpBowl(hero: HTMLElement, stage: HTMLElement, intro: HTMLElement) {
 		if (event.key === "Escape" && selected) close();
 	});
 	reduceMotion.addEventListener("change", () => {
-		run++;
-		for (const animation of pencil) animation.cancel();
+		stopEntrance();
 		layout(true);
 	});
 

@@ -1,0 +1,151 @@
+---
+import type { Tool, ToolId } from "../data/tools";
+import AwakeDemo from "./demos/AwakeDemo.astro";
+import CaptureDemo from "./demos/CaptureDemo.astro";
+import ClipboardDemo from "./demos/ClipboardDemo.astro";
+import MeetingDemo from "./demos/MeetingDemo.astro";
+import TilingDemo from "./demos/TilingDemo.astro";
+import Keys from "./Keys.astro";
+
+interface Props {
+	tool: Tool;
+}
+const { tool } = Astro.props;
+const demos = {
+	screenshots: CaptureDemo,
+	clipboard: ClipboardDemo,
+	windows: TilingDemo,
+	awake: AwakeDemo,
+	meetings: MeetingDemo,
+} satisfies Record<ToolId, unknown>;
+const Demo = demos[tool.id];
+---
+<section class="tool-sheet needs-js" id={`sheet-${tool.id}`} data-sheet={tool.id} aria-labelledby={`sheet-${tool.id}-title`}>
+	<button type="button" class="sheet-back" data-close><span aria-hidden="true">←</span> Back to the whole mix</button>
+	<h2 id={`sheet-${tool.id}-title`} tabindex="-1">{tool.name}</h2>
+	<p class="hand sheet-note">{tool.note}</p>
+	<p class="sheet-pitch">{tool.pitch}</p>
+	<Demo />
+	<div class="sheet-facts">
+		<Keys tool={tool} />
+		<a class="sheet-more" href={`#tool-${tool.id}`}>See it in the tool list</a>
+	</div>
+</section>
+
+<style>
+	/* The sheet is always light paper, also on the dark page. */
+	.tool-sheet {
+		--sheet-paper: #fffefb;
+		--berry: #b72d48;
+		color-scheme: light;
+		position: relative;
+		isolation: isolate;
+		width: 100%;
+		max-width: 30rem;
+		padding: 1.35rem 1.75rem 1.6rem;
+		color: var(--ink);
+		filter: drop-shadow(0 1px 1px #0000000f) drop-shadow(2px 10px 14px var(--sheet-shadow, #2031361c));
+		transform-origin: 90% 50%;
+	}
+	@media (prefers-color-scheme: dark) {
+		.tool-sheet {
+			--sheet-paper: #e9e8e1;
+			--sheet-shadow: #00000080;
+		}
+	}
+	.tool-sheet::before {
+		content: "";
+		position: absolute;
+		inset: 0;
+		z-index: -1;
+		background: var(--sheet-paper);
+		clip-path: polygon(0.4% 1%, 98.8% 0, 100% 97.7%, 97% 98.4%, 95% 99%, 92% 98.5%, 89% 99.2%, 86% 98.8%, 82% 99.5%, 78% 98.9%, 74% 99.4%, 70% 98.9%, 66% 99.5%, 62% 98.8%, 58% 99.4%, 54% 99%, 50% 99.5%, 46% 98.8%, 42% 99.4%, 38% 98.9%, 34% 99.6%, 30% 99.1%, 26% 99.5%, 22% 98.9%, 18% 99.5%, 14% 98.9%, 10% 99.5%, 6% 98.7%, 2% 99.4%, 0 98%);
+	}
+	.tool-sheet::after {
+		content: "";
+		position: absolute;
+		top: 0.3rem;
+		right: 2.2rem;
+		width: 5rem;
+		height: 1.2rem;
+		background: var(--tape);
+		border-inline: 1px dashed #c7b96566;
+		transform: rotate(5deg);
+	}
+	.sheet-back {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		min-height: 2.25rem;
+		color: var(--ink-soft);
+		font-size: 0.875rem;
+		font-weight: 500;
+		cursor: pointer;
+		text-decoration: underline;
+		text-decoration-color: var(--rule-strong);
+		text-underline-offset: 4px;
+		transition: color 0.2s ease;
+	}
+	.sheet-back:hover {
+		color: var(--ink);
+	}
+	h2 {
+		margin-top: 0.5rem;
+		font-size: clamp(2rem, 3vw, 2.5rem);
+		font-weight: 650;
+		line-height: 1.05;
+		letter-spacing: -0.045em;
+	}
+	h2:focus {
+		outline: none;
+	}
+	.sheet-note {
+		display: inline-block;
+		margin-top: 0.2rem;
+		font-size: 1.6rem;
+		line-height: 1.1;
+		color: var(--berry);
+		transform: rotate(-3deg);
+		transform-origin: left bottom;
+	}
+	.sheet-pitch {
+		max-width: 26em;
+		margin-top: 0.7rem;
+		color: var(--ink-soft);
+		line-height: 1.65;
+	}
+	.sheet-facts {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.75rem 1.25rem;
+		margin-top: 1rem;
+		padding-top: 0.85rem;
+		border-top: 1px dashed var(--rule);
+		font-size: 0.875rem;
+	}
+	.sheet-facts :global(.keys-words) {
+		text-align: left;
+	}
+	.sheet-more {
+		color: var(--ink-soft);
+		text-decoration: underline;
+		text-decoration-color: var(--rule-strong);
+		text-underline-offset: 4px;
+	}
+	.sheet-more:hover {
+		color: var(--ink);
+		text-decoration-color: var(--berry);
+	}
+	@media (pointer: coarse) {
+		.sheet-back {
+			min-height: 2.75rem;
+		}
+	}
+	@media (max-width: 480px) {
+		.tool-sheet {
+			padding: 1.4rem 1.25rem 1.5rem;
+		}
+	}
+</style>

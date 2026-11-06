@@ -1,0 +1,122 @@
+---
+import DemoFrame from "./DemoFrame.astro";
+---
+<DemoFrame name="meetings" label="Keep a note" status="Stay in the conversation.">
+	<div class="meeting-bar" aria-hidden="true"><span class="rec-dot"></span>Recording<span class="rec-time">12:34</span></div>
+	<div class="meeting-transcript">
+		<p><strong>Me</strong> <span>12:10</span> Let's keep the simpler version.</p>
+		<p><strong>Them</strong> <span>12:18</span> I'll send the sketch today.</p>
+	</div>
+	<p class="hand meeting-note">A good decision, remembered.</p>
+</DemoFrame>
+
+<script>
+	import { SHEET_CLOSED, SHEET_OPENED } from "../../scripts/sheet-events";
+	import { reduceMotion } from "../../scripts/spring";
+	import { type DemoParts, findDemo, startClock } from "./demo";
+
+	function setUp({ root, button, status, sheet }: DemoParts) {
+		const note = root.querySelector<HTMLElement>(".meeting-note");
+		const clock = root.querySelector<HTMLElement>(".rec-time");
+		if (!note || !clock) return;
+		const start = { button: button.textContent, status: status.textContent, note: note.textContent };
+		let noted = false;
+		let stopClock = () => {};
+		const show = () => {
+			note.textContent = noted ? "12:25 Keep the simpler version." : start.note;
+			button.textContent = noted ? "Clear the note" : start.button;
+			status.textContent = noted ? "Noted." : start.status;
+		};
+		button.addEventListener("click", () => {
+			noted = !noted;
+			show();
+			if (reduceMotion.matches) return;
+			note.animate(
+				[
+					{ transform: "translateY(7px) rotate(-5deg)", opacity: 0.3 },
+					{ transform: "translateY(0) rotate(-2deg)", opacity: 1 },
+				],
+				{ duration: 350, easing: "cubic-bezier(.2,.8,.2,1)" },
+			);
+		});
+		sheet.addEventListener(SHEET_OPENED, () => {
+			stopClock = startClock(clock, 12 * 60 + 34, 1);
+		});
+		sheet.addEventListener(SHEET_CLOSED, () => {
+			stopClock();
+			noted = false;
+			show();
+		});
+	}
+
+	const demo = findDemo("meetings");
+	if (demo) setUp(demo);
+</script>
+
+<style>
+	.meeting-bar {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.45rem;
+		padding: 0.2rem 0.65rem;
+		font-size: 0.75rem;
+		font-weight: 600;
+		font-variant-numeric: tabular-nums;
+		color: #7d3443;
+		background: #ffffff;
+		border: 1px solid #e3d5d8;
+		border-radius: 99px;
+	}
+	.rec-dot {
+		width: 0.45rem;
+		height: 0.45rem;
+		border-radius: 50%;
+		background: #c43a54;
+	}
+	/* The dot pulses a few times each time the sheet opens, then stays on. */
+	:global(.is-open) .rec-dot {
+		animation: rec-pulse 1.6s ease-in-out 3;
+	}
+	@keyframes rec-pulse {
+		50% {
+			opacity: 0.3;
+		}
+	}
+	.rec-time {
+		color: #8a6a70;
+	}
+	.meeting-transcript {
+		margin-top: 0.7rem;
+		font-size: 0.85rem;
+		line-height: 1.6;
+		color: #45585a;
+	}
+	.meeting-transcript p + p {
+		margin-top: 0.2rem;
+	}
+	.meeting-transcript strong {
+		margin-right: 0.2rem;
+		font-size: 0.7rem;
+		font-weight: 650;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		color: #ad4e60;
+	}
+	.meeting-transcript span {
+		margin-right: 0.3rem;
+		font-size: 0.72rem;
+		font-variant-numeric: tabular-nums;
+		color: #7f8e8d;
+	}
+	.meeting-note {
+		display: inline-block;
+		margin-top: 0.7rem;
+		padding: 0.35rem 0.65rem;
+		font-size: 1.25rem;
+		line-height: 1.2;
+		color: #645f48;
+		background: #f5efd8;
+		border-bottom: 1px solid #d6ca9d;
+		transform: rotate(-2deg);
+	}
+</style>

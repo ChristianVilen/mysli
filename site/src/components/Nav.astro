@@ -1,9 +1,10 @@
 ---
-import { appIcon, home } from "../data/site";
+import { home } from "../data/site";
+import Brand from "./Brand.astro";
 ---
 <header class="site-header">
 	<nav class="site-nav page-width" aria-label="Main navigation">
-		<a href={`${home}#top`} class="brand"><img class="brand-icon" src={appIcon} width="40" height="40" alt="" /><span>Mysli<span class="brand-dot" aria-hidden="true">.</span></span></a>
+		<Brand />
 		<p class="hand nav-note">Little tools. Good company.</p>
 		<div class="nav-links">
 			<a class="nav-link tools-link" href={`${home}#tools`}>The tools</a>
@@ -12,3 +13,73 @@ import { appIcon, home } from "../data/site";
 		</div>
 	</nav>
 </header>
+
+<style>
+	/* Above the hero, so the arriving pieces fall from behind the navigation. */
+	.site-header {
+		position: relative;
+		z-index: 20;
+	}
+	.site-nav {
+		display: flex;
+		align-items: center;
+		gap: 1rem 2rem;
+		padding-block: 1.6rem 0.75rem;
+	}
+	.nav-note {
+		font-size: 1.4rem;
+		line-height: 1;
+		color: var(--pencil);
+		transform: rotate(-3deg);
+		white-space: nowrap;
+	}
+	.nav-links {
+		display: flex;
+		align-items: center;
+		gap: 1.75rem;
+		margin-left: auto;
+		font-size: 0.95rem;
+		font-weight: 500;
+	}
+	.nav-link {
+		color: var(--ink-soft);
+		text-underline-offset: 0.3em;
+		transition: color 0.2s ease;
+	}
+	.nav-link:hover {
+		color: var(--ink);
+		text-decoration: underline;
+		text-decoration-color: var(--berry);
+	}
+	@media (pointer: coarse) {
+		.nav-link {
+			display: inline-flex;
+			align-items: center;
+			min-height: 2.75rem;
+		}
+	}
+	@media (max-width: 1080px) {
+		.nav-note {
+			display: none;
+		}
+	}
+	@media (max-width: 760px) {
+		.site-nav {
+			padding-block: 1.1rem 0.25rem;
+		}
+		.nav-links {
+			gap: 1.25rem;
+			font-size: 0.875rem;
+		}
+	}
+	@media (max-width: 480px) {
+		.nav-links .tools-link {
+			display: none;
+		}
+	}
+	@media (max-width: 400px) {
+		.nav-links .nav-link {
+			display: none;
+		}
+	}
+</style>

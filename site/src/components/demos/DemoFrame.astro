@@ -1,0 +1,77 @@
+---
+import type { ToolId } from "../../data/tools";
+
+interface Props {
+	name: ToolId;
+	label: string;
+	status: string;
+}
+const { name, label, status } = Astro.props;
+---
+<div class="mini-demo" data-demo={name}>
+	<slot />
+	<div class="demo-bottom">
+		<button type="button" class="demo-button" data-demo-button>{label}</button>
+		<span class="hand demo-status" data-demo-status aria-live="polite">{status}</span>
+	</div>
+</div>
+
+<style>
+	.mini-demo {
+		position: relative;
+		margin-top: 1.1rem;
+		padding: 0.9rem 1rem;
+		overflow: hidden;
+		font-size: 0.875rem;
+		color: #586766;
+		background: #f0f3f2;
+		border: 1px solid #dbe1df;
+		border-radius: 4px;
+	}
+	.demo-bottom {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.6rem 1rem;
+		margin-top: 0.8rem;
+	}
+	.demo-button {
+		min-height: 2.25rem;
+		padding: 0.4rem 0.85rem;
+		color: #3f5250;
+		font-size: 0.85rem;
+		font-weight: 550;
+		cursor: pointer;
+		background: #ffffff;
+		border: 1px solid #c4ceca;
+		border-radius: 4px;
+		box-shadow: 0 1px 0 #c4ceca;
+		transition:
+			border-color 0.15s ease,
+			transform 0.15s ease,
+			box-shadow 0.15s ease;
+	}
+	.demo-button:hover {
+		border-color: #98aaa5;
+	}
+	.demo-button:active {
+		transform: translateY(1px);
+		box-shadow: none;
+	}
+	.demo-status {
+		font-size: 1.35rem;
+		line-height: 1;
+		color: #57746f;
+	}
+	@media (pointer: coarse) {
+		.demo-button {
+			min-height: 2.75rem;
+		}
+	}
+	@media (max-width: 480px) {
+		.mini-demo {
+			padding: 0.8rem;
+		}
+	}
+</style>

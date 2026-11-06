@@ -22,3 +22,39 @@ const combos = tool.keys ?? [];
 ) : (
 	<span class="keys keys-words">{tool.shortcut}</span>
 )}
+
+<style>
+	.keys {
+		font-size: 0.875rem;
+		color: var(--ink-soft);
+	}
+	.keycaps {
+		display: inline-flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: flex-end;
+		gap: 0.35rem;
+	}
+	kbd {
+		display: inline-block;
+		min-width: 2.4em;
+		padding: 0.15rem 0.5rem;
+		font: 500 0.85rem / 1.35 var(--font-sans);
+		letter-spacing: 0.1em;
+		text-align: center;
+		color: var(--ink);
+		background: var(--paper-raised);
+		border: 1px solid var(--rule-strong);
+		border-bottom-width: 2px;
+		border-radius: 5px;
+	}
+	.keys-or {
+		padding-inline: 0.1rem;
+		font-size: 0.8rem;
+	}
+	.keys-words {
+		display: block;
+		max-width: 13rem;
+		text-align: right;
+	}
+</style>

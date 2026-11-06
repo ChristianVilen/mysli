@@ -1,0 +1,28 @@
+---
+import { bowlArt } from "../art/pieces";
+---
+<div class="bowl-art" data-bowl-art set:html={bowlArt("back")} />
+<slot />
+<div class="bowl-art bowl-front" data-bowl-art set:html={bowlArt("front")} />
+
+<style>
+	/* The slot content sits inside the bowl: in front of the back copy, behind the front rim. */
+	.bowl-art {
+		position: absolute;
+		left: 0;
+		bottom: 0;
+		z-index: 1;
+		width: 100%;
+		pointer-events: none;
+	}
+	.bowl-art :global(svg) {
+		width: 100%;
+		height: auto;
+	}
+	.bowl-art :global(.bowl-shadow) {
+		fill: var(--bowl-shadow);
+	}
+	.bowl-front {
+		z-index: 6;
+	}
+</style>

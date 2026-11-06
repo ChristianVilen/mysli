@@ -9,3 +9,73 @@ const { label, command } = Astro.props;
 	<div class="command-heading"><span>{label}</span><button class="copy-button" type="button" data-copy={command} aria-live="polite">Copy</button></div>
 	<pre><code>{command}</code></pre>
 </div>
+
+<style>
+	/* A terminal card: dark in both appearances. */
+	.command-block {
+		min-width: 0;
+		color: #eef0ee;
+		background: light-dark(#272b2c, #0f1112);
+		border-radius: 8px;
+		box-shadow: 0 12px 28px -14px var(--shadow);
+	}
+	.command-heading {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 1rem;
+		padding: 0.5rem 0.6rem 0.5rem 1.1rem;
+		font-size: 0.8rem;
+		color: #aeb6b7;
+		border-bottom: 1px solid #ffffff1a;
+	}
+	.copy-button {
+		position: relative;
+		min-height: 2rem;
+		padding: 0.2rem 0.75rem;
+		font-size: 0.8rem;
+		font-weight: 500;
+		color: #eef0ee;
+		cursor: pointer;
+		border: 1px solid #ffffff38;
+		border-radius: 5px;
+		transition: border-color 0.2s ease;
+	}
+	.copy-button:hover {
+		border-color: #ffffff8c;
+	}
+	/* The empty alternative text keeps the note out of the button's accessible name. */
+	.copy-button::before {
+		content: "copied!" / "";
+		position: absolute;
+		right: calc(100% + 0.7rem);
+		top: 50%;
+		font: 600 1.35rem / 1 var(--font-hand);
+		white-space: nowrap;
+		color: #ec6b80;
+		opacity: 0;
+		transform: translateY(-50%) rotate(-8deg) scale(0.6);
+		transition:
+			opacity 0.2s ease,
+			transform 0.4s cubic-bezier(0.3, 1.6, 0.5, 1);
+		pointer-events: none;
+	}
+	.copy-button[data-state="copied"]::before {
+		opacity: 1;
+		transform: translateY(-50%) rotate(-8deg) scale(1);
+	}
+	pre {
+		margin: 0;
+		padding: 1rem 1.1rem 1.15rem;
+		white-space: pre-wrap;
+		overflow-wrap: anywhere;
+	}
+	code {
+		font: 0.85rem / 1.75 var(--font-mono);
+	}
+	@media (pointer: coarse) {
+		.copy-button {
+			min-height: 2.75rem;
+		}
+	}
+</style>

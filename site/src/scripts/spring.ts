@@ -7,7 +7,7 @@ const DAMPING = 24;
 const properties = ["x", "y", "r", "s"] as const;
 const states = new WeakMap<HTMLElement, State>();
 const moving = new Set<HTMLElement>();
-const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
+export const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
 let frame = 0;
 let previous = 0;
 

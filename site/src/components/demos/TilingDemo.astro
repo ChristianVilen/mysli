@@ -1,0 +1,82 @@
+---
+import DemoFrame from "./DemoFrame.astro";
+---
+<DemoFrame name="windows" label="Give it more room" status="Nice and tidy.">
+	<div class="tiny-desktop" aria-hidden="true">
+		<div class="tiny-window"><span></span><span></span><span></span></div>
+		<div class="tiny-window tiny-window-blue"><span></span><span></span></div>
+	</div>
+</DemoFrame>
+
+<script>
+	import { SHEET_CLOSED } from "../../scripts/sheet-events";
+	import { type DemoParts, findDemo } from "./demo";
+
+	function setUp({ root, button, status, sheet }: DemoParts) {
+		const desktop = root.querySelector<HTMLElement>(".tiny-desktop");
+		if (!desktop) return;
+		const start = { button: button.textContent, status: status.textContent };
+		const show = (full: boolean) => {
+			desktop.classList.toggle("is-full", full);
+			button.textContent = full ? "Two windows again" : start.button;
+			status.textContent = full ? "All the room it needs." : start.status;
+		};
+		button.addEventListener("click", () => show(!desktop.classList.contains("is-full")));
+		sheet.addEventListener(SHEET_CLOSED, () => show(false));
+	}
+
+	const demo = findDemo("windows");
+	if (demo) setUp(demo);
+</script>
+
+<style>
+	.tiny-desktop {
+		display: flex;
+		gap: 0.35rem;
+		height: 7rem;
+		padding: 0.45rem;
+		background: #e1e8e9;
+		border-radius: 3px;
+		transition: gap 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
+	}
+	.tiny-window {
+		flex: none;
+		width: calc(50% - 0.175rem);
+		overflow: hidden;
+		background: #fbfcf8;
+		border: 1px solid #8fa6af;
+		border-radius: 3px;
+		box-shadow: 0 2px 3px #00000009;
+		transition:
+			width 0.45s cubic-bezier(0.2, 0.8, 0.2, 1),
+			opacity 0.3s ease;
+	}
+	.tiny-window::before {
+		content: "";
+		display: block;
+		height: 0.8rem;
+		background: #f2f5f1;
+		border-bottom: 1px solid #b2c1c3;
+	}
+	.tiny-window > span {
+		display: block;
+		width: 60%;
+		height: 3px;
+		margin: 0.55rem;
+		background: #d4dfe0;
+	}
+	.tiny-window-blue {
+		background: #a9c3d5;
+	}
+	.tiny-desktop.is-full {
+		gap: 0;
+	}
+	.is-full .tiny-window:first-child {
+		width: 100%;
+	}
+	.is-full .tiny-window-blue {
+		width: 0;
+		border-width: 0;
+		opacity: 0;
+	}
+</style>

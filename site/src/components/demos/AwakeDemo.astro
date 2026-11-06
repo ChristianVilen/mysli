@@ -1,0 +1,117 @@
+---
+import DemoFrame from "./DemoFrame.astro";
+---
+<DemoFrame name="awake" label="Keep it awake" status="Take your time.">
+	<div class="awake-scene">
+		<div class="awake-dial" aria-hidden="true">
+			<svg viewBox="0 0 80 80" focusable="false"><circle class="dial-track" cx="40" cy="40" r="34" /><circle class="dial-ring" cx="40" cy="40" r="34" pathLength="100" /></svg>
+			<span class="hand dial-time">1h</span>
+			<span class="hand dial-zzz">z z z</span>
+		</div>
+		<p class="awake-text"><strong>A little longer.</strong>Your build can finish. You can get a coffee.</p>
+	</div>
+</DemoFrame>
+
+<script>
+	import { SHEET_CLOSED } from "../../scripts/sheet-events";
+	import { type DemoParts, findDemo, startClock } from "./demo";
+
+	function setUp({ root, button, status, sheet }: DemoParts) {
+		const scene = root.querySelector<HTMLElement>(".awake-scene");
+		const face = root.querySelector<HTMLElement>(".dial-time");
+		if (!scene || !face) return;
+		const start = { button: button.textContent, status: status.textContent, face: face.textContent };
+		let stopClock = () => {};
+		const show = (awake: boolean) => {
+			scene.classList.toggle("is-awake", awake);
+			button.textContent = awake ? "Let it rest" : start.button;
+			status.textContent = awake ? "Wide awake." : start.status;
+			stopClock();
+			if (awake) stopClock = startClock(face, 60 * 60, -1);
+			else face.textContent = start.face;
+		};
+		button.addEventListener("click", () => show(!scene.classList.contains("is-awake")));
+		sheet.addEventListener(SHEET_CLOSED, () => show(false));
+	}
+
+	const demo = findDemo("awake");
+	if (demo) setUp(demo);
+</script>
+
+<style>
+	.awake-scene {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 1.5rem;
+		min-height: 7rem;
+	}
+	.awake-dial {
+		position: relative;
+		display: grid;
+		flex: none;
+		place-items: center;
+		width: 5rem;
+		height: 5rem;
+	}
+	.awake-dial svg {
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		height: 100%;
+		transform: rotate(-90deg);
+	}
+	.dial-track {
+		fill: none;
+		stroke: #8fa2a3;
+		stroke-width: 1.3;
+		stroke-dasharray: 3 4;
+	}
+	.dial-ring {
+		fill: none;
+		stroke: #855c43;
+		stroke-width: 3;
+		stroke-linecap: round;
+		stroke-dasharray: 100;
+		stroke-dashoffset: 100;
+		transition: stroke-dashoffset 0.9s cubic-bezier(0.3, 0.7, 0.2, 1);
+	}
+	.dial-time {
+		position: relative;
+		font-size: 1.7rem;
+		line-height: 1;
+		color: #4f6a70;
+	}
+	.dial-zzz {
+		position: absolute;
+		top: -0.5rem;
+		right: -1.2rem;
+		font-size: 1.15rem;
+		color: #8fa2a3;
+		transform: rotate(-12deg);
+		transition:
+			opacity 0.3s ease,
+			transform 0.3s ease;
+	}
+	.is-awake .dial-ring {
+		stroke-dashoffset: 0;
+	}
+	.is-awake .dial-time {
+		font: 600 0.95rem / 1 var(--font-sans);
+		font-variant-numeric: tabular-nums;
+	}
+	.is-awake .dial-zzz {
+		opacity: 0;
+		transform: translateY(-6px) rotate(-12deg);
+	}
+	.awake-text {
+		max-width: 12rem;
+		line-height: 1.6;
+	}
+	.awake-text strong {
+		display: block;
+		font-size: 0.95rem;
+		font-weight: 600;
+		color: #354e56;
+	}
+</style>

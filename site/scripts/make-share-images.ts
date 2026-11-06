@@ -8,14 +8,14 @@ import { mkdtempSync, readFileSync, rmdirSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { grain } from "../src/art/paper.ts";
 import { bowlArt, pieceArt, restingPlaces } from "../src/art/pieces.ts";
+import { description, headline } from "../src/data/copy.ts";
 
 const chrome = process.env.CHROME ?? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const publicFolder = fileURLToPath(new URL("../public/", import.meta.url));
 const work = mkdtempSync(path.join(tmpdir(), "mysli-share-"));
 const appIcon = readFileSync(path.join(publicFolder, "mysli.svg"), "utf8");
-const grain =
-	"url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .5 0 0 0 0 .5 0 0 0 .09 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")";
 const fonts =
 	"https://fonts.googleapis.com/css2?family=Caveat:wght@500;600&family=DM+Sans:opsz,wght@9..40,400;9..40,650;9..40,700&display=block";
 
@@ -71,9 +71,9 @@ h1 { margin-top: 18px; font-size: 90px; font-weight: 650; line-height: 0.98; let
 <div class="copy">
 <div class="brand">${appIcon}<span>Mysli<span class="dot">.</span></span></div>
 <p class="note">A little of everything you need.</p>
-<h1>A daily mix<br>of Mac tools<span class="stop">.</span></h1>
+<h1>${headline[0]}<br>${headline[1]}<span class="stop">.</span></h1>
 <svg class="mark" viewBox="0 0 300 20"><path d="M4 12C67 3 148 5 296 8M36 17c93-6 175-5 236-4"/></svg>
-<p class="description">Screenshots, clipboard history, window tiling, Keep Awake and private meeting notes, in one menu bar app.</p>
+<p class="description">${description}</p>
 </div>
 <div class="stage"><div class="wash"></div><div class="bowl">${bowlArt("back")}</div>${pieces}<div class="bowl">${bowlArt("front")}</div><p class="caption">a mix of good things.</p></div>
 </body></html>`;

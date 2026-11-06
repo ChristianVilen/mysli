@@ -19,3 +19,57 @@ import { tools } from "../data/tools";
 		</tbody>
 	</table>
 </section>
+
+<style>
+	.limits-table {
+		width: 100%;
+		border-collapse: collapse;
+	}
+	th,
+	td {
+		padding: 1rem 1rem 1rem 0;
+		text-align: left;
+		vertical-align: top;
+		border-bottom: 1px solid var(--rule);
+	}
+	thead th {
+		padding-top: 0;
+		font-size: 0.8rem;
+		font-weight: 500;
+		color: var(--ink-soft);
+	}
+	tbody th {
+		width: 34%;
+		font-weight: 600;
+	}
+	td {
+		color: var(--ink-soft);
+	}
+	.tool-label {
+		display: inline-flex;
+		align-items: flex-start;
+		gap: 0.65rem;
+	}
+	.tool-dot {
+		flex: none;
+		width: 0.6rem;
+		height: 0.6rem;
+		margin-top: 0.5em;
+		border-radius: 50%;
+		background: var(--tool-color);
+	}
+	@media (max-width: 760px) {
+		tbody th {
+			width: 40%;
+		}
+	}
+	@media (max-width: 480px) {
+		.limits-table {
+			font-size: 0.925rem;
+		}
+		th,
+		td {
+			padding-right: 0.75rem;
+		}
+	}
+</style>

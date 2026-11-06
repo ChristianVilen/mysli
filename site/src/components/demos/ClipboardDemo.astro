@@ -1,0 +1,105 @@
+---
+import DemoFrame from "./DemoFrame.astro";
+---
+<DemoFrame name="clipboard" label="Paste an older one" status="Never far away.">
+	<ol class="clip-stack" aria-label="Copied earlier">
+		<li class="hand">The link you meant to keep.</li>
+		<li class="hand">An idea worth another look.</li>
+		<li class="hand">That thing you just copied.</li>
+	</ol>
+</DemoFrame>
+
+<script>
+	import { SHEET_CLOSED } from "../../scripts/sheet-events";
+	import { reduceMotion } from "../../scripts/spring";
+	import { type DemoParts, findDemo } from "./demo";
+
+	/** Moves the oldest slip to the front of the stack, animating every slip from where it was. */
+	function pasteOldest(stack: HTMLElement) {
+		const slips = [...stack.querySelectorAll<HTMLElement>("li")];
+		const oldest = slips[0];
+		if (!oldest) return;
+		const before = new Map(
+			slips.map((slip) => [
+				slip,
+				{ box: slip.getBoundingClientRect(), transform: getComputedStyle(slip).transform },
+			]),
+		);
+		stack.append(oldest);
+		if (reduceMotion.matches) return;
+		for (const slip of slips) {
+			const first = before.get(slip);
+			if (!first) continue;
+			const last = slip.getBoundingClientRect();
+			const dx = first.box.left + first.box.width / 2 - (last.left + last.width / 2);
+			const dy = first.box.top + first.box.height / 2 - (last.top + last.height / 2);
+			const from = `translate(${dx}px, ${dy}px) ${first.transform === "none" ? "" : first.transform}`;
+			const to = getComputedStyle(slip).transform;
+			const frames =
+				slip === oldest
+					? [
+							{ transform: from },
+							{ transform: `translate(${dx / 2}px, ${dy / 2 - 46}px) rotate(7deg)`, offset: 0.45 },
+							{ transform: to },
+						]
+					: [{ transform: from }, { transform: to }];
+			slip.animate(frames, {
+				duration: slip === oldest ? 620 : 420,
+				easing: "cubic-bezier(.2,.75,.2,1)",
+			});
+		}
+	}
+
+	function setUp({ root, button, status, sheet }: DemoParts) {
+		const stack = root.querySelector<HTMLElement>(".clip-stack");
+		if (!stack) return;
+		const firstOrder = [...stack.children];
+		const start = status.textContent;
+		button.addEventListener("click", () => {
+			pasteOldest(stack);
+			// A live region announces only a change, so each paste switches the words.
+			status.textContent = status.textContent === "Back on top." ? "Pasted again." : "Back on top.";
+		});
+		sheet.addEventListener(SHEET_CLOSED, () => {
+			stack.append(...firstOrder);
+			status.textContent = start;
+		});
+	}
+
+	const demo = findDemo("clipboard");
+	if (demo) setUp(demo);
+</script>
+
+<style>
+	.clip-stack {
+		position: relative;
+		height: 7.4rem;
+		margin: 0.2rem 0.75rem 0;
+	}
+	.clip-stack li {
+		position: absolute;
+		left: 0;
+		right: 0;
+		padding: 0.65rem 0.8rem;
+		font-size: 1.2rem;
+		line-height: 1;
+		color: #45514f;
+		background: #fffefb;
+		border: 1px solid #dbe0d9;
+		box-shadow: 0 2px 3px #0000000a;
+	}
+	.clip-stack li:nth-child(1) {
+		top: 0;
+		transform: rotate(-4deg);
+	}
+	.clip-stack li:nth-child(2) {
+		top: 2.3rem;
+		left: 0.5rem;
+		transform: rotate(2deg);
+	}
+	.clip-stack li:nth-child(3) {
+		top: 4.6rem;
+		left: -0.25rem;
+		transform: rotate(-1deg);
+	}
+</style>

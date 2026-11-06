@@ -22,9 +22,126 @@ import Keys from "./Keys.astro";
 				</li>
 			))}
 		</ul>
-		<aside class="privacy-note paper-note" aria-labelledby="privacy-heading">
+		<aside class="privacy-note" aria-labelledby="privacy-heading">
 			<h3 id="privacy-heading">Your audio stays on your Mac.</h3>
 			<p>Meeting transcription runs locally. For AI summaries, Mysli sends the transcript and your typed notes to your chosen provider through Antigravity or Claude Code. If you add a meeting-context file, it goes too. Screenshot attachments stay on your Mac.</p>
 		</aside>
 	</div>
 </section>
+
+<style>
+	.tool-list {
+		border-top: 1px solid var(--rule);
+	}
+	.tool-row {
+		position: relative;
+		isolation: isolate;
+		display: grid;
+		grid-template-columns: 4.5rem minmax(0, 1fr) auto;
+		gap: 1.4rem;
+		align-items: center;
+		padding-block: 1.35rem;
+		border-bottom: 1px solid var(--rule);
+		scroll-margin-top: 2rem;
+	}
+	.tool-row::before {
+		content: "";
+		position: absolute;
+		inset: 0 -1rem;
+		z-index: -1;
+		border-radius: 8px;
+		background: var(--berry-soft);
+		opacity: 0;
+	}
+	.tool-row:target::before {
+		animation: row-found 2s ease-out;
+	}
+	@keyframes row-found {
+		0%,
+		35% {
+			opacity: 1;
+		}
+		100% {
+			opacity: 0;
+		}
+	}
+	.tool-art {
+		display: block;
+		width: 4.5rem;
+		height: 4.5rem;
+		filter: drop-shadow(2px 5px 3px var(--shadow));
+		transition: transform 0.4s cubic-bezier(0.3, 1.5, 0.5, 1);
+	}
+	.tool-art :global(svg) {
+		width: 100%;
+		height: 100%;
+		overflow: visible;
+	}
+	.tool-row:hover .tool-art {
+		transform: translateY(-4px) rotate(-6deg) scale(1.05);
+	}
+	.tool-text h3 {
+		font-size: 1.2rem;
+		font-weight: 600;
+		letter-spacing: -0.02em;
+	}
+	.tool-text p {
+		margin-top: 0.2rem;
+		color: var(--ink-soft);
+	}
+	.privacy-note {
+		position: relative;
+		margin-top: 2.75rem;
+		padding: 1.5rem 1.6rem 1.4rem;
+		background: var(--paper-raised);
+		border: 1px solid var(--rule);
+		box-shadow: 2px 10px 22px -12px var(--shadow);
+		transform: rotate(-0.5deg);
+	}
+	.privacy-note::before {
+		content: "";
+		position: absolute;
+		top: -0.7rem;
+		left: 2rem;
+		width: 5.5rem;
+		height: 1.35rem;
+		background: var(--tape);
+		border-inline: 1px dashed #c7b96566;
+		transform: rotate(-4deg);
+	}
+	.privacy-note h3 {
+		font-size: 1.05rem;
+		font-weight: 600;
+	}
+	.privacy-note p {
+		margin-top: 0.45rem;
+		font-size: 0.95rem;
+		line-height: 1.65;
+		color: var(--ink-soft);
+	}
+	@media (max-width: 760px) {
+		.tool-row {
+			grid-template-columns: 3.5rem minmax(0, 1fr);
+			gap: 0.4rem 1rem;
+			align-items: start;
+		}
+		.tool-art {
+			width: 3.5rem;
+			height: 3.5rem;
+		}
+		.tool-row > :global(.keys) {
+			grid-column: 2;
+		}
+		.tool-row :global(.keycaps) {
+			justify-content: flex-start;
+		}
+		.tool-row :global(.keys-words) {
+			text-align: left;
+		}
+	}
+	@media (max-width: 480px) {
+		.privacy-note {
+			padding: 1.4rem 1.25rem 1.25rem;
+		}
+	}
+</style>

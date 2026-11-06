@@ -1,0 +1,48 @@
+---
+import { appIcon, home } from "../data/site";
+
+interface Props {
+	small?: boolean;
+}
+const { small = false } = Astro.props;
+---
+<a href={`${home}#top`} class:list={["brand", { small }]}><img class="brand-icon" src={appIcon} width="40" height="40" alt="" /><span>Mysli<span class="brand-dot" aria-hidden="true">.</span></span></a>
+
+<style>
+	.brand {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.65rem;
+		font-size: 1.75rem;
+		font-weight: 700;
+		letter-spacing: -0.055em;
+		line-height: 1;
+	}
+	.brand-icon {
+		width: 2.5rem;
+		height: 2.5rem;
+		border-radius: 11px;
+		background: #f5f5f7;
+		box-shadow: 0 1px 2px #0000001f;
+	}
+	.brand-dot {
+		color: var(--berry);
+	}
+	.small {
+		font-size: 1.35rem;
+	}
+	.small .brand-icon {
+		width: 2rem;
+		height: 2rem;
+		border-radius: 9px;
+	}
+	@media (max-width: 480px) {
+		.brand:not(.small) {
+			font-size: 1.5rem;
+		}
+		.brand:not(.small) .brand-icon {
+			width: 2.2rem;
+			height: 2.2rem;
+		}
+	}
+</style>
