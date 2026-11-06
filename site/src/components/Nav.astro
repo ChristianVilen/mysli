@@ -1,14 +1,14 @@
 ---
-import { appIcon } from "../data/site";
+import { appIcon, home } from "../data/site";
 ---
 <header class="site-header">
 	<nav class="site-nav page-width" aria-label="Main navigation">
-		<a href="#top" class="brand"><img class="brand-icon" src={appIcon} width="40" height="40" alt="" /><span>Mysli<span class="brand-dot" aria-hidden="true">.</span></span></a>
+		<a href={`${home}#top`} class="brand"><img class="brand-icon" src={appIcon} width="40" height="40" alt="" /><span>Mysli<span class="brand-dot" aria-hidden="true">.</span></span></a>
 		<p class="hand nav-note">Little tools. Good company.</p>
 		<div class="nav-links">
-			<a class="nav-link tools-link" href="#tools">The tools</a>
+			<a class="nav-link tools-link" href={`${home}#tools`}>The tools</a>
 			<a class="nav-link" href="https://github.com/ChristianVilen/mysli">GitHub</a>
-			<a class="button-primary button-small" href="#install">Get Mysli</a>
+			<a class="button-primary button-small" href={`${home}#install`}>Get Mysli</a>
 		</div>
 	</nav>
 </header>

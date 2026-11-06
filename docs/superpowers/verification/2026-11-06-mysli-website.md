@@ -29,6 +29,16 @@ Chrome checks, through Claude in Chrome on the dev server:
 
 Not checked: Safari, Firefox, a real phone, VoiceOver, real system reduced motion, slow devices, the GitHub Pages deploy, and command copying after this change. Firefox does not support the scroll-linked handwriting on the section notes, so they appear without it.
 
+## Share images, page not found, and small changes
+
+- `site/scripts/make-share-images.ts` renders `public/share-card.jpg` (1200 × 630) and `public/apple-touch-icon.png` (180 × 180) with headless Chrome. It uses the same art module as the hero. Run it again after the art or the tagline changes.
+- The page has Open Graph and Twitter card tags with absolute URLs, a canonical link, and the home screen icon.
+- `404.html` shows an empty bowl, has `noindex`, and links back to the home page. The navigation and footer links now go to `/mysli/#…`, so they work from that page.
+- The navigation is above the hero, so the arriving pieces pass behind it.
+- Copy shows a handwritten "copied!" note. Assistive technology does not read it, and the button name stays "Copied ✓". A second click no longer resets the label early.
+
+Chrome showed the page not found, the copy note with a stubbed clipboard, and a piece passing behind "Get Mysli". The build has both pages and the expected tags. Not checked: the preview in Slack, iMessage, or X, the icon on an iPhone home screen, and the page not found on GitHub Pages.
+
 ## Build and source checks
 
 From `site/`, these commands passed:

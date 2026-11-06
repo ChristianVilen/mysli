@@ -1,10 +1,10 @@
 ---
-import { appIcon } from "../data/site";
+import { appIcon, home } from "../data/site";
 ---
 <footer class="site-footer">
 	<div class="footer-inner page-width">
 		<div class="footer-brand">
-			<a href="#top" class="brand brand-small"><img class="brand-icon" src={appIcon} width="32" height="32" alt="" /><span>Mysli<span class="brand-dot" aria-hidden="true">.</span></span></a>
+			<a href={`${home}#top`} class="brand brand-small"><img class="brand-icon" src={appIcon} width="32" height="32" alt="" /><span>Mysli<span class="brand-dot" aria-hidden="true">.</span></span></a>
 			<p class="hand footer-note">Mysli is Finnish for muesli: a mix of good things.</p>
 		</div>
 		<div class="footer-links">

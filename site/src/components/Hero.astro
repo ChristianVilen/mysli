@@ -1,17 +1,8 @@
 ---
-import { bowlArt, pieceArt } from "../art/pieces";
-import { type ToolId, tools } from "../data/tools";
+import { bowlArt, pieceArt, restingPlaces } from "../art/pieces";
+import { tools } from "../data/tools";
 import Keys from "./Keys.astro";
 import ToolDemo from "./ToolDemo.astro";
-
-// Where each piece rests: its centre as a percentage of the stage, and its tilt in degrees.
-const homes: Record<ToolId, { left: number; top: number; turn: number }> = {
-	screenshots: { left: 64, top: 50, turn: 13 },
-	clipboard: { left: 38, top: 45, turn: -21 },
-	windows: { left: 49, top: 40, turn: -8 },
-	awake: { left: 26, top: 50, turn: -27 },
-	meetings: { left: 74, top: 42, turn: 12 },
-};
 ---
 <section class="bowl-hero page-width" aria-labelledby="hero-heading" data-bowl>
 	<div class="hero-intro" data-intro>
@@ -39,7 +30,7 @@ const homes: Record<ToolId, { left: number; top: number; turn: number }> = {
 			<div class="bowl-art" data-bowl-art set:html={bowlArt("back")} />
 			<div class="piece-layer">
 				{tools.map((tool) => {
-					const home = homes[tool.id];
+					const home = restingPlaces[tool.id];
 					return (
 						<button
 							type="button"

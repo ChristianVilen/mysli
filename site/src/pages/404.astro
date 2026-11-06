@@ -1,0 +1,36 @@
+---
+import { bowlArt } from "../art/pieces";
+import Footer from "../components/Footer.astro";
+import Nav from "../components/Nav.astro";
+import { home } from "../data/site";
+import Layout from "../layouts/Layout.astro";
+---
+<Layout title="Page not found - Mysli" noindex>
+  <div id="top"></div>
+  <a class="skip-link" href="#content">Skip to content</a>
+  <Nav />
+  <main id="content" class="lost page-width">
+    <div class="lost-stage" aria-hidden="true">
+      <div class="bowl-art" set:html={bowlArt("back")} />
+      <svg class="lost-crumbs" viewBox="0 0 640 500" focusable="false">
+        <g stroke="#303333" stroke-linejoin="round">
+          <path d="M262 266l6-17 21-4-5 11 9 7z" fill="#e6bf64" stroke-width="1.6" />
+          <path d="M268 262v-9h9" fill="none" stroke-width="2.6" stroke-linecap="round" />
+          <path d="M338 270l4-5 6 2-1 6z" fill="#e6bf64" stroke-width="1.2" />
+          <path d="M372 262c4-6 13-6 15 0-4 4-11 4-15 0z" fill="#8da876" stroke-width="1.2" />
+          <path d="M309 274l3-3 4 2-2 3z" fill="#855c43" stroke-width="1" />
+        </g>
+      </svg>
+      <div class="bowl-art bowl-front" set:html={bowlArt("front")} />
+      <p class="hand lost-note">all gone!</p>
+    </div>
+    <p class="hand kicker">nothing here but crumbs</p>
+    <h1>This page is not in the mix.</h1>
+    <p class="lost-text">It may have moved, or the link may have a small typo.</p>
+    <div class="lost-actions">
+      <a class="button-primary" href={home}>Back to Mysli</a>
+      <a class="text-button" href={`${home}#tools`}>See the five tools</a>
+    </div>
+  </main>
+  <Footer />
+</Layout>

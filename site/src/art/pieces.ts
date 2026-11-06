@@ -3,6 +3,15 @@ import type { ToolId } from "../data/tools";
 const ink = "#303333";
 let serial = 0;
 
+/** Where each piece rests in the bowl: its centre as a percentage of a 640 × 500 stage, and its tilt in degrees. */
+export const restingPlaces: Record<ToolId, { left: number; top: number; turn: number }> = {
+	screenshots: { left: 64, top: 50, turn: 13 },
+	clipboard: { left: 38, top: 45, turn: -21 },
+	windows: { left: 49, top: 40, turn: -8 },
+	awake: { left: 26, top: 50, turn: -27 },
+	meetings: { left: 74, top: 42, turn: 12 },
+};
+
 function specks(seed: number, count: number, bounds: number[], color: string, opacity = 0.3) {
 	let value = seed;
 	const random = () => {

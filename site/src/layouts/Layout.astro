@@ -1,22 +1,39 @@
 ---
 import { Font } from "astro:assets";
 import "../styles/global.css";
-import { appIcon } from "../data/site";
+import { appIcon, home, shareCard, touchIcon } from "../data/site";
 
 interface Props {
 	title?: string;
+	noindex?: boolean;
 }
-const { title = "Mysli - A daily mix of Mac tools." } = Astro.props;
+const { title = "Mysli - A daily mix of Mac tools.", noindex = false } = Astro.props;
+const description =
+	"Screenshots, clipboard history, window tiling, Keep Awake and private meeting notes, in one menu bar app.";
+const pageUrl = new URL(home, Astro.site);
+const shareImage = new URL(shareCard, Astro.site);
 ---
 <!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Screenshots, clipboard history, window tiling, Keep Awake and private meeting notes, in one menu bar app." />
+    <meta name="description" content={description} />
+    {noindex ? <meta name="robots" content="noindex" /> : <link rel="canonical" href={pageUrl} />}
     <meta name="theme-color" content="#f7f7f5" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#17191a" media="(prefers-color-scheme: dark)" />
     <link rel="icon" type="image/svg+xml" href={appIcon} />
+    <link rel="apple-touch-icon" href={touchIcon} />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Mysli" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={pageUrl} />
+    <meta property="og:image" content={shareImage} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Mysli: a daily mix of Mac tools. A porcelain bowl holds five paper ingredients, one for each tool." />
+    <meta name="twitter:card" content="summary_large_image" />
     <script is:inline>document.documentElement.classList.add("js");</script>
     <Font cssVariable="--font-dm-sans" preload />
     <Font cssVariable="--font-caveat" preload />

@@ -140,6 +140,11 @@ html.js .no-js {
 
 /* Navigation */
 
+/* Above the hero, so the arriving pieces fall from behind the navigation. */
+.site-header {
+	position: relative;
+	z-index: 20;
+}
 .site-nav {
 	display: flex;
 	align-items: center;
@@ -1254,6 +1259,7 @@ kbd {
 	border-bottom: 1px solid #ffffff1a;
 }
 .copy-button {
+	position: relative;
 	min-height: 2rem;
 	padding: 0.2rem 0.75rem;
 	font-size: 0.8rem;
@@ -1266,6 +1272,25 @@ kbd {
 }
 .copy-button:hover {
 	border-color: #ffffff8c;
+}
+.copy-button::before {
+	content: "copied!" / "";
+	position: absolute;
+	right: calc(100% + 0.7rem);
+	top: 50%;
+	font: 600 1.35rem / 1 var(--font-hand);
+	white-space: nowrap;
+	color: #ec6b80;
+	opacity: 0;
+	transform: translateY(-50%) rotate(-8deg) scale(0.6);
+	transition:
+		opacity 0.2s ease,
+		transform 0.4s cubic-bezier(0.3, 1.6, 0.5, 1);
+	pointer-events: none;
+}
+.copy-button[data-state="copied"]::before {
+	opacity: 1;
+	transform: translateY(-50%) rotate(-8deg) scale(1);
 }
 .command-block pre {
 	margin: 0;
@@ -1434,6 +1459,76 @@ code {
 	color: var(--ink);
 	text-decoration: underline;
 	text-decoration-color: var(--berry);
+}
+
+/* Page not found */
+
+.lost {
+	display: grid;
+	justify-items: center;
+	padding-block: clamp(1.5rem, 5vw, 3.5rem) var(--section-space);
+	text-align: center;
+}
+.lost-stage {
+	position: relative;
+	width: min(100%, 30rem);
+	aspect-ratio: 640 / 500;
+	margin-top: -10%;
+	transform-origin: 50% 90%;
+	animation: show-empty 0.9s 0.3s cubic-bezier(0.3, 0.7, 0.3, 1) both;
+}
+@keyframes show-empty {
+	from {
+		transform: rotate(0);
+	}
+	35% {
+		transform: translateY(-4px) rotate(-3deg);
+	}
+	70% {
+		transform: rotate(1deg);
+	}
+	to {
+		transform: rotate(0);
+	}
+}
+.lost-crumbs {
+	position: absolute;
+	inset: 0;
+	z-index: 4;
+	width: 100%;
+	height: 100%;
+}
+.lost-note {
+	position: absolute;
+	right: 3%;
+	top: 25%;
+	z-index: 7;
+	font-size: 1.6rem;
+	color: var(--berry);
+	transform: rotate(8deg);
+}
+.lost .kicker {
+	margin-top: 1.25rem;
+}
+.lost h1 {
+	font-size: clamp(2.2rem, 5vw, 3.4rem);
+	font-weight: 650;
+	line-height: 1.05;
+	letter-spacing: -0.05em;
+	text-wrap: balance;
+}
+.lost-text {
+	margin-top: 1rem;
+	font-size: 1.1rem;
+	color: var(--ink-soft);
+}
+.lost-actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: center;
+	gap: 0.75rem 1.75rem;
+	margin-top: 2rem;
 }
 
 /* Motion preferences */
