@@ -1,87 +1,30 @@
 ---
-// F3 tabular spec sheet — rows are features, keys in mono, hairline rules.
-const groups = [
-	{
-		heading: "Capture",
-		rows: [
-			{
-				name: "Full screen",
-				key: "⇧⌘3",
-				note: "Captures the display under your cursor; a flash confirms it.",
-			},
-			{ name: "Area", key: "⇧⌘4", note: "Drag to select; dimensions read out live." },
-			{
-				name: "Window",
-				key: "⇧⌘4, then Space",
-				note: "Click a window and Mysli captures exactly that window.",
-			},
-			{
-				name: "Multi-monitor",
-				key: "",
-				note: "Every screen dims; the capture follows your cursor's display.",
-			},
-			{
-				name: "Save + clipboard",
-				key: "automatic",
-				note: "Timestamped PNG in ~/Screenshots/, copied to the clipboard.",
-			},
-			{
-				name: "Thumbnails",
-				key: "up to 5",
-				note: "Floating previews stack; combine them into one image.",
-			},
-			{
-				name: "Annotation",
-				key: "click a thumbnail",
-				note: "Draw freehand or crop, undo, save over the original file.",
-			},
-			{
-				name: "Delete",
-				key: "one click",
-				note: "Removes the file and clears the clipboard with it.",
-			},
-		],
-	},
-	{
-		heading: "Desktop utilities",
-		rows: [
-			{
-				name: "Window tiling",
-				key: "⌃⌥← · ⌃⌥→ · ⌃⌥↩",
-				note: "Snap to either half; Return maximises, again restores. Stage Manager aware, and can be switched off.",
-			},
-			{
-				name: "Keep awake",
-				key: "30 min – 4 h, or until off",
-				note: "Stops sleep through long builds and downloads; the display may still sleep unless you keep it on too.",
-			},
-		],
-	},
-];
+import { pieceArt } from "../art/pieces";
+import { tools } from "../data/tools";
+import Keys from "./Keys.astro";
 ---
-<section class="px-6 py-24">
-  <div class="mx-auto max-w-4xl">
-    <h2 class="font-display text-[clamp(1.85rem,3vw+0.5rem,2.75rem)] font-medium tracking-[-0.02em] text-ink">
-      One icon. Ten tools.
-    </h2>
-
-    <div class="mt-12 overflow-x-auto">
-      <table class="w-full min-w-[36rem] border-collapse text-left text-sm">
-        {groups.map((g) => (
-          <tbody>
-            <tr>
-              <th scope="rowgroup" colspan="3" class="mono-label pb-3 pt-8 font-medium">{g.heading}</th>
-            </tr>
-            {g.rows.map((r) => (
-              <tr class="border-t border-rule">
-                <th scope="row" class="w-[26%] py-3.5 pr-4 align-top font-display text-base font-medium text-ink">{r.name}</th>
-                <td class="w-[24%] py-3.5 pr-4 align-top font-mono text-[0.8rem] text-muted">{r.key || "—"}</td>
-                <td class="py-3.5 align-top text-neutral">{r.note}</td>
-              </tr>
-            ))}
-          </tbody>
-        ))}
-      </table>
-    </div>
-  </div>
+<section id="tools" class="section split page-width" aria-labelledby="tools-heading">
+	<div class="section-heading sticky-heading">
+		<p class="hand kicker">the ingredients</p>
+		<h2 id="tools-heading">Five tools. One small home.</h2>
+		<p>Turn on the tools you want. Leave the rest off.</p>
+	</div>
+	<div>
+		<ul class="tool-list">
+			{tools.map((tool) => (
+				<li class="tool-row" id={`tool-${tool.id}`}>
+					<span class="tool-art" set:html={pieceArt(tool.id)} />
+					<div class="tool-text">
+						<h3>{tool.name}</h3>
+						<p>{tool.description}</p>
+					</div>
+					<Keys tool={tool} />
+				</li>
+			))}
+		</ul>
+		<aside class="privacy-note paper-note" aria-labelledby="privacy-heading">
+			<h3 id="privacy-heading">Your audio stays on your Mac.</h3>
+			<p>Meeting transcription runs locally. For AI summaries, Mysli sends the transcript and your typed notes to your chosen provider through Antigravity or Claude Code. If you add a meeting-context file, it goes too. Screenshot attachments stay on your Mac.</p>
+		</aside>
+	</div>
 </section>

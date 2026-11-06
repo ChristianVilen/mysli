@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="100 100 824 824">
+
+  <rect x="180" y="495" width="664" height="40" rx="20" fill="#2E2118"/>
+  <path d="M 204 520 H 820 C 816 665 684 765 512 765 C 340 765 208 665 204 520 Z" fill="#2E2118"/>
+
+  <circle cx="618" cy="335" r="76" fill="#B4233C"/>
+
+  <g transform="translate(420 345) rotate(-10)">
+    <rect x="-70" y="-70" width="64" height="140" rx="20" fill="#D9A441"/>
+    <rect x="6" y="-70" width="64" height="140" rx="20" fill="#D9A441"/>
+  </g>
+
+  <g transform="translate(712 463) rotate(10)">
+    <rect x="-68" y="-68" width="136" height="136" rx="26" fill="#E2B07A"/>
+    <path d="M -42 -14 V -42 H -14 M 14 -42 H 42 V -14 M 42 14 V 42 H 14 M -14 42 H -42 V 14" stroke="#2E2118" stroke-width="14" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <ellipse cx="512" cy="480" rx="92" ry="56" transform="rotate(-10 512 480)" fill="#D4B070"/>
+  <ellipse cx="548" cy="445" rx="92" ry="56" transform="rotate(8 548 445)" fill="#E9CE96"/>
+
+  <g transform="translate(330 463) rotate(-20)">
+    <ellipse rx="100" ry="68" fill="#5A3A24"/>
+    <path d="M -74 0 C -30 -24 30 24 74 0" stroke="#8C5E3C" stroke-width="14" fill="none" stroke-linecap="round"/>
+  </g>
+
+</svg>

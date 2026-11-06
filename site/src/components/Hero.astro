@@ -1,38 +1,93 @@
 ---
-const brewCommands = "brew tap ChristianVilen/mysli\nbrew trust --cask christianvilen/mysli/mysli\nbrew install --cask mysli";
----
-<section id="hero" data-capture-zone class="cursor-crosshair touch-pan-y">
-  <div class="mx-auto grid max-w-6xl items-center gap-14 px-6 pb-28 pt-16 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-16 lg:pt-20">
-    <div>
-      <h1 class="rise font-display text-[clamp(2.5rem,4.5vw+0.75rem,4.5rem)] font-semibold leading-[1.05] tracking-[-0.03em] text-ink" style="--i:0">
-        Screenshots. Tiling. Keep&nbsp;awake.
-      </h1>
-      <p class="rise mt-6 max-w-[55ch] text-lg text-neutral" style="--i:1">
-        Mysli is one lightweight menu bar app for macOS: a better
-        <kbd>⇧⌘3</kbd>/<kbd>⇧⌘4</kbd> screenshot tool, hotkeys that tile
-        windows, and a timer that keeps your Mac awake through long builds.
-        It stays out of your Dock.
-      </p>
-      <div class="rise mt-9 flex flex-wrap items-center gap-x-7 gap-y-4" style="--i:2">
-        <a href="#install" class="btn-primary px-5 py-2.5">Install with Homebrew</a>
-        <a href="https://github.com/ChristianVilen/mysli/releases/latest" class="link-quiet">Download the .zip →</a>
-      </div>
-      <p class="rise mono-label mt-12" style="--i:4">
-        Try it: drag anywhere, just like <kbd>⇧⌘4</kbd>
-      </p>
-    </div>
+import { bowlArt, pieceArt } from "../art/pieces";
+import { type ToolId, tools } from "../data/tools";
+import Keys from "./Keys.astro";
+import ToolDemo from "./ToolDemo.astro";
 
-    <figure class="rise" style="--i:3">
-      <div class="code-card text-sm">
-        <figcaption class="flex items-center justify-between border-b border-graphite-rule px-4 py-2.5">
-          <span class="mono-label text-graphite-muted!">Terminal</span>
-          <button type="button" class="btn-copy" data-copy={brewCommands}>Copy</button>
-        </figcaption>
-        <pre class="overflow-x-auto px-4 py-4 leading-relaxed"><code><span class="text-accent-bright">$</span> brew tap ChristianVilen/mysli
-<span class="text-accent-bright">$</span> brew trust --cask christianvilen/mysli/mysli
-<span class="text-accent-bright">$</span> brew install --cask mysli
-<span class="text-graphite-muted"># requires macOS 26 (Tahoe) or later</span></code></pre>
-      </div>
-    </figure>
-  </div>
+// Where each piece rests: its centre as a percentage of the stage, and its tilt in degrees.
+const homes: Record<ToolId, { left: number; top: number; turn: number }> = {
+	screenshots: { left: 64, top: 50, turn: 13 },
+	clipboard: { left: 38, top: 45, turn: -21 },
+	windows: { left: 49, top: 40, turn: -8 },
+	awake: { left: 26, top: 50, turn: -27 },
+	meetings: { left: 74, top: 42, turn: 12 },
+};
+---
+<section class="bowl-hero page-width" aria-labelledby="hero-heading" data-bowl>
+	<div class="hero-intro" data-intro>
+		<p class="hand hero-note">A little of everything you need.</p>
+		<h1 id="hero-heading">A daily mix<br />of Mac tools<span class="full-stop">.</span></h1>
+		<svg class="headline-mark" viewBox="0 0 300 20" aria-hidden="true" focusable="false"><path data-pencil d="M4 12C67 3 148 5 296 8M36 17c93-6 175-5 236-4" /></svg>
+		<p class="hero-description">Screenshots, clipboard history, window tiling, Keep Awake and private meeting notes, in one menu bar app.</p>
+		<div class="hero-actions">
+			<a class="button-primary" href="#install">Get Mysli for Mac</a>
+			<button class="text-button needs-js" type="button" data-start="screenshots">Meet the mix</button>
+			<a class="text-button no-js" href="#tools">Meet the tools</a>
+		</div>
+		<p class="fine-print">Free and open source. For macOS 26 or later.</p>
+	</div>
+
+	<div class="bowl-column">
+		<div class="bowl-stage" data-stage>
+			<div class="stage-wash" aria-hidden="true"></div>
+			<svg class="scribbles" viewBox="0 0 640 500" aria-hidden="true" focusable="false">
+				<g class="scribble-arrows"><path data-pencil d="M125 84c5 14 25 19 38 31m-11-3 11 3-1-10" /><path data-pencil d="M520 83c-4 23-20 35-38 41m12-1-12 1 5-10" /><path data-pencil d="M86 252c-13-5-18-17-17-26m-5 8 5-8 6 6" /><path data-pencil d="M529 354c18-6 24-17 22-29m-5 8 5-8 6 8" /></g>
+				<g class="scribble-marks"><path data-pencil d="m116 344 8 8m-9 0 10-8m415-226 8 8m-8 0 8-8" /><path data-pencil d="M577 231q8-11 13 0-5 8-13 0M163 56l1 7m-5-4 8-1" /></g>
+			</svg>
+			<p class="hand scene-note scene-note-left" aria-hidden="true">a few everyday<br />favourites</p>
+			<p class="hand scene-note scene-note-right needs-js" aria-hidden="true">pick a piece!</p>
+			<div class="bowl-art" data-bowl-art set:html={bowlArt("back")} />
+			<div class="piece-layer">
+				{tools.map((tool) => {
+					const home = homes[tool.id];
+					return (
+						<button
+							type="button"
+							class="piece"
+							tabindex="-1"
+							aria-hidden="true"
+							data-piece={tool.id}
+							data-left={home.left}
+							data-top={home.top}
+							data-turn={home.turn}
+							style={`left: ${home.left}%; top: ${home.top}%; --turn: ${home.turn}deg`}
+						>
+							<Fragment set:html={pieceArt(tool.id)} />
+							<span class="hand piece-label">{tool.name}</span>
+						</button>
+					);
+				})}
+			</div>
+			<div class="bowl-art bowl-front" data-bowl-art set:html={bowlArt("front")} />
+			<svg class="selected-orbit" viewBox="0 0 200 160" aria-hidden="true" focusable="false"><path d="M24 96C-8 30 112-8 176 41c60 44-22 130-97 99-30-13-51-37-49-62" /></svg>
+			<div class="bowl-caption">
+				<span class="hand">A mix of good things.</span>
+				<button class="replay-button needs-js" type="button" data-replay>Mix again <span aria-hidden="true">↻</span></button>
+			</div>
+		</div>
+	</div>
+
+	<div class="tool-picker needs-js" role="group" aria-label="Explore a tool">
+		{tools.map((tool) => (
+			<button type="button" aria-expanded="false" aria-controls={`sheet-${tool.id}`} data-open={tool.id} style={`--tool-color: ${tool.color}`}>{tool.name}</button>
+		))}
+	</div>
+
+	{tools.map((tool) => (
+		<section class="tool-sheet" id={`sheet-${tool.id}`} data-sheet={tool.id} aria-labelledby={`sheet-${tool.id}-title`} hidden>
+			<button type="button" class="sheet-back" data-close><span aria-hidden="true">←</span> Back to the whole mix</button>
+			<h2 id={`sheet-${tool.id}-title`} tabindex="-1">{tool.name}</h2>
+			<p class="hand sheet-note">{tool.note}</p>
+			<p class="sheet-pitch">{tool.pitch}</p>
+			<ToolDemo id={tool.id} />
+			<div class="sheet-facts">
+				<Keys tool={tool} />
+				<a class="sheet-more" href={`#tool-${tool.id}`}>See it in the tool list</a>
+			</div>
+		</section>
+	))}
 </section>
+
+<script>
+	import "../scripts/bowl.ts";
+</script>

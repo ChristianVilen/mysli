@@ -1,15 +1,16 @@
 ---
+import { appIcon } from "../data/site";
 ---
-<footer class="border-t border-rule px-6 py-10">
-  <p class="mx-auto flex max-w-6xl flex-wrap items-center gap-x-3 gap-y-2 text-sm text-muted">
-    <span class="font-display font-medium text-ink-2">Mysli</span>
-    <span aria-hidden="true">·</span>
-    <span>a macOS menu bar toolkit</span>
-    <span aria-hidden="true">·</span>
-    <a href="https://github.com/ChristianVilen/mysli" class="link-quiet">GitHub</a>
-    <span aria-hidden="true">·</span>
-    <a href="https://github.com/ChristianVilen/mysli/releases/latest" class="link-quiet">Releases</a>
-    <span aria-hidden="true">·</span>
-    <span>© 2026 Christian Vilen</span>
-  </p>
+<footer class="site-footer">
+	<div class="footer-inner page-width">
+		<div class="footer-brand">
+			<a href="#top" class="brand brand-small"><img class="brand-icon" src={appIcon} width="32" height="32" alt="" /><span>Mysli<span class="brand-dot" aria-hidden="true">.</span></span></a>
+			<p class="hand footer-note">Mysli is Finnish for muesli: a mix of good things.</p>
+		</div>
+		<div class="footer-links">
+			<a href="https://github.com/ChristianVilen/mysli">GitHub</a>
+			<a href="https://github.com/ChristianVilen/mysli/releases/latest">Releases</a>
+			<span>Made by Christian Vilen</span>
+		</div>
+	</div>
 </footer>

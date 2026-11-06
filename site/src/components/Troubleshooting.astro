@@ -1,59 +1,40 @@
 ---
-// Conversational Q&A — bold question, brief answer. No cards, no emoji.
-// Answer text is HTML (inline <code>/<strong>), rendered with set:html.
-const cmdBlock = (label: string, lines: string[]) =>
-	`<div class="mt-3 rounded-[6px] border border-rule bg-paper-2"><div class="border-b border-rule px-3 py-1.5"><span class="mono-label">${label}</span></div><pre class="overflow-x-auto px-3 py-2.5 font-mono text-[0.8rem] leading-relaxed">${lines.join("\n")}</pre></div>`;
-
-const items = [
-	{
-		q: "Mysli won't open.",
-		a: `Mysli is unsigned, so Gatekeeper blocks the first launch. Clear the quarantine flag:${cmdBlock("Terminal", ["sudo xattr -d com.apple.quarantine /Applications/Mysli.app"])}<p class="mt-3">Or go to <strong>System Settings → Privacy &amp; Security</strong> and click <strong>"Open Anyway"</strong>.</p>`,
-	},
-	{
-		q: "The shortcut does nothing.",
-		a: `Mysli needs <strong>Accessibility</strong> permission to intercept <code>⇧⌘4</code> — the same permission also powers window tiling. Go to <strong>System Settings → Privacy &amp; Security → Accessibility</strong>, enable Mysli, then restart it from the menu bar.`,
-	},
-	{
-		q: "Captures come out black, or fail.",
-		a: `That's the <strong>Screen Recording</strong> permission. Go to <strong>System Settings → Privacy &amp; Security → Screen Recording</strong>, enable Mysli, and capture again.`,
-	},
-	{
-		q: "Screenshots aren't saving.",
-		a: `Check that the folder exists and is writable:${cmdBlock("Terminal", ["mkdir -p ~/Screenshots", "chmod 755 ~/Screenshots"])}<p class="mt-3">Files are named <code>Screenshot_YYYY-MM-DD_at_HH-MM-SS.png</code>.</p>`,
-	},
-	{
-		q: "⌃⌥ keys stopped working in another app.",
-		a: `While Window Tiling is on, Mysli takes <code>⌃⌥←/→/↩</code> globally, even in apps that use those keys themselves. Untick <strong>Window Tiling</strong> in the menu bar menu to give them back; Mysli remembers the choice across restarts.`,
-	},
-	{
-		q: "The Mac still sleeps with Keep Awake on.",
-		a: `Closing a laptop's lid still sleeps the Mac unless it's plugged in with an external display attached. No app can get around that, so keep the lid open or run docked. The display turning off is normal; tick <strong>Keep display awake</strong> if you want the screen on too.`,
-	},
-	{
-		q: "A window won't tile.",
-		a: `Some apps refuse to let anything move their windows through the Accessibility API, so the hotkey silently does nothing. With more than one display, the window tiles on the screen it overlaps the most, so check the other display before assuming it didn't work.`,
-	},
-	{
-		q: "A permission looks granted, but Mysli still doesn't work.",
-		a: `Reset both permissions so you can grant them again from scratch. These commands <strong>remove</strong> Mysli from the permission lists:${cmdBlock("Terminal", ["tccutil reset Accessibility io.github.christianvilen.mysli", "tccutil reset ScreenCapture io.github.christianvilen.mysli"])}<p class="mt-3">Then re-enable Accessibility and Screen Recording in System Settings and restart Mysli.</p>`,
-	},
-];
+import CommandBlock from "./CommandBlock.astro";
 ---
-<section class="px-6 py-24">
-  <div class="mx-auto max-w-2xl">
-    <h2 class="font-display text-[clamp(1.85rem,3vw+0.5rem,2.75rem)] font-medium tracking-[-0.02em] text-ink">
-      When something doesn't work.
-    </h2>
-
-    <div class="mt-10">
-      {items.map((item) => (
-        <details class="group border-t border-rule py-4 last:border-b">
-          <summary class="cursor-pointer list-none font-display text-base font-medium text-ink [&::-webkit-details-marker]:hidden">
-            <span class="mr-2 inline-block text-muted transition-transform duration-200 group-open:rotate-90" aria-hidden="true">›</span>{item.q}
-          </summary>
-          <div class="max-w-[62ch] pb-2 pl-6 pt-3 text-sm text-neutral" set:html={item.a} />
-        </details>
-      ))}
-    </div>
-  </div>
+<section id="help" class="section split page-width" aria-labelledby="help-heading">
+	<div class="section-heading">
+		<p class="hand kicker">a little help</p>
+		<h2 id="help-heading">If something gets stuck.</h2>
+		<p>Setup and permissions live in Mysli's Settings.</p>
+	</div>
+	<div class="help-list">
+		<details>
+			<summary>Mysli won't open.</summary>
+			<div class="help-answer"><p>Open Mysli once, then go to <strong>System Settings &gt; Privacy &amp; Security</strong> and choose <strong>Open Anyway</strong>. Mysli is unsigned, so macOS can block its first launch.</p><p>If that option is unavailable, this command removes the quarantine flag from the installed app:</p><CommandBlock label="Remove quarantine" command="sudo xattr -d com.apple.quarantine /Applications/Mysli.app" /></div>
+		</details>
+		<details>
+			<summary>Which permissions does Mysli need?</summary>
+			<div class="help-answer"><p>Open the <strong>Permissions</strong> page in Mysli's Settings. It lists the access needed by your enabled tools.</p><p>Screenshots need Screen Recording. Clipboard paste and window tiling need Accessibility. Meetings need Microphone and Screen Recording. Calendar reminders also need Calendar and Notifications. Keep Awake needs none.</p></div>
+		</details>
+		<details>
+			<summary>A screenshot shortcut does nothing.</summary>
+			<div class="help-answer"><p>Check that <strong>Use Mysli for screenshots</strong> is on in Settings. If macOS uses the same shortcut, the Permissions page explains how to turn that system shortcut off in Keyboard Settings.</p><p>Registering shortcuts does not need Accessibility access. Screen Recording is needed to capture the image.</p></div>
+		</details>
+		<details>
+			<summary>Captures are black, or a meeting cannot start.</summary>
+			<div class="help-answer"><p>Check the Permissions page in Mysli. Allow Screen Recording in System Settings. Meetings also need Microphone access. If macOS asks you to quit and reopen, setup remembers your step.</p></div>
+		</details>
+		<details>
+			<summary>A Mysli shortcut is used by another app.</summary>
+			<div class="help-answer"><p>Turn off the tool on its page in Mysli's Settings to release its shortcuts. You can turn it on again later. Mysli remembers your choice.</p></div>
+		</details>
+		<details>
+			<summary>The Mac still sleeps with Keep Awake on.</summary>
+			<div class="help-answer"><p>Turn on <strong>Keep screen on</strong> in the Keep Awake menu if you also want to prevent display sleep. Closing a laptop's lid still puts the Mac to sleep unless it is in a supported setup with external power and a display.</p></div>
+		</details>
+		<details>
+			<summary>What leaves my Mac when I record a meeting?</summary>
+			<div class="help-answer"><p>Transcription runs on your Mac. The AI summary tool receives the transcript and saved typed notes, relevant known-word forms, and the complete optional meeting-context file. It receives image references from your notes, but no screenshot pixels. Audio is not sent to the summary provider.</p><p>Automatic tries Antigravity and then Claude Code, so it can send the text to both providers. Choose one tool in Settings to use only that provider. See the <a class="text-link" href="https://github.com/ChristianVilen/mysli#meeting-notes">meeting notes guide</a> for the full details.</p></div>
+		</details>
+	</div>
 </section>

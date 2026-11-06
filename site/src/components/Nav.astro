@@ -1,11 +1,14 @@
 ---
+import { appIcon } from "../data/site";
 ---
-<header class="sticky top-0 z-50 border-b border-rule bg-(--color-paper-glass) backdrop-blur-[8px]">
-  <div class="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
-    <a href="#top" class="font-display text-lg font-semibold tracking-[-0.02em] text-ink">Mysli</a>
-    <div class="flex items-center gap-6">
-      <a href="https://github.com/ChristianVilen/mysli" class="link-quiet text-sm">GitHub</a>
-      <a href="#install" class="btn-primary px-3.5 py-1.5 text-sm">Install</a>
-    </div>
-  </div>
+<header class="site-header">
+	<nav class="site-nav page-width" aria-label="Main navigation">
+		<a href="#top" class="brand"><img class="brand-icon" src={appIcon} width="40" height="40" alt="" /><span>Mysli<span class="brand-dot" aria-hidden="true">.</span></span></a>
+		<p class="hand nav-note">Little tools. Good company.</p>
+		<div class="nav-links">
+			<a class="nav-link tools-link" href="#tools">The tools</a>
+			<a class="nav-link" href="https://github.com/ChristianVilen/mysli">GitHub</a>
+			<a class="button-primary button-small" href="#install">Get Mysli</a>
+		</div>
+	</nav>
 </header>

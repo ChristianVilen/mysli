@@ -1,0 +1,24 @@
+---
+import type { Tool } from "../data/tools";
+
+interface Props {
+	tool: Tool;
+}
+const { tool } = Astro.props;
+const combos = tool.keys ?? [];
+---
+{combos.length > 0 ? (
+	<span class="keys">
+		<span class="visually-hidden">{tool.shortcut}</span>
+		<span class="keycaps" aria-hidden="true">
+			{combos.map((combo, index) => (
+				<>
+					{index > 0 && index === combos.length - 1 && <span class="keys-or">or</span>}
+					<kbd>{combo.join("")}</kbd>
+				</>
+			))}
+		</span>
+	</span>
+) : (
+	<span class="keys keys-words">{tool.shortcut}</span>
+)}

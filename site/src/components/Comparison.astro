@@ -1,47 +1,21 @@
 ---
-// Honest differences only — no all-tick marketing column.
-const rows = [
-	{ what: "Where files land", macos: "Desktop, by default", mysli: "~/Screenshots/, timestamped" },
-	{ what: "Clipboard", macos: "hold ⌃ while capturing", mysli: "copied every time" },
-	{ what: "Thumbnails", macos: "one, briefly", mysli: "a stack of five; combine into one image" },
-	{
-		what: "After the shot",
-		macos: "Markup toolbar",
-		mysli: "freehand draw, crop, or delete + clear clipboard",
-	},
-	{ what: "Multi-monitor", macos: "active display", mysli: "every screen dims; your cursor picks" },
-	{ what: "Beyond capture", macos: "—", mysli: "tiling hotkeys, keep-awake timer" },
-];
+import { tools } from "../data/tools";
 ---
-<section class="px-6 py-20">
-  <div class="mx-auto max-w-4xl">
-    <h2 class="font-display text-[clamp(1.85rem,3vw+0.5rem,2.75rem)] font-medium tracking-[-0.02em] text-ink">
-      Same shortcuts you already press.
-    </h2>
-    <p class="mt-4 max-w-[55ch] text-neutral">
-      Mysli takes over <kbd>⇧⌘3</kbd> and <kbd>⇧⌘4</kbd>, so there's nothing
-      new to learn. The differences start after the keypress.
-    </p>
-
-    <div class="mt-10 overflow-x-auto">
-      <table class="w-full min-w-[34rem] border-collapse text-left text-sm">
-        <thead>
-          <tr>
-            <th class="w-[24%] pb-3 pr-4"><span class="sr-only">Difference</span></th>
-            <th scope="col" class="mono-label w-[34%] pb-3 pr-4 font-medium">Built-in ⇧⌘4</th>
-            <th scope="col" class="mono-label pb-3 font-medium text-accent!">Mysli</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr class="border-t border-rule">
-              <th scope="row" class="py-3.5 pr-4 align-top font-display text-base font-medium text-ink">{r.what}</th>
-              <td class="py-3.5 pr-4 align-top text-muted">{r.macos}</td>
-              <td class="py-3.5 align-top text-neutral">{r.mysli}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  </div>
+<section class="section split page-width" aria-labelledby="comparison-heading">
+	<div class="section-heading">
+		<p class="hand kicker">honest labels</p>
+		<h2 id="comparison-heading">One app instead of five.</h2>
+		<p>A few useful tools together, with clear limits.</p>
+	</div>
+	<table class="limits-table">
+		<thead><tr><th scope="col">The tool</th><th scope="col">What to expect</th></tr></thead>
+		<tbody>
+			{tools.map((tool) => (
+				<tr>
+					<th scope="row"><span class="tool-label"><span class="tool-dot" style={`--tool-color: ${tool.color}`} aria-hidden="true"></span><span>{tool.name}</span></span></th>
+					<td>{tool.limit}</td>
+				</tr>
+			))}
+		</tbody>
+	</table>
 </section>
