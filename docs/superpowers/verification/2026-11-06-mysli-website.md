@@ -51,7 +51,9 @@ A strict code review asked for the styles and the demos to live with their compo
 - The recording dot in the meeting demo pulses when its sheet opens, not while it is hidden.
 - An opened sheet that is partly outside the window always scrolls into view.
 
-Biome and the build passed. Chrome showed all five demos, their reset on close, Escape with focus return, the intro fade, light and dark appearance, the phone frame, the page without JavaScript, the page not found, and the copy note. The build has both pages and the expected tags. Not checked: the preview in Slack, iMessage, or X, the icon on an iPhone home screen, and the page not found on GitHub Pages.
+Biome and the build passed. Chrome showed all five demos, their reset on close, Escape with focus return, the intro fade, light and dark appearance, the phone frame, the page without JavaScript, the page not found, and the copy note.
+
+Later, the user removed the "Mix again" button, because replaying the arrival gives a visitor nothing. The pieces arrive once, at load. The build has both pages and the expected tags. Not checked: the preview in Slack, iMessage, or X, the icon on an iPhone home screen, and the page not found on GitHub Pages.
 
 ## Build and source checks
 

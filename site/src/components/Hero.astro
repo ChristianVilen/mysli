@@ -52,10 +52,7 @@ import ToolSheet from "./ToolSheet.astro";
 				</div>
 			</Bowl>
 			<svg class="selected-orbit" viewBox="0 0 200 160" aria-hidden="true" focusable="false"><path d="M24 96C-8 30 112-8 176 41c60 44-22 130-97 99-30-13-51-37-49-62" /></svg>
-			<div class="bowl-caption">
-				<span class="hand">A mix of good things.</span>
-				<button class="replay-button needs-js" type="button" data-replay>Mix again <span aria-hidden="true">↻</span></button>
-			</div>
+			<p class="hand bowl-caption">A mix of good things.</p>
 		</div>
 	</div>
 
@@ -203,41 +200,12 @@ import ToolSheet from "./ToolSheet.astro";
 	.bowl-caption {
 		position: absolute;
 		left: 15%;
-		right: 10%;
 		bottom: -1%;
 		z-index: 7;
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 1rem;
-	}
-	.bowl-caption .hand {
 		font-size: clamp(1.3rem, 1.9vw, 1.6rem);
+		white-space: nowrap;
 		color: var(--pencil);
 		transform: rotate(-3deg);
-	}
-	.replay-button {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.35rem;
-		min-height: 2.25rem;
-		font-size: 0.85rem;
-		color: var(--ink-soft);
-		white-space: nowrap;
-		cursor: pointer;
-		border-bottom: 1px dotted var(--rule-strong);
-		transition: color 0.2s ease;
-	}
-	.replay-button:hover {
-		color: var(--ink);
-	}
-	.replay-button span {
-		display: inline-block;
-		font-size: 1rem;
-		transition: transform 0.45s ease;
-	}
-	.replay-button:hover span {
-		transform: rotate(200deg);
 	}
 
 	/* The pieces */
@@ -480,12 +448,8 @@ import ToolSheet from "./ToolSheet.astro";
 	@media (max-width: 480px) {
 		.bowl-caption {
 			left: 6%;
-			right: 3%;
 			bottom: -5%;
-		}
-		.bowl-caption .hand {
 			font-size: 1.2rem;
-			white-space: nowrap;
 		}
 		.scene-note-left {
 			left: 3%;
@@ -495,9 +459,6 @@ import ToolSheet from "./ToolSheet.astro";
 		}
 	}
 	@media (pointer: coarse) {
-		.replay-button {
-			min-height: 2.75rem;
-		}
 		.piece-label {
 			display: none;
 		}

@@ -134,13 +134,12 @@ function setUpBowl(hero: HTMLElement, stage: HTMLElement) {
 		}
 	}
 
-	function assemble() {
-		close();
-		stopEntrance();
-		lifted = null;
+	// The pieces arrive only when the visitor can see the bowl. Otherwise they are already in it.
+	function arrive(visible: boolean) {
 		stage.classList.add("is-live");
-		if (reduceMotion.matches) layout(true);
-		else stopEntrance = playEntrance(hero, stage, pieces, (piece) => place(piece));
+		if (visible && !reduceMotion.matches) {
+			stopEntrance = playEntrance(hero, stage, pieces, (piece) => place(piece));
+		} else layout(true);
 	}
 
 	function measure() {
@@ -181,7 +180,6 @@ function setUpBowl(hero: HTMLElement, stage: HTMLElement) {
 	for (const button of hero.querySelectorAll<HTMLElement>("[data-close]")) {
 		button.addEventListener("click", () => close());
 	}
-	hero.querySelector("[data-replay]")?.addEventListener("click", assemble);
 	document.addEventListener("keydown", (event) => {
 		if (event.key === "Escape" && selected) close();
 	});
@@ -196,16 +194,11 @@ function setUpBowl(hero: HTMLElement, stage: HTMLElement) {
 		if (measure()) layout(true);
 	}).observe(stage);
 
-	// The pieces arrive only when the visitor can see the bowl. Otherwise they are already in it.
 	const begin = () => {
 		const observer = new IntersectionObserver(
 			([entry]) => {
 				observer.disconnect();
-				if (entry?.isIntersecting) assemble();
-				else {
-					stage.classList.add("is-live");
-					layout(true);
-				}
+				arrive(entry?.isIntersecting ?? false);
 			},
 			{ threshold: 0.2 },
 		);
