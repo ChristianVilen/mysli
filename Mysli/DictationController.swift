@@ -9,6 +9,7 @@ final class DictationController {
         var task: Task<Void, Never>?
         var timers: [() -> Void] = []
         var delivering = false
+        var cleanupWaiters: [CheckedContinuation<Void, Never>] = []
 
         init(capture: (any DictationCapture)? = nil) { self.capture = capture }
         func cancel() {
@@ -30,6 +31,8 @@ final class DictationController {
     private final class Preparation {
         var task: Task<Void, Never>?
         var polishTask: Task<Void, Never>?
+        var inputReady = false
+        var inputGeneration = UUID()
     }
 
     private final class Ready {
@@ -75,9 +78,42 @@ final class DictationController {
     private let schedule: Schedule
     private let prepareText: (String) async throws -> DictationPolishRequest?
     private var state = State.disabled(nil)
+    private var hasAccess = true
+    private var terminationWait: Task<Void, Never>?
+    private var terminating = false
 
     private(set) var lastDictation: LastDictation?
     var onChange: (() -> Void)?
+
+    var canPasteLast: Bool {
+        guard hasAccess, lastDictation != nil, case .ready(let ready, let phase) = state,
+              ready.preparation.inputReady else { return false }
+        switch phase {
+        case .idle, .notice: return true
+        default: return false
+        }
+    }
+
+    var isListening: Bool {
+        if case .ready(_, .listening) = state { return true }
+        return false
+    }
+
+    private var pendingPaste: Work? {
+        let work: Work?
+        switch state {
+        case .disabled(let pending), .loading(_, let pending), .failed(_, let pending): work = pending
+        case .ready(_, let phase): work = phase.work
+        }
+        return work?.delivering == true ? work : nil
+    }
+
+    var hasPendingPaste: Bool { pendingPaste != nil }
+
+    private func waitForPasteCleanup() async {
+        guard let work = pendingPaste else { return }
+        await withCheckedContinuation { work.cleanupWaiters.append($0) }
+    }
 
     init(keys: any DictationKeyInput, recorder: any DictationCapturing,
          speech: any DictationSpeechPreparing, polisher: any DictationPolishing,
@@ -111,21 +147,17 @@ final class DictationController {
     }
 
     func setEnabled(_ enabled: Bool) {
-        if !enabled { disable(); return }
+        if !enabled || terminating { disable(); return }
         guard case .disabled(let pending) = state else { return }
         let preparation = Preparation()
         state = .loading(preparation, pending)
         do {
-            try keys.start { [weak self, weak preparation] event in
-                guard let self, let preparation, self.ownsKeys(preparation) else { return }
-                self.receive(event)
-            }
+            if hasAccess { try startKeys(preparation) }
         } catch {
             keys.stop()
-            showStartupError()
-            return
         }
-        preparation.polishTask = Task { [polisher] in await polisher.prepare() }
+        guard ownsKeys(preparation) else { return }
+        if preparation.inputReady { preparation.polishTask = Task { [polisher] in await polisher.prepare() } }
         preparation.task = Task { [weak self, speech] in
             do {
                 let session = try await speech.prepare()
@@ -133,7 +165,9 @@ final class DictationController {
                       current === preparation else { session.release(); return }
                 let ready = Ready(speech: session, preparation: preparation)
                 self.state = .ready(ready, pending.map(Phase.settling) ?? .idle)
-                self.publish()
+                if self.hasAccess, !preparation.inputReady, pending == nil {
+                    self.showNotice(.error, ready: ready)
+                } else { self.publish() }
             } catch {
                 guard let self, case .loading(let current, _) = self.state,
                       current === preparation else { return }
@@ -144,6 +178,44 @@ final class DictationController {
             }
         }
         publish()
+    }
+
+    func setAccess(_ allowed: Bool) {
+        let changed = allowed != hasAccess
+        hasAccess = allowed
+        let preparation: Preparation
+        switch state {
+        case .loading(let current, _): preparation = current
+        case .ready(let ready, _): preparation = ready.preparation
+        case .disabled, .failed: return
+        }
+        if allowed {
+            guard !preparation.inputReady else { return }
+            do { try startKeys(preparation) }
+            catch { receive(.unavailable); return }
+            guard ownsKeys(preparation), hasAccess else { return }
+            preparation.polishTask = Task { [polisher] in await polisher.prepare() }
+        } else {
+            guard changed else { return }
+            preparation.inputReady = false
+            preparation.inputGeneration = UUID()
+            cancel()
+            keys.stop()
+            preparation.polishTask?.cancel()
+            polisher.stop()
+        }
+        publish()
+    }
+
+    private func startKeys(_ preparation: Preparation) throws {
+        let generation = UUID()
+        preparation.inputGeneration = generation
+        try keys.start { [weak self, weak preparation] event in
+            guard let self, let preparation, self.hasAccess, self.ownsKeys(preparation),
+                  preparation.inputGeneration == generation else { return }
+            self.receive(event)
+        }
+        preparation.inputReady = hasAccess && ownsKeys(preparation) && preparation.inputGeneration == generation
     }
 
     private func ownsKeys(_ preparation: Preparation) -> Bool {
@@ -162,12 +234,17 @@ final class DictationController {
         case .unavailable:
             switch state {
             case .loading(let preparation, _):
-                preparation.task?.cancel()
+                preparation.inputReady = false
+                preparation.inputGeneration = UUID()
                 preparation.polishTask?.cancel()
                 polisher.stop()
                 keys.stop()
-                showStartupError()
             case .ready(let ready, let phase):
+                ready.preparation.inputReady = false
+                ready.preparation.inputGeneration = UUID()
+                ready.preparation.polishTask?.cancel()
+                polisher.stop()
+                keys.stop()
                 if phase.work?.delivering == true { cancel() }
                 else { showNotice(.error, ready: ready, cancelling: phase.work) }
             case .disabled, .failed: break
@@ -176,7 +253,8 @@ final class DictationController {
     }
 
     private func press() {
-        guard case .ready(let ready, let phase) = state else { return }
+        guard hasAccess, case .ready(let ready, let phase) = state,
+              ready.preparation.inputReady else { return }
         switch phase {
         case .idle: break
         case .notice(let notice): notice.cancelExpiry?()
@@ -272,6 +350,11 @@ final class DictationController {
     private func deliver(_ text: PasteText, work: Work, ready: Ready, unpolished: Bool) async {
         guard owns(work) else { return }
         work.delivering = true
+        defer {
+            let waiters = work.cleanupWaiters
+            work.cleanupWaiters = []
+            waiters.forEach { $0.resume() }
+        }
         do {
             try await paster.paste(text)
             work.delivering = false
@@ -286,7 +369,7 @@ final class DictationController {
     }
 
     func pasteLastAgain() {
-        guard let lastDictation, case .ready(let ready, let phase) = state else { return }
+        guard canPasteLast, let lastDictation, case .ready(let ready, let phase) = state else { return }
         switch phase {
         case .idle: break
         case .notice(let notice): notice.cancelExpiry?()
@@ -308,6 +391,19 @@ final class DictationController {
     }
 
     func shutdown() { disable() }
+
+    func shutDownForTermination(reply: @escaping () -> Void) -> Bool {
+        terminating = true
+        disable()
+        guard hasPendingPaste else { return false }
+        if terminationWait == nil {
+            terminationWait = Task { [self] in
+                await waitForPasteCleanup()
+                reply()
+            }
+        }
+        return true
+    }
 
     private func disable() {
         let old = state

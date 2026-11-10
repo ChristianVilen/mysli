@@ -1,8 +1,92 @@
 import XCTest
+import AppKit
 @testable import Mysli
 
 @MainActor
 final class DictationControllerTests: XCTestCase {
+    func testRevokedAccessAndShutdownWaitForOwedPasteCleanup() async {
+        let f = DictationFixture()
+        let cleanup = DictationTestGate<Void>()
+        f.paste.gate = cleanup
+        await f.enable()
+        f.hold()
+        await cleanup.waitUntilEntered()
+        f.controller.setAccess(false)
+        XCTAssertFalse(f.controller.canPasteLast)
+        XCTAssertTrue(f.controller.hasPendingPaste)
+        let reply = DictationTestGate<Void>()
+        var replies = 0
+        XCTAssertTrue(f.controller.shutDownForTermination { replies += 1; reply.resume(()) })
+        XCTAssertTrue(f.controller.shutDownForTermination { replies += 1 })
+        f.controller.setEnabled(true)
+        XCTAssertEqual(f.controller.presentation, .disabled)
+        XCTAssertEqual(replies, 0)
+        XCTAssertTrue(f.speech.session.released)
+        XCTAssertNil(f.keys.receive)
+        cleanup.resume(())
+        await reply.value()
+        XCTAssertEqual(replies, 1)
+        XCTAssertFalse(f.controller.hasPendingPaste)
+        XCTAssertEqual(f.controller.presentation, .disabled)
+        XCTAssertTrue(f.speech.session.released)
+        XCTAssertFalse(f.controller.shutDownForTermination { replies += 1 })
+        XCTAssertEqual(replies, 1)
+    }
+    func testMissingAccessRetainsModelAndGrantStartsInputWithoutReload() async {
+        let f = DictationFixture()
+        f.controller.setAccess(false)
+        await f.enable()
+        XCTAssertNil(f.keys.receive)
+        XCTAssertFalse(f.speech.session.released)
+        f.controller.receive(.pressed)
+        XCTAssertEqual(f.controller.presentation, .idle)
+        XCTAssertTrue(f.recorder.captures.isEmpty)
+        f.controller.setAccess(true)
+        f.keys.receive?(.pressed)
+        XCTAssertEqual(f.controller.presentation, .listening(level: 0, warning: false))
+        f.controller.setAccess(false)
+        XCTAssertEqual(f.controller.presentation, .idle)
+        XCTAssertTrue(f.recorder.captures[0].cancelled)
+        XCTAssertFalse(f.speech.session.released)
+        f.controller.shutdown()
+        XCTAssertTrue(f.speech.session.released)
+    }
+    func testReplayAvailabilitySeparatesStartupErrorFromReadyNoticeAndCleanup() async {
+        let f = DictationFixture()
+        let menu = NSMenu()
+        let section = DictationMenuSection(controller: f.controller)
+        section.buildMenuSection(into: menu)
+        menu.update()
+        XCTAssertFalse(section.replay.isEnabled)
+        XCTAssertFalse(f.controller.canPasteLast)
+        await f.enable()
+        f.paste.fails = true
+        f.hold()
+        await f.waitFor(.error)
+        XCTAssertTrue(f.controller.canPasteLast)
+        menu.update()
+        XCTAssertTrue(section.replay.isEnabled)
+        f.controller.setEnabled(false)
+        f.keys.fails = true
+        f.controller.setEnabled(true)
+        await f.waitFor(.error)
+        XCTAssertEqual(f.controller.presentation, .error)
+        XCTAssertFalse(f.controller.canPasteLast)
+        f.controller.setEnabled(false)
+        f.keys.fails = false
+        f.paste.fails = false
+        await f.enable()
+        let gate = DictationTestGate<Void>()
+        f.paste.gate = gate
+        f.controller.pasteLastAgain()
+        await gate.waitUntilEntered()
+        f.controller.cancel()
+        XCTAssertFalse(f.controller.canPasteLast)
+        gate.resume(())
+        await f.waitFor(.idle)
+        XCTAssertTrue(f.controller.canPasteLast)
+        f.controller.shutdown()
+    }
     func testNoContentReturnsIdleAndKeepsLastDictation() async {
         let f = DictationFixture()
         await f.enable()
@@ -351,7 +435,7 @@ final class DictationControllerTests: XCTestCase {
         f.controller.shutdown()
     }
 
-    func testKeyRegistrationFailureShowsErrorWithoutCaptureAndExpires() async {
+    func testKeyRegistrationFailureKeepsModelAndRetriesWithoutReload() async {
         let f = DictationFixture()
         f.keys.fails = true
         f.controller.setEnabled(true)
@@ -359,7 +443,12 @@ final class DictationControllerTests: XCTestCase {
         f.controller.receive(.pressed)
         XCTAssertTrue(f.recorder.captures.isEmpty)
         f.clock.advance(to: 2)
-        XCTAssertEqual(f.controller.presentation, .disabled)
+        XCTAssertEqual(f.controller.presentation, .idle)
+        XCTAssertFalse(f.speech.session.released)
+        f.keys.fails = false
+        f.controller.setAccess(true)
+        f.keys.receive?(.pressed)
+        XCTAssertEqual(f.controller.presentation, .listening(level: 0, warning: false))
         f.controller.shutdown()
     }
 }
