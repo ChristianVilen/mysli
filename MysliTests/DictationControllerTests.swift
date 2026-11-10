@@ -3,6 +3,26 @@ import XCTest
 
 @MainActor
 final class DictationControllerTests: XCTestCase {
+    func testDisableDuringUnavailableCallbackKeepsReleasedSessionDisabled() async {
+        let f = DictationFixture()
+        await f.enable()
+        f.controller.receive(.pressed)
+        var failurePresentations: [DictationPresentation] = []
+        f.controller.onChange = {
+            failurePresentations.append(f.controller.presentation)
+            f.controller.onChange = nil
+            f.controller.setEnabled(false)
+        }
+        f.controller.receive(.unavailable)
+        XCTAssertEqual(failurePresentations, [.error])
+        XCTAssertEqual(f.controller.presentation, .disabled)
+        XCTAssertTrue(f.speech.session.released)
+        XCTAssertNil(f.keys.receive)
+        XCTAssertEqual(f.recorder.captures.map(\.cancelled), [true])
+        f.clock.advance(to: 2)
+        XCTAssertEqual(f.controller.presentation, .disabled)
+    }
+
     func testEscapeRegistrationFailurePreventsCaptureAndLostKeysCancelActiveWork() async {
         let f = DictationFixture()
         f.controller.setEnabled(true)

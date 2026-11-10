@@ -168,8 +168,8 @@ final class DictationController {
                 keys.stop()
                 showStartupError()
             case .ready(let ready, let phase):
-                cancel()
-                if phase.work?.delivering != true { showNotice(.error, ready: ready) }
+                if phase.work?.delivering == true { cancel() }
+                else { showNotice(.error, ready: ready, cancelling: phase.work) }
             case .disabled, .failed: break
             }
         }
@@ -363,9 +363,10 @@ final class DictationController {
         publish()
     }
 
-    private func showNotice(_ presentation: DictationPresentation, ready: Ready) {
+    private func showNotice(_ presentation: DictationPresentation, ready: Ready, cancelling work: Work? = nil) {
         let notice = Notice(presentation)
         state = .ready(ready, .notice(notice))
+        work?.cancel()
         notice.cancelExpiry = schedule(2) { [weak self, weak notice] in
             guard let self, let notice, case .ready(let currentReady, .notice(let current)) = self.state,
                   current === notice else { return }
