@@ -2,8 +2,8 @@
 
 The user chose this design on 2026-11-10. Hold a key,
 speak in English, and release it to put polished text at the cursor. The product
-choices below are settled. The speech engine and process timing need measurements
-before the pipeline is built.
+choices below are settled. The measurements below select Whisper and support a
+fresh ready Claude process for each dictation.
 
 ## Hold to speak
 
@@ -12,10 +12,14 @@ modifier flag. This is the user's narrow exception to the Carbon-only shortcut
 rule. The monitor never blocks or changes an event. A different key pressed while
 Fn is down cancels the hold, including Fn with an arrow or F5. Escape cancels too.
 
-Settings also offers a Carbon key combination. The builder selects its default
-through the existing conflict check. The Carbon registrar owns press and release
+Settings also offers a Carbon key combination. The builder chose Control+Option+D.
+The existing system conflict check found no enabled match on this Mac. A real
+probe registered and released both that combination and unmodified Escape.
+The Carbon registrar owns press and release
 delivery. Existing shortcuts still act only on press. Dictation has its own
-enable gate in the hotkey manager.
+enable gate in the hotkey manager. In Carbon mode, the registrar also owns a
+temporary Escape binding while a dictation can be cancelled. This needs no second
+passive monitor. Physical key delivery remains a manual check.
 
 A hold shorter than 0.3 seconds does nothing. Recording stops on release or after
 two minutes. The pill warns by shape during the last ten seconds. There is no
@@ -59,7 +63,8 @@ The controller takes fakeable key input, recorder, speech engine, polisher,
 pasteboard, keystroke sender, and clock. The adapters own OS work. Timers and
 deadlines use an injected clock in tests. Text and audio have no file owner.
 
-Keep the most recent successful dictation in memory, both as heard and as pasted.
+Keep the most recent dictation with text in memory, both as heard and as selected
+for paste. Save it before delivery so a paste failure still permits replay.
 "Paste last dictation again" uses the same safe paste path. The design leaves room
 for a later "Fix last dictation" action that can add known words.
 
