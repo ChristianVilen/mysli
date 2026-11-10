@@ -59,6 +59,11 @@ final class DictationPanel: FloatingPanel {
     }
 
     func show(_ state: DictationPresentation) {
+        let startsListening: Bool
+        if case .listening = state {
+            if case .listening = presentation { startsListening = false }
+            else { startsListening = true }
+        } else { startsListening = false }
         presentation = state
         let label: String
         var spinning = false
@@ -90,7 +95,7 @@ final class DictationPanel: FloatingPanel {
         else { progress.stopAnimation(nil) }
         pill.setAccessibilityLabel(label)
         applyMaterial()
-        if !isVisible, let screen = screenFrame() {
+        if (!isVisible || startsListening), let screen = screenFrame() {
             setFrameOrigin(NSPoint(x: screen.midX - frame.width / 2, y: screen.minY + 24))
         }
         orderFrontRegardless()

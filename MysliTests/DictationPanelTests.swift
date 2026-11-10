@@ -4,6 +4,23 @@ import AppKit
 
 @MainActor
 final class DictationPanelTests: XCTestCase {
+    func testNewListeningDuringNoticeMovesToFocusedScreenWithoutReadingOnLevelUpdates() {
+        var screen = NSRect(x: 0, y: 0, width: 1200, height: 800)
+        var reads = 0
+        let panel = DictationPanel(screenFrame: { reads += 1; return screen },
+                                   reduceTransparency: { true }, reduceMotion: { true })
+        defer { panel.close() }
+        panel.show(.listening(level: 0.1, warning: false))
+        panel.show(.unpolished)
+        screen = NSRect(x: 1200, y: 40, width: 1000, height: 800)
+        panel.show(.listening(level: 0.2, warning: false))
+        XCTAssertEqual(panel.frame.midX, 1700)
+        XCTAssertEqual(panel.frame.minY, 64)
+        panel.show(.listening(level: 0.8, warning: true))
+        XCTAssertEqual(reads, 2)
+        XCTAssertEqual(panel.frame.midX, 1700)
+    }
+
     func testPanelNeverTakesFocusAndPlacesWithinChosenScreen() {
         let panel = DictationPanel(screenFrame: { NSRect(x: 900, y: 40, width: 1200, height: 800) },
                                    reduceTransparency: { true })
