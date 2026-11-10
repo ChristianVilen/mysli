@@ -2,8 +2,6 @@ import Foundation
 
 @MainActor
 final class DictationController {
-    typealias Schedule = (Double, @escaping @MainActor () -> Void) -> () -> Void
-
     @MainActor private final class Work {
         var capture: (any DictationCapture)?
         var task: Task<Void, Never>?
@@ -75,7 +73,7 @@ final class DictationController {
     private let polisher: any DictationPolishing
     private let paster: any DictationPasting
     private let now: () -> Double
-    private let schedule: Schedule
+    private let schedule: DictationSchedule
     private let prepareText: (String) async throws -> DictationPolishRequest?
     private var state = State.disabled(nil)
     private var hasAccess = true
@@ -118,7 +116,7 @@ final class DictationController {
     init(keys: any DictationKeyInput, recorder: any DictationCapturing,
          speech: any DictationSpeechPreparing, polisher: any DictationPolishing,
          paster: any DictationPasting, now: @escaping () -> Double,
-         schedule: @escaping Schedule,
+         schedule: @escaping DictationSchedule,
          prepareText: @escaping (String) async throws -> DictationPolishRequest?) {
         self.keys = keys
         self.recorder = recorder

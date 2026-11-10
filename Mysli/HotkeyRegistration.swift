@@ -124,12 +124,11 @@ final class CarbonHotkeyRegistrar {
               let shortcut = registrations.first(where: { $0.value.id == key.id && $0.value.state == .active })?.key else {
             return OSStatus(eventNotHandledErr)
         }
-        switch shortcut {
-        case .dictation: onDictation?(kind == UInt32(kEventHotKeyPressed) ? .pressed : .released)
-        case .dictationEscape:
-            if kind == UInt32(kEventHotKeyPressed) { onDictation?(.cancelled) }
-        default:
-            if kind == UInt32(kEventHotKeyPressed), let action = shortcut.action { onAction?(action) }
+        let pressed = kind == UInt32(kEventHotKeyPressed)
+        switch shortcut.binding {
+        case .dictationHold: onDictation?(pressed ? .pressed : .released)
+        case .dictationCancel: if pressed { onDictation?(.cancelled) }
+        case .action(let action): if pressed { onAction?(action) }
         }
         return noErr
     }

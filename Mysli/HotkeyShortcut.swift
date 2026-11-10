@@ -67,18 +67,26 @@ enum HotkeyShortcut: CaseIterable {
         }
     }
 
-    var action: HotkeyAction? {
+    var binding: HotkeyBinding {
         switch self {
-        case .dictation, .dictationEscape: return nil
-        case .captureFullScreen: return .captureFullScreen
-        case .captureArea: return .captureArea
-        case .clipboardHistory: return .showClipboardHistory
-        case .tileLeft: return .tile(.leftHalf)
-        case .tileRight: return .tile(.rightHalf)
-        case .maximize: return .tile(.maximize)
-        case .center: return .tile(.center)
+        case .dictation: return .dictationHold
+        case .dictationEscape: return .dictationCancel
+        case .captureFullScreen: return .action(.captureFullScreen)
+        case .captureArea: return .action(.captureArea)
+        case .clipboardHistory: return .action(.showClipboardHistory)
+        case .tileLeft: return .action(.tile(.leftHalf))
+        case .tileRight: return .action(.tile(.rightHalf))
+        case .maximize: return .action(.tile(.maximize))
+        case .center: return .action(.tile(.center))
         }
     }
+}
+
+/// An action fires on press only. The dictation hold also reports its release.
+enum HotkeyBinding {
+    case action(HotkeyAction)
+    case dictationHold
+    case dictationCancel
 }
 
 struct Keycap: Equatable {

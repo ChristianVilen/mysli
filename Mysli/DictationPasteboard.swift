@@ -26,7 +26,7 @@ enum DictationPasteError: Error, Equatable { case snapshot, changed, write, rest
 final class DictationPasteboard: DictationPasting {
     private let board: any DictationPasteboardAccess
     private let keystrokes: any KeystrokeSending
-    private let schedule: DictationController.Schedule
+    private let schedule: DictationSchedule
     private let settleInterval: Double
     private let adoptOwnWrite: (Int) -> Void
     private var busy = false
@@ -34,7 +34,7 @@ final class DictationPasteboard: DictationPasting {
 
     init(board: any DictationPasteboardAccess = NativeDictationPasteboard(),
          keystrokes: any KeystrokeSending = CGEventKeystrokeSender(),
-         schedule: @escaping DictationController.Schedule,
+         schedule: @escaping DictationSchedule,
          settleInterval: Double = 0.15,
          adoptOwnWrite: @escaping (Int) -> Void) {
         self.board = board

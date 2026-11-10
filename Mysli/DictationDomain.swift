@@ -1,5 +1,19 @@
 import Foundation
 
+/// Runs the work on the main actor after the delay in seconds. The returned closure cancels it.
+typealias DictationSchedule = (Double, @escaping @MainActor () -> Void) -> () -> Void
+
+enum DictationTimer {
+    static func schedule(_ delay: Double, _ work: @escaping @MainActor () -> Void) -> () -> Void {
+        let task = Task { @MainActor in
+            do { try await Task.sleep(for: .seconds(delay)) }
+            catch { return }
+            work()
+        }
+        return { task.cancel() }
+    }
+}
+
 struct PasteText: Equatable, Sendable {
     let value: String
 

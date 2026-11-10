@@ -50,7 +50,7 @@ final class RealDictationPolisherTests: XCTestCase {
                 children.append(child)
                 return child
             }, schedule: { delay, work in
-                DictationPolisher.schedule(delay) { timedOut = true; work() }
+                DictationTimer.schedule(delay) { timedOut = true; work() }
             })
             await polisher.prepare()
             try await Task.sleep(for: .milliseconds(300))

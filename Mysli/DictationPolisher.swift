@@ -30,7 +30,7 @@ final class DictationPolisher: DictationPolishing {
     }
 
     private let launch: () async throws -> any DictationClaudeChild
-    private let schedule: DictationController.Schedule
+    private let schedule: DictationSchedule
     private var enabled = false
     private var preparation: Preparation?
     private var idle: (any DictationClaudeChild)?
@@ -39,7 +39,7 @@ final class DictationPolisher: DictationPolishing {
     private var launching = 0
 
     init(launch: @escaping () async throws -> any DictationClaudeChild = { try await DictationClaudeProcess.launch() },
-         schedule: @escaping DictationController.Schedule = { delay, work in DictationPolisher.schedule(delay, work) }) {
+         schedule: @escaping DictationSchedule = { DictationTimer.schedule($0, $1) }) {
         self.launch = launch
         self.schedule = schedule
     }
@@ -133,14 +133,5 @@ final class DictationPolisher: DictationPolishing {
     private func startSuccessor() {
         guard enabled else { return }
         Task { [weak self] in await self?.prepareIfEnabled() }
-    }
-
-    static func schedule(_ delay: Double, _ work: @escaping @MainActor () -> Void) -> () -> Void {
-        let task = Task { @MainActor in
-            do { try await Task.sleep(for: .seconds(delay)) }
-            catch { return }
-            work()
-        }
-        return { task.cancel() }
     }
 }

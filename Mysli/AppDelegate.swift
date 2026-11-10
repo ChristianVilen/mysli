@@ -35,12 +35,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private lazy var dictationKeys = SystemDictationKeyInput(manager: hotkeyManager, mode: settings.dictationKeyMode)
     private lazy var dictationContext = DictationContext(knownWords: knownWords,
         nearbyText: { [settings] in settings.dictationNearbyText })
-    private lazy var dictationPasteboard = DictationPasteboard(schedule: { DictationPolisher.schedule($0, $1) },
+    private lazy var dictationPasteboard = DictationPasteboard(schedule: { DictationTimer.schedule($0, $1) },
         adoptOwnWrite: { [clipboardHistory] in clipboardHistory.adoptOwnWrite($0) })
     private lazy var dictation = DictationController(
         keys: dictationKeys, recorder: DictationMicrophone(), speech: DictationSpeech(transcriber: whisperTranscriber),
         polisher: DictationPolisher(), paster: dictationPasteboard,
-        now: { ProcessInfo.processInfo.systemUptime }, schedule: { DictationPolisher.schedule($0, $1) },
+        now: { ProcessInfo.processInfo.systemUptime }, schedule: { DictationTimer.schedule($0, $1) },
         prepareText: { [dictationContext] in await dictationContext.prepareText($0) })
     private lazy var dictationPanel = DictationPanel()
     private lazy var dictationSetup = DictationSetup(settings: settings, permissions: permissions, controller: dictation,
