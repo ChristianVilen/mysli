@@ -8,16 +8,46 @@ final class DictationPCMAccumulator {
     private var voicedFrames = 0
     private var windowEnergy: Double = 0
     private var windowFrames = 0
+    private var finished: Result<DictationAudio, Error>?
 
     init(maximumSamples: Int = 120 * 16_000) { self.maximumSamples = maximumSamples }
 
-    var audio: DictationAudio {
+    func finish() throws -> DictationAudio {
+        if let finished { return try finished.get() }
+        do {
+            if let converter {
+                while true {
+                    guard let output = AVAudioPCMBuffer(pcmFormat: converter.outputFormat, frameCapacity: 1_024) else {
+                        throw DictationCaptureFailure.conversion
+                    }
+                    var error: NSError?
+                    let status = converter.convert(to: output, error: &error) { _, status in
+                        status.pointee = .endOfStream
+                        return nil
+                    }
+                    guard status != .error, error == nil else { throw DictationCaptureFailure.conversion }
+                    try appendOutput(output)
+                    if status == .endOfStream { break }
+                    guard status == .haveData, output.frameLength > 0 else { throw DictationCaptureFailure.conversion }
+                }
+            }
+            let audio = makeAudio()
+            finished = .success(audio)
+            return audio
+        } catch {
+            finished = .failure(error)
+            throw error
+        }
+    }
+
+    private func makeAudio() -> DictationAudio {
         let partial = windowFrames > 0 && Float(sqrt(windowEnergy / Double(windowFrames))) >= 0.005 ? windowFrames : 0
         return DictationAudio(samples: samples, evidence: .init(voicedSeconds: Double(voicedFrames + partial) / 16_000, peak: peak))
     }
 
     @discardableResult
     func append(_ input: AVAudioPCMBuffer) throws -> Double {
+        guard finished == nil else { throw DictationCaptureFailure.conversion }
         guard samples.count < maximumSamples, input.frameLength > 0 else { return 0 }
         guard input.format.sampleRate > 0, input.format.channelCount > 0,
               let format = AVAudioFormat(standardFormatWithSampleRate: 16_000, channels: 1) else {
@@ -41,9 +71,15 @@ final class DictationPCMAccumulator {
             status.pointee = .haveData
             return input
         }
-        guard status != .error, error == nil, let data = output.floatChannelData?[0] else {
+        guard status != .error, error == nil else {
             throw DictationCaptureFailure.conversion
         }
+        return try appendOutput(output)
+    }
+
+    @discardableResult
+    private func appendOutput(_ output: AVAudioPCMBuffer) throws -> Double {
+        guard let data = output.floatChannelData?[0] else { throw DictationCaptureFailure.conversion }
         let count = min(Int(output.frameLength), maximumSamples - samples.count)
         var energy: Double = 0
         for index in 0..<count {

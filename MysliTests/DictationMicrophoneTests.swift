@@ -4,12 +4,38 @@ import os
 @testable import Mysli
 
 final class DictationMicrophoneTests: XCTestCase {
+    @MainActor
+    func testSealRetainsTheFinalSignalAtANonIntegralRate() async throws {
+        let source = FakeDictationAudioSource()
+        let queue = DispatchQueue(label: "dictation.test")
+        let microphone = DictationMicrophone(authorized: { true }, makeSource: { source }, queue: queue,
+                                             startMeter: { _ in {} })
+        let capture = try microphone.begin(level: { _ in }, failed: { _ in XCTFail("Unexpected failure") })
+        await source.started.value()
+        for index in 0..<10 {
+            let buffer = try Self.pcm(frames: 1_024, rate: 44_100, channels: [0])
+            if index == 9 {
+                for frame in 1_008..<1_024 { buffer.floatChannelData![0][frame] = 0.8 }
+            }
+            source.receive?(buffer)
+        }
+        capture.seal()
+        let audio = try await capture.audio()
+        XCTAssertGreaterThan(audio.samples.suffix(16).map { abs($0) }.max() ?? 0, 0.5)
+        XCTAssertGreaterThan(audio.evidence.peak, 0.5)
+        XCTAssertGreaterThan(audio.evidence.voicedSeconds, 0)
+        let repeated = try await capture.audio()
+        XCTAssertEqual(repeated.samples, audio.samples)
+        XCTAssertEqual(repeated.evidence.peak, audio.evidence.peak)
+    }
+
     func testResamplingRetainsTheFrameCountAcrossBufferBoundaries() throws {
         let accumulator = DictationPCMAccumulator()
         try accumulator.append(Self.pcm(frames: 480, rate: 48_000, channels: [0.25]))
         try accumulator.append(Self.pcm(frames: 480, rate: 48_000, channels: [0.25]))
-        XCTAssertEqual(accumulator.audio.samples.count, 320)
-        XCTAssertEqual(accumulator.audio.samples.last!, 0.25, accuracy: 0.001)
+        let audio = try accumulator.finish()
+        XCTAssertEqual(audio.samples.count, 331)
+        XCTAssertEqual(audio.samples[160], 0.25, accuracy: 0.001)
     }
 
     @MainActor
@@ -35,7 +61,7 @@ final class DictationMicrophoneTests: XCTestCase {
     func testStereo48kIsConvertedToBoundedMono16kSamples() throws {
         let accumulator = DictationPCMAccumulator(maximumSamples: 320)
         try accumulator.append(Self.pcm(frames: 1_920, rate: 48_000, channels: [0.2, 0.4]))
-        let audio = accumulator.audio
+        let audio = try accumulator.finish()
         XCTAssertEqual(audio.samples.count, 320)
         XCTAssertEqual(audio.samples[160], 0.3, accuracy: 0.001)
         XCTAssertEqual(audio.evidence.voicedSeconds, 0.02, accuracy: 0.0001)
@@ -45,16 +71,18 @@ final class DictationMicrophoneTests: XCTestCase {
     func testAcousticEvidenceUsesWindowsAndRejectsSilenceAndQuietNoise() throws {
         let silent = DictationPCMAccumulator()
         try silent.append(Self.pcm(frames: 320, rate: 16_000, channels: [0]))
-        XCTAssertEqual(silent.audio.evidence.voicedSeconds, 0)
-        XCTAssertEqual(silent.audio.evidence.peak, 0)
+        let silence = try silent.finish()
+        XCTAssertEqual(silence.evidence.voicedSeconds, 0)
+        XCTAssertEqual(silence.evidence.peak, 0)
         let quiet = DictationPCMAccumulator()
         try quiet.append(Self.pcm(frames: 320, rate: 16_000, channels: [0.0049]))
-        XCTAssertEqual(quiet.audio.evidence.voicedSeconds, 0)
+        XCTAssertEqual(try quiet.finish().evidence.voicedSeconds, 0)
         let speech = DictationPCMAccumulator()
         try speech.append(Self.pcm(frames: 160, rate: 16_000, channels: [0.005]))
         try speech.append(Self.pcm(frames: 160, rate: 16_000, channels: [0.005]))
-        XCTAssertEqual(speech.audio.evidence.voicedSeconds, 0.02)
-        XCTAssertEqual(speech.audio.evidence.peak, 0.005, accuracy: 0.00001)
+        let audio = try speech.finish()
+        XCTAssertEqual(audio.evidence.voicedSeconds, 0.02)
+        XCTAssertEqual(audio.evidence.peak, 0.005, accuracy: 0.00001)
     }
 
     @MainActor

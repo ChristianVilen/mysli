@@ -172,20 +172,31 @@ private final class CaptureStorage: @unchecked Sendable {
         let audio: DictationAudio = try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
                 queue.async { [self] in
-                    let admission = gate.withLock { state in
-                        if case .sealed = state.admission { state.admission = .completed }
-                        return state.admission
-                    }
+                    let admission = gate.withLock { $0.admission }
                     switch admission {
                     case .cancelled: continuation.resume(throwing: CancellationError())
                     case .failed(let error): continuation.resume(throwing: error)
-                    case .sealed, .completed: continuation.resume(returning: accumulator.audio)
+                    case .sealed, .completed:
+                        do {
+                            let audio = try accumulator.finish()
+                            let completion = gate.withLock { state in
+                                if case .sealed = state.admission { state.admission = .completed }
+                                return state.admission
+                            }
+                            switch completion {
+                            case .cancelled: throw CancellationError()
+                            case .failed(let error): throw error
+                            case .completed: continuation.resume(returning: audio)
+                            case .open, .sealed: throw DictationCaptureFailure.device
+                            }
+                        } catch { continuation.resume(throwing: error) }
                     case .open: continuation.resume(throwing: DictationCaptureFailure.device)
                     }
                 }
             }
         } onCancel: { self.cancel() }
         try Task.checkCancellation()
+        if case .cancelled = gate.withLock({ $0.admission }) { throw CancellationError() }
         return audio
     }
 }
