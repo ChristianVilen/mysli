@@ -21,6 +21,7 @@ Keep this file short. Add a rule only when an agent would break it without being
 - Every test runs in under 0.1 s. After a full test run, run `scripts/check-tests.sh`. It fails for a test over 0.15 s that has no line with its reason in `scripts/slow-tests-allowed.txt`, and when this file is over 150 lines. XCTest adds up to about 0.12 s to some async tests at random, so the script allows that much.
 - Make `setUp` and `tearDown` sync when they await nothing. In this test host, an `async` one costs 0.1 to 0.2 s for each test.
 - XCTest starts a passive host that never constructs `AppDelegate`, and `--uitesting` starts the isolated `SettingsPreviewAppDelegate`. `AppDelegate` has no test-mode branches.
+- Computer-use `getApp` can launch Mysli without `--uitesting`. Start the isolated preview explicitly before binding to it; never bind to an absent app for verification.
 - Tests use fakes, temporary folders, and isolated defaults. They never use real capture, EventKit, Teams Accessibility, notification delivery, permission prompts, model downloads, the log folder, or `~/Meetings`. The calendar source `"synthetic"` is for tests only.
 - The `Real*Tests` classes and the picture writers (`MYSLI_*_SNAPSHOTS`) are opt-in. They skip unless their variables are set, and the comment above each one gives its command. xcodebuild passes a variable to the tests only with the `TEST_RUNNER_` prefix.
 - Unit tests and pictures do not prove that capture, tiling, paste, keyboard use, sheets, or VoiceOver work in the real app. Report those checks as not done.
@@ -36,6 +37,8 @@ Keep this file short. Add a rule only when an agent would break it without being
 - Shortcuts use Carbon `RegisterEventHotKey`. Only dictation may use one passive Fn event tap, decided by the user, 2026-11-10. Never block or change its events or poll Secure Input. Only `CarbonHotkeyRegistrar` holds Carbon registration state.
 - Never change macOS preferences. On a shortcut conflict, send the user to Keyboard Settings. A warning never blames another app or promises that lock and unlock fix it.
 - Clipboard history stays in memory. Never write it to disk, and never record content that has an `org.nspasteboard` concealed, transient, or auto-generated marker.
+- Dictation audio, text, context, clipboard snapshots, and Claude I/O stay in memory. Quit waits only for an owed clipboard restore. Dictated instructions stay text, never actions (decided by the user, 2026-11-10).
+- Dictation sends Claude Haiku the dictated text, every correct spelling from the current known-words list, the front app name, and optional preceding text. Never send list notes, dates, check marks, or audio. This is separate from the meeting summary input below (decided by the user, 2026-11-10).
 
 ## Logging and privacy
 

@@ -204,6 +204,23 @@ message format, and words-only prompt data. Run the full suite and then
 
 ## Manual checks not done
 
+The implementation now connects the native Dictation page, opt-in onboarding,
+permission setup, wordless pill, listening mark, and replay menu. One shared
+Whisper owner serves meetings and dictation. Missing grants block input and
+replay while dictation keeps its speech session. Grant changes retry input
+without reloading it. Quit releases input and model resources immediately and
+waits only if a clipboard restore is still owed.
+
+The pill uses the screen with the largest overlap with the focused window.
+A read-only Accessibility failure falls back to the main screen, then the first
+screen. The panel ignores the mouse and cannot become key or main. Native
+synthetic renders cover light, dark, and reduced transparency. Settings renders
+cover 760 by 700 and 640 by 420 point windows. These checks do not prove physical
+focus, screen sharing, keyboard input, or VoiceOver behavior.
+The offscreen render paints the native selected sidebar row black in light mode,
+on both the existing General page and Dictation. Live selected-row rendering
+remains unchecked.
+
 The user must check the physical Fn key and its permission, real microphone
 capture, paste in a browser, terminal, and Electron app, pill placement on a real
 screen, dictation during a meeting, and VoiceOver. Unit tests do not prove these.
