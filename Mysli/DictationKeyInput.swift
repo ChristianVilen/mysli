@@ -7,6 +7,8 @@ enum DictationKeyFailure: Error, Equatable { case permission, source, carbon }
 enum FnKeyEvent {
     case flagsChanged(keyCode: UInt16, fn: Bool)
     case keyDown(UInt16)
+    /// The tap was off for a moment, so a key change can be missing.
+    case interrupted
     case lost
 }
 
@@ -164,6 +166,7 @@ final class SystemDictationKeyInput: DictationKeyInput {
     private func handle(_ event: FnKeyEvent) {
         switch event {
         case .lost: fail()
+        case .interrupted: if hold == .down { cancelHold() }
         case .flagsChanged(let keyCode, let fn):
             guard keyCode == UInt16(kVK_Function) else {
                 if hold == .down { cancelHold() }
@@ -262,7 +265,10 @@ final class PassiveFnEventSource: FnEventSource {
 
     private func handle(_ type: CGEventType, event: CGEvent) {
         switch type {
-        case .tapDisabledByTimeout, .tapDisabledByUserInput: lost()
+        case .tapDisabledByTimeout, .tapDisabledByUserInput:
+            // macOS turns a tap off without invalidating it. Only port invalidation ends the tap.
+            if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
+            receive?(.interrupted)
         case .flagsChanged:
             receive?(.flagsChanged(keyCode: UInt16(event.getIntegerValueField(.keyboardEventKeycode)),
                                    fn: event.flags.contains(.maskSecondaryFn)))

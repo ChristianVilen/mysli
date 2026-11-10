@@ -11,6 +11,8 @@ Fn is the default key. Dictation alone may use one passive monitor of the Fn
 modifier flag. This is the user's narrow exception to the Carbon-only shortcut
 rule. The monitor never blocks or changes an event. A different key pressed while
 Fn is down cancels the hold, including Fn with an arrow or F5. Escape cancels too.
+If macOS turns the monitor off, Mysli turns it on again and cancels a held key,
+because the release can be missing.
 
 Settings also offers a Carbon key combination. The builder chose Control+Option+D.
 The existing system conflict check found no enabled match on this Mac. A real

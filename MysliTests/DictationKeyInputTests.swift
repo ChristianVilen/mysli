@@ -118,6 +118,21 @@ final class DictationKeyInputTests: XCTestCase {
         XCTAssertEqual(events, [.pressed, .cancelled, .pressed, .cancelled, .pressed, .released, .cancelled])
     }
 
+    func testInterruptedTapCancelsAHoldAndKeepsListening() throws {
+        let source = FakeFnSource()
+        let keys = SystemDictationKeyInput(manager: HotkeyManager(), source: source)
+        var events: [DictationKeyEvent] = []
+        try keys.start { events.append($0) }
+        source.send(.interrupted)
+        source.send(.flagsChanged(keyCode: 63, fn: true))
+        source.send(.interrupted)
+        source.send(.flagsChanged(keyCode: 63, fn: false))
+        source.send(.flagsChanged(keyCode: 63, fn: true))
+        XCTAssertEqual(events, [.pressed, .cancelled, .pressed])
+        XCTAssertNil(keys.failure)
+        keys.stop()
+    }
+
     func testStopAndSourceFailureRejectStaleCallbacks() throws {
         let source = FakeFnSource()
         let keys = SystemDictationKeyInput(manager: HotkeyManager(), source: source)
