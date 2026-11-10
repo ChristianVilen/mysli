@@ -12,7 +12,8 @@ final class PermissionListViewTests: XCTestCase {
             microphone: { self.requested.append(.microphone) },
             calendar: { self.requested.append(.calendar) },
             notifications: { self.requested.append(.notifications) },
-            keyboardSettings: { XCTFail("Keyboard setup is outside the permission list") }))
+            keyboardSettings: { XCTFail("Keyboard setup is outside the permission list") },
+            inputMonitoring: { self.requested.append(.inputMonitoring) }))
     }
 
     func testNeededRowsRenderGrantsAndRequestTheirOwnAccess() {
@@ -21,14 +22,14 @@ final class PermissionListViewTests: XCTestCase {
         list.render(.init(accessibility: true, screenRecording: false, microphone: .notDetermined,
                           calendar: .denied, notifications: .notDetermined))
         XCTAssertEqual(list.rows.filter { !$0.view.isHidden }.map(\.permission),
-                       [.accessibility, .screenRecording, .microphone, .calendar, .notifications])
-        XCTAssertEqual(list.controls.map(\.isEnabled), [false, true, true, true, true])
+                       [.accessibility, .screenRecording, .microphone, .calendar, .notifications, .inputMonitoring])
+        XCTAssertEqual(list.controls.map(\.isEnabled), [false, true, true, true, true, true])
         for button in list.controls where button.isEnabled { button.performClick(nil) }
-        XCTAssertEqual(requested, [.screenRecording, .microphone, .calendar, .notifications])
+        XCTAssertEqual(requested, [.screenRecording, .microphone, .calendar, .notifications, .inputMonitoring])
         list.render(.init(accessibility: false, screenRecording: true, microphone: .granted,
-                          calendar: .full, notifications: .granted))
+                          calendar: .full, notifications: .granted, inputMonitoring: true))
         for button in list.controls where button.isEnabled { button.performClick(nil) }
-        XCTAssertEqual(requested, [.screenRecording, .microphone, .calendar, .notifications, .accessibility])
+        XCTAssertEqual(requested, [.screenRecording, .microphone, .calendar, .notifications, .inputMonitoring, .accessibility])
     }
 
     func testChangingNeededRowsKeepsTheirCurrentGrantsAndHidesAnEmptyList() {

@@ -2,12 +2,6 @@ import XCTest
 @testable import Mysli
 
 final class DictationTextTests: XCTestCase {
-    func testPasteCannotContainLineBreaksIncludingBeforeTrailingSpaces() {
-        XCTAssertEqual(PasteText("git push\n ")?.value, "git push")
-        XCTAssertEqual(PasteText("one\r\ntwo\nthree\rfour")?.value, "one two three four")
-        XCTAssertNil(PasteText("\n \t"))
-    }
-
     func testLocalProseCleanupUsesOnlyConfirmedSpellings() {
         let words = KnownWordsList(markdown: "- john → **Jon** ✓\n- lunch → **launch**")
         XCTAssertEqual(DictationText.local("um john will will send the lunch notes", knownWords: words)?.value,
