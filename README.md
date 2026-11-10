@@ -229,6 +229,21 @@ defaults delete io.github.christianvilen.mysli meetingContextFile
 
 This leaves your file in place. It does not remove context already sent to a provider or saved in `agy` history.
 
+## Dictation privacy
+
+Dictation uses Claude Code with Haiku, independently of the meeting summary tool
+in Settings. Claude receives the dictated words, every correct spelling from the
+known-words list, and the front app name. If nearby-text sharing is on, it also
+receives up to 500 characters before the cursor. List notes, dates, and check marks
+are not sent. Audio is never sent.
+
+Mysli keeps dictation audio, text, nearby text, and Claude input and output only in
+memory. It sends text through pipes to a fresh Claude conversation with no tools
+and no session persistence. The process runs in an empty temporary folder, which
+Mysli removes after it exits. Dictated commands remain text. Mysli pastes one line
+and never sends Return. If polish fails or takes more than 2.5 seconds, Mysli uses
+locally cleaned text.
+
 ## Logs
 
 Choose **Show Log…** in the menu, immediately after **Settings…**. The window
