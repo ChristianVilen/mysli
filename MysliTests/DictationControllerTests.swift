@@ -3,6 +3,21 @@ import XCTest
 
 @MainActor
 final class DictationControllerTests: XCTestCase {
+    func testCaptureFailureCancelsItsHoldAndIgnoresAnOldFailure() async {
+        let f = DictationFixture()
+        await f.enable()
+        f.controller.receive(.pressed)
+        let oldFailure = f.recorder.failed
+        oldFailure?(.device)
+        XCTAssertEqual(f.controller.presentation, .error)
+        XCTAssertEqual(f.recorder.captures.map(\.cancelled), [true])
+        f.clock.advance(to: 2)
+        f.controller.receive(.pressed)
+        oldFailure?(.device)
+        XCTAssertEqual(f.controller.presentation, .listening(level: 0, warning: false))
+        XCTAssertEqual(f.recorder.captures.map(\.cancelled), [true, false])
+        f.controller.shutdown()
+    }
     func testDisableDuringUnavailableCallbackKeepsReleasedSessionDisabled() async {
         let f = DictationFixture()
         await f.enable()

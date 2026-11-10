@@ -85,8 +85,11 @@ final class DictationTestRecorder: DictationCapturing {
     var captures: [DictationTestCapture] = []
     var next = DictationTestCapture()
     var level: (@MainActor (Float) -> Void)?
-    func begin(level: @escaping @MainActor (Float) -> Void) throws -> any DictationCapture {
+    var failed: (@MainActor (DictationCaptureFailure) -> Void)?
+    func begin(level: @escaping @MainActor (Float) -> Void,
+               failed: @escaping @MainActor (DictationCaptureFailure) -> Void) throws -> any DictationCapture {
         self.level = level
+        self.failed = failed
         let capture = next
         captures.append(capture)
         next = DictationTestCapture()

@@ -189,12 +189,15 @@ final class DictationController {
             try keys.setCancellable(true)
             guard case .ready(let current, let currentPhase) = state,
                   current === ready, currentPhase.work == nil else { return }
-            let capture = try recorder.begin { [weak self, weak hold] level in
+            let capture = try recorder.begin(level: { [weak self, weak hold] level in
                 guard let self, let hold, case .ready(_, .listening(let current)) = self.state,
                       current === hold else { return }
                 hold.level = level
                 self.publish()
-            }
+            }, failed: { [weak self, weak work] _ in
+                guard let self, let work, self.owns(work) else { return }
+                self.showNotice(.error, ready: ready, cancelling: work)
+            })
             work.capture = capture
             state = .ready(ready, .listening(hold))
             work.timers.append(schedule(110) { [weak self, weak hold] in

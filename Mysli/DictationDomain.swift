@@ -51,12 +51,17 @@ protocol DictationKeyInput: AnyObject {
 
 @MainActor
 protocol DictationCapturing: AnyObject {
-    func begin(level: @escaping @MainActor (Float) -> Void) throws -> any DictationCapture
+    func begin(level: @escaping @MainActor (Float) -> Void,
+               failed: @escaping @MainActor (DictationCaptureFailure) -> Void) throws -> any DictationCapture
 }
+
+enum DictationCaptureFailure: Error { case permission, device, conversion }
 
 @MainActor
 protocol DictationCapture: AnyObject {
+    /// Closes sample admission synchronously, including while startup is pending.
     func seal()
+    /// Discards audio and prevents pending startup from reopening admission.
     func cancel()
     func audio() async throws -> DictationAudio
 }
@@ -69,6 +74,7 @@ protocol DictationSpeechPreparing: AnyObject {
 @MainActor
 protocol DictationSpeechSession: AnyObject {
     func transcribe(_ audio: DictationAudio) async throws -> DictationSpeechResult
+    /// Idempotent. In-flight transcription retains its own resource until it ends.
     func release()
 }
 
