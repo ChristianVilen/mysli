@@ -234,7 +234,8 @@ This leaves your file in place. It does not remove context already sent to a pro
 Turn on **Dictation** in **Settings… → Dictation**. Dictated words go to Claude
 Haiku for polish. Allow Microphone and Accessibility when asked. Fn also needs
 Input Monitoring. Select **Control + Option + D** to use dictation without that
-extra permission. **Set Up Permissions…** retries setup after a change.
+extra permission. The **Permissions** page shows each permission and its
+**Grant** button. Dictation starts again by itself after a grant.
 
 For Fn, open **Keyboard Settings** and set **Press 🌐 key to** to **Do Nothing**.
 This control is on the main Keyboard page, as described in

@@ -285,7 +285,7 @@ final class SettingsWindowControllerTests: XCTestCase {
                         sut.calendarReminders, sut.calendarReminderTime, sut.calendarReminderEvents,
                         sut.teamsSpeakerNames] + guides(.meetings),
             .permissions: sut.permissionsPage.controls + guides(.permissions),
-            .dictation: [sut.dictationEnabled, sut.dictationKey, sut.dictationNearbyText, sut.dictationSetup, sut.dictationKeyboard] + guides(.dictation),
+            .dictation: [sut.dictationEnabled, sut.dictationKey, sut.dictationNearbyText, sut.dictationKeyboard] + guides(.dictation),
             .help: sut.helpPage.controls
         ]
         for page in SettingsPage.allCases {

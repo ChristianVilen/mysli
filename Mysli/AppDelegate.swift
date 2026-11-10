@@ -272,7 +272,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             updateStatus()
         }
         dictationKeys.onAvailabilityChange = { [weak self] in self?.updateStatus() }
-        settingsWindow.onDictationSetup = { [weak self] in self?.requestDictationAccess() }
         settingsWindow.onDictationKeyChanged = { [weak self] in
             guard let self else { return }
             dictationPermissionTask?.cancel()
