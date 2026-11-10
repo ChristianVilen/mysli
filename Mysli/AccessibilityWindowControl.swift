@@ -46,7 +46,7 @@ struct AccessibilityWindowControl: WindowControlling {
     /// Caps how long a single AX round trip can block the main thread. A
     /// hung target app can otherwise stall an AX call for several seconds
     /// per attribute read/write.
-    private static let messagingTimeout: Float = 0.5
+    var messagingTimeout: Float = 0.5
 
     func focusedWindow() -> FocusedWindow? {
         guard let primaryScreenHeight = Self.primaryScreenHeight() else {
@@ -70,11 +70,13 @@ struct AccessibilityWindowControl: WindowControlling {
         }
 
         let app = AXUIElementCreateApplication(frontmost.processIdentifier)
-        AXUIElementSetMessagingTimeout(app, Self.messagingTimeout)
+        AXUIElementSetMessagingTimeout(app, messagingTimeout)
 
         guard let window = Self.axElement(kAXFocusedWindowAttribute as CFString, from: app, label: "focused window") else {
             return nil
         }
+        // A timeout applies only to the element it is set on, not to elements read from it.
+        AXUIElementSetMessagingTimeout(window, messagingTimeout)
         guard let position = Self.axPoint(kAXPositionAttribute as CFString, from: window, label: "window position") else {
             return nil
         }
@@ -96,7 +98,7 @@ struct AccessibilityWindowControl: WindowControlling {
         }
 
         let element = handle.element
-        AXUIElementSetMessagingTimeout(element, Self.messagingTimeout)
+        AXUIElementSetMessagingTimeout(element, messagingTimeout)
 
         var positionSettable: DarwinBoolean = false
         let positionSettableError = AXUIElementIsAttributeSettable(element, kAXPositionAttribute as CFString, &positionSettable)

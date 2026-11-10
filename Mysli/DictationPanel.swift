@@ -124,35 +124,12 @@ final class DictationPanel: FloatingPanel {
 
     static func focusedScreenFrame() -> NSRect? {
         let screens = NSScreen.screens
-        // AX uses top-left desktop coordinates. A failed read falls back to the main screen.
-        guard AXIsProcessTrusted(), let app = NSWorkspace.shared.frontmostApplication else {
+        // The pill appears at press time, so it waits less for a slow app than tiling does.
+        guard AXIsProcessTrusted(),
+              let window = AccessibilityWindowControl(messagingTimeout: 0.1).focusedWindow(),
+              let index = ScreenCoordinates.bestScreenIndex(for: window.frame, screenFrames: screens.map(\.frame)) else {
             return NSScreen.main?.visibleFrame ?? screens.first?.visibleFrame
         }
-        let element = AXUIElementCreateApplication(app.processIdentifier)
-        _ = AXUIElementSetMessagingTimeout(element, 0.1)
-        var value: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, kAXFocusedWindowAttribute as CFString, &value) == .success,
-              let value, CFGetTypeID(value) == AXUIElementGetTypeID() else {
-            return NSScreen.main?.visibleFrame ?? screens.first?.visibleFrame
-        }
-        let window = unsafeBitCast(value, to: AXUIElement.self)
-        _ = AXUIElementSetMessagingTimeout(window, 0.1)
-        var position: CFTypeRef?
-        var size: CFTypeRef?
-        var point = CGPoint.zero
-        var extent = CGSize.zero
-        guard AXUIElementCopyAttributeValue(window, kAXPositionAttribute as CFString, &position) == .success,
-              AXUIElementCopyAttributeValue(window, kAXSizeAttribute as CFString, &size) == .success,
-              let position, let size, CFGetTypeID(position) == AXValueGetTypeID(), CFGetTypeID(size) == AXValueGetTypeID(),
-              AXValueGetValue(unsafeBitCast(position, to: AXValue.self), .cgPoint, &point),
-              AXValueGetValue(unsafeBitCast(size, to: AXValue.self), .cgSize, &extent) else {
-            return NSScreen.main?.visibleFrame ?? screens.first?.visibleFrame
-        }
-        let frame = ScreenCoordinates.flipVertical(CGRect(origin: point, size: extent),
-            primaryScreenHeight: screens.first?.frame.maxY ?? 0)
-        if let index = ScreenCoordinates.bestScreenIndex(for: frame, screenFrames: screens.map(\.frame)) {
-            return screens[index].visibleFrame
-        }
-        return NSScreen.main?.visibleFrame ?? screens.first?.visibleFrame
+        return screens[index].visibleFrame
     }
 }
