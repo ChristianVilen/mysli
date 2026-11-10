@@ -33,7 +33,7 @@ Keep this file short. Add a rule only when an agent would break it without being
 - Launch, opening a window, and a refresh never write a preference. Only a user action writes one.
 - Post every notification through `Notifying`. `SystemNotifier` is the only notification delegate. Ask for notification permission only when the user starts something that notifies.
 - The marks on the status icon differ by shape, not only by colour.
-- Shortcuts use Carbon `RegisterEventHotKey` only, never a keyboard event tap or Secure Input polling. Only `CarbonHotkeyRegistrar` holds registration state.
+- Shortcuts use Carbon `RegisterEventHotKey`. Only dictation may use one passive Fn event tap, decided by the user, 2026-11-10. Never block or change its events or poll Secure Input. Only `CarbonHotkeyRegistrar` holds Carbon registration state.
 - Never change macOS preferences. On a shortcut conflict, send the user to Keyboard Settings. A warning never blames another app or promises that lock and unlock fix it.
 - Clipboard history stays in memory. Never write it to disk, and never record content that has an `org.nspasteboard` concealed, transient, or auto-generated marker.
 

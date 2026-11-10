@@ -53,11 +53,15 @@ final class DictationTestKeys: DictationKeyInput {
     var receive: (@MainActor (DictationKeyEvent) -> Void)?
     var fails = false
     var cancellable = false
+    var cancellationFails = false
     func start(_ receive: @escaping @MainActor (DictationKeyEvent) -> Void) throws {
         if fails { throw DictationTestError.failed }
         self.receive = receive
     }
-    func setCancellable(_ cancellable: Bool) { self.cancellable = cancellable }
+    func setCancellable(_ cancellable: Bool) throws {
+        if cancellable && cancellationFails { throw DictationTestError.failed }
+        self.cancellable = cancellable
+    }
     func stop() { receive = nil; cancellable = false }
 }
 

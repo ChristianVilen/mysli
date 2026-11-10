@@ -40,12 +40,12 @@ enum DictationPolishResult: Sendable {
     case unavailable
 }
 
-enum DictationKeyEvent { case pressed, released, cancelled }
+enum DictationKeyEvent: Equatable { case pressed, released, cancelled, unavailable }
 
 @MainActor
 protocol DictationKeyInput: AnyObject {
     func start(_ receive: @escaping @MainActor (DictationKeyEvent) -> Void) throws
-    func setCancellable(_ cancellable: Bool)
+    func setCancellable(_ cancellable: Bool) throws
     func stop()
 }
 

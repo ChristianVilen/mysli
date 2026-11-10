@@ -3,6 +3,22 @@ import XCTest
 
 @MainActor
 final class DictationControllerTests: XCTestCase {
+    func testEscapeRegistrationFailurePreventsCaptureAndLostKeysCancelActiveWork() async {
+        let f = DictationFixture()
+        f.controller.setEnabled(true)
+        await f.waitFor(.idle)
+        f.keys.cancellationFails = true
+        f.controller.receive(.pressed)
+        XCTAssertEqual(f.controller.presentation, .error)
+        XCTAssertTrue(f.recorder.captures.isEmpty)
+        f.keys.cancellationFails = false
+        f.clock.advance(to: 2)
+        f.controller.receive(.pressed)
+        f.controller.receive(.unavailable)
+        XCTAssertEqual(f.controller.presentation, .error)
+        XCTAssertEqual(f.recorder.captures.map(\.cancelled), [true])
+        f.controller.shutdown()
+    }
     func testCancellationOnPolishPresentationStopsThePolishRequest() async {
         let f = DictationFixture()
         await f.enable()
@@ -74,7 +90,6 @@ final class DictationControllerTests: XCTestCase {
         XCTAssertTrue(f.recorder.captures[0].cancelled)
         XCTAssertEqual(f.controller.presentation, .idle)
         gate.resume(.init(samples: [1], evidence: .init(voicedSeconds: 1, peak: 1)))
-        // A new operation completes after the stale capture continuation is resumed.
         f.hold()
         await f.waitFor(.idle)
         XCTAssertEqual(f.paste.texts.map(\.value), ["polished"])

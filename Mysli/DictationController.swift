@@ -159,6 +159,19 @@ final class DictationController {
         case .pressed: press()
         case .released: releaseHold()
         case .cancelled: cancel()
+        case .unavailable:
+            switch state {
+            case .loading(let preparation, _):
+                preparation.task?.cancel()
+                preparation.polishTask?.cancel()
+                polisher.stop()
+                keys.stop()
+                showStartupError()
+            case .ready(let ready, let phase):
+                cancel()
+                if phase.work?.delivering != true { showNotice(.error, ready: ready) }
+            case .disabled, .failed: break
+            }
         }
     }
 
@@ -173,7 +186,9 @@ final class DictationController {
         let work = Work()
         let hold = Hold(work: work, startedAt: startedAt)
         do {
-            // begin returns ownership before any asynchronous microphone startup.
+            try keys.setCancellable(true)
+            guard case .ready(let current, let currentPhase) = state,
+                  current === ready, currentPhase.work == nil else { return }
             let capture = try recorder.begin { [weak self, weak hold] level in
                 guard let self, let hold, case .ready(_, .listening(let current)) = self.state,
                       current === hold else { return }
@@ -368,7 +383,8 @@ final class DictationController {
             default: cancellable = false
             }
         } else { cancellable = false }
-        keys.setCancellable(cancellable)
+        do { try keys.setCancellable(cancellable) }
+        catch { receive(.unavailable) }
         onChange?()
     }
 }

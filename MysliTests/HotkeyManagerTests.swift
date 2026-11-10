@@ -4,6 +4,54 @@ import Carbon.HIToolbox
 
 @MainActor
 final class HotkeyManagerTests: XCTestCase {
+    func testDictationAndEscapeHaveSeparateFeatureGates() {
+        let system = FakeHotkeySystem()
+        let manager = HotkeyManager(registrar: CarbonHotkeyRegistrar(api: system.api))
+        manager.screenshotsEnabled = false
+        manager.tilingEnabled = false
+        manager.clipboardHistoryEnabled = true
+        manager.start()
+        defer { manager.stop() }
+        XCTAssertEqual(system.reservedShortcuts, [.clipboardHistory])
+        manager.dictationEnabled = true
+        manager.dictationCancellable = true
+        manager.clipboardHistoryEnabled = false
+        XCTAssertEqual(system.reservedShortcuts, [.dictation, .dictationEscape])
+        manager.dictationEnabled = false
+        XCTAssertEqual(system.reservedShortcuts, [])
+    }
+
+    func testRegistrarDispatchesDictationReleaseButOtherActionsOnlyOnPress() {
+        let system = FakeHotkeySystem()
+        let registrar = CarbonHotkeyRegistrar(api: system.api)
+        var actions: [HotkeyAction] = []
+        var keys: [DictationKeyEvent] = []
+        registrar.onAction = { actions.append($0) }
+        registrar.onDictation = { keys.append($0) }
+        XCTAssertEqual(registrar.reconcile(desired: [.dictation, .dictationEscape, .captureArea]), [])
+        XCTAssertEqual(system.installedTypes.map(\.eventClass), [0x6B657962, 0x6B657962])
+        XCTAssertEqual(system.installedTypes.map(\.eventKind), [5, 6])
+        system.press(.captureArea)
+        system.callback(.captureArea, kind: UInt32(kEventHotKeyReleased))?()
+        system.press(.dictation)
+        let staleRelease = system.callback(.dictation, kind: UInt32(kEventHotKeyReleased))!
+        staleRelease()
+        system.press(.dictationEscape)
+        system.callback(.dictationEscape, kind: UInt32(kEventHotKeyReleased))?()
+        system.callback(.dictation, kind: UInt32(kEventHotKeyPressed), eventClass: 0)?()
+        system.callback(.dictation, kind: 99)?()
+        system.releaseFailures.insert(.dictation)
+        XCTAssertEqual(registrar.reconcile(desired: []), [.init(shortcut: .dictation, failure: .releaseFailed(-50))])
+        staleRelease()
+        system.releaseFailures = []
+        XCTAssertEqual(registrar.reconcile(desired: [.dictation]), [])
+        staleRelease()
+        system.press(.dictation)
+        XCTAssertEqual(actions, [.captureArea])
+        XCTAssertEqual(keys, [.pressed, .released, .cancelled, .pressed])
+        registrar.stop()
+    }
+
     func testSystemLookupFailureBlocksRegistrationUntilTheCheckRecovers() {
         let system = FakeHotkeySystem()
         system.lookupFailure = OSStatus(memFullErr)
@@ -241,7 +289,7 @@ final class HotkeyManagerTests: XCTestCase {
 }
 
 @MainActor
-private final class FakeHotkeySystem {
+final class FakeHotkeySystem {
     private struct Registered {
         let id: EventHotKeyID
         let reference: EventHotKeyRef
@@ -254,6 +302,7 @@ private final class FakeHotkeySystem {
     var failures: [HotkeyShortcut: OSStatus] = [:]
     var conflicts: Set<HotkeyShortcut> = []
     var attempts: [HotkeyShortcut: Int] = [:]
+    var installedTypes: [EventTypeSpec] = []
     private var active: [HotkeyShortcut: Registered] = [:]
     private var handler: EventHandlerUPP?
     private var context: UnsafeMutableRawPointer?
@@ -287,8 +336,9 @@ private final class FakeHotkeySystem {
                 self.active[shortcut] = nil
                 return noErr
             },
-            installHandler: { handler, context, reference in
+            installHandler: { handler, types, context, reference in
                 if let failure = self.handlerFailure { return failure }
+                self.installedTypes = types
                 self.handler = handler
                 self.context = context
                 reference = EventHandlerRef(bitPattern: 1)!
@@ -303,20 +353,26 @@ private final class FakeHotkeySystem {
     }
 
     var callbacks: [HotkeyShortcut: () -> Void] {
-        guard let handler, let context else { return [:] }
-        return active.mapValues { registration in
-            return {
-                var event: EventRef?
-                precondition(CreateEvent(nil, OSType(kEventClassKeyboard), UInt32(kEventHotKeyPressed),
-                                         GetCurrentEventTime(), 0, &event) == noErr)
-                guard let event else { preconditionFailure("No event") }
-                defer { ReleaseEvent(event) }
-                var id = registration.id
-                if let signature = self.eventSignature { id.signature = signature }
-                precondition(SetEventParameter(event, EventParamName(kEventParamDirectObject),
-                                               EventParamType(typeEventHotKeyID), MemoryLayout<EventHotKeyID>.size, &id) == noErr)
-                _ = handler(nil, event, context)
-            }
+        Dictionary(uniqueKeysWithValues: active.keys.compactMap { shortcut in
+            callback(shortcut, kind: UInt32(kEventHotKeyPressed)).map { (shortcut, $0) }
+        })
+    }
+
+    func callback(_ shortcut: HotkeyShortcut, kind: UInt32,
+                  eventClass: OSType = OSType(kEventClassKeyboard)) -> (() -> Void)? {
+        guard let handler, let context else { return nil }
+        guard let registration = active[shortcut] else { return nil }
+        return {
+            var event: EventRef?
+            precondition(CreateEvent(nil, eventClass, kind,
+                                     GetCurrentEventTime(), 0, &event) == noErr)
+            guard let event else { preconditionFailure("No event") }
+            defer { ReleaseEvent(event) }
+            var id = registration.id
+            if let signature = self.eventSignature { id.signature = signature }
+            precondition(SetEventParameter(event, EventParamName(kEventParamDirectObject),
+                                           EventParamType(typeEventHotKeyID), MemoryLayout<EventHotKeyID>.size, &id) == noErr)
+            _ = handler(nil, event, context)
         }
     }
 
