@@ -26,7 +26,7 @@ protocol PasteboardWriting: AnyObject {
 }
 
 protocol KeystrokeSending {
-    func sendPasteKeystroke()
+    func sendPasteKeystroke() throws
 }
 
 // MARK: - SystemPasteboard
@@ -167,12 +167,13 @@ final class SystemPasteboard: PasteboardReading, PasteboardWriting {
 /// pasteboard gets pasted into whatever app is focused. Accessibility
 /// permission covers this; the app already requires it elsewhere.
 final class CGEventKeystrokeSender: KeystrokeSending {
+    enum Failure: Error { case eventCreation }
     /// kVK_ANSI_V.
     private static let vKeyCode: CGKeyCode = 0x09
 
-    func sendPasteKeystroke() {
+    func sendPasteKeystroke() throws {
         guard let keyDown = CGEvent(keyboardEventSource: nil, virtualKey: Self.vKeyCode, keyDown: true),
-              let keyUp = CGEvent(keyboardEventSource: nil, virtualKey: Self.vKeyCode, keyDown: false) else { return }
+              let keyUp = CGEvent(keyboardEventSource: nil, virtualKey: Self.vKeyCode, keyDown: false) else { throw Failure.eventCreation }
 
         // Set flags to exactly .maskCommand so modifier keys the user is
         // still physically holding don't leak into the synthesized paste.

@@ -145,6 +145,10 @@ final class ClipboardHistoryController {
         refilter()
     }
 
+    func adoptOwnWrite(_ changeCount: Int) {
+        lastSeenChangeCount = changeCount
+    }
+
     // MARK: - Panel entry points
 
     /// Resets to a fresh, unfiltered view before the panel is shown: the
@@ -281,7 +285,7 @@ final class ClipboardHistoryController {
         // the delay elapses — the pasteboard write above already happened
         // and shouldn't be left half finished.
         let keystrokes = self.keystrokes
-        delay { keystrokes.sendPasteKeystroke() }
+        delay { try? keystrokes.sendPasteKeystroke() }
     }
 
     // MARK: - Helpers

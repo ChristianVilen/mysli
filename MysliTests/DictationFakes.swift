@@ -157,11 +157,12 @@ final class DictationFixture {
     let speech = DictationTestSpeech()
     let polisher = DictationTestPolisher()
     let paste = DictationTestPaste()
+    var pasteOverride: (any DictationPasting)?
     var preparedHeard: [String] = []
     var textGate: DictationTestGate<Void>?
     var noContent = false
     lazy var controller = DictationController(
-        keys: keys, recorder: recorder, speech: speech, polisher: polisher, paster: paste,
+        keys: keys, recorder: recorder, speech: speech, polisher: polisher, paster: pasteOverride ?? paste,
         now: { self.clock.now }, schedule: clock.schedule,
         prepareText: { heard in
             self.preparedHeard.append(heard)
