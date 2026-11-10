@@ -42,11 +42,13 @@ The controller owns key callback attachment. AppDelegate composes objects. Captu
 
 The speech interface must match the measured path. If Apple wins using progressive input, use a recognition session that consumes ordered samples during the hold. Do not substitute buffered post-release inference and claim the streaming measurement. Whisper may buffer behind that same session interface if it is selected.
 
+Whisper passed the measured gate. The reviewed adapter uses `loadSamples(for:)` and `SampleTranscriptionSession.transcribe(samples:)` alongside file transcription. Capture `begin` also takes a typed failure callback so background startup errors reach the owned hold. Conversion finishes on the audio queue before result completion. AppDelegate's single `whisperTranscriber` value serves meetings and dictation.
+
 Control+Option+D is the builder's default Carbon choice. A real CopySymbolicHotKeys lookup found no enabled conflict on this Mac. Real Carbon registration and release returned success for this combination and for unmodified Escape. The existing registrar owns a temporary Escape registration while an operation can be cancelled. Physical delivery remains untested.
 
 ## Task 1: Controller and states
 
-Own `DictationController.swift`, `DictationTypes.swift`, and controller tests. Define the small adapter contracts needed by later slices. No OS adapters in this task. Use private owned operation states and a presentation projection with no text. Keep the most recent dictation with text as heard and as selected for paste in memory, before attempting delivery, so paste failure still permits replay.
+Own `DictationController.swift`, `DictationDomain.swift`, and controller tests. Define the small adapter contracts needed by later slices. No OS adapters in this task. Use private owned operation states and a presentation projection with no text. Keep the most recent dictation with text as heard and as selected for paste in memory, before attempting delivery, so paste failure still permits replay.
 
 - [ ] Write failing controller tests with fake keys, capture, speech, polish, clipboard, keystrokes, and clock.
 - [ ] Prove press/release, duplicate input, 0.299-second cancellation, the 0.3-second boundary, Escape/chord cancellation, the 110-second warning, and the 120-second stop.
@@ -70,7 +72,7 @@ Own `DictationMicrophone.swift`, the selected speech adapter and its sample entr
 
 - [ ] Write failing tests for in-memory sample conversion, bounded audio, synchronous seal/cancel, pending startup, and the speech-session contract selected by measurement.
 - [ ] Add AVAudioEngine capture with Microphone permission only. No audio file, ScreenCaptureKit, or Screen Recording gate.
-- [ ] Add samples input to TranscriptionSession without breaking file callers. No known-words Whisper prompt. Use a separate dictation no-speech policy with audio evidence.
+- [ ] Add a narrow samples session alongside TranscriptionSession without breaking file callers. No known-words Whisper prompt. Use a separate dictation no-speech policy with audio evidence.
 - [ ] Prove silence and valid short speech, empty samples, cancellation, sample rate/channel conversion, and preservation of meeting semantics. If sharing Whisper, prove one load during concurrent acquisition and no unload while leased.
 - [ ] Run focused tests, reconcile interfaces, and commit. Real microphone checks remain not done.
 

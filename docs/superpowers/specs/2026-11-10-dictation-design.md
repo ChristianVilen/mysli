@@ -138,6 +138,11 @@ The pasted text never ends in a newline. Mysli never sends Return. Run hard
 command and instruction cases once against real Haiku through an opt-in
 `Real*Tests` check. Normal tests never start Claude.
 
+The builder keeps delivery on one line in this version. An internal line break
+can also submit a command in a terminal. Local line breaks become spaces, and a
+command result that introduces a line break is rejected. Multiline voice commands
+are outside this version.
+
 ## Paste and clipboard
 
 Reuse the existing Command-V sender. Dictation needs Accessibility permission for
