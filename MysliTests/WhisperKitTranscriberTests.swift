@@ -11,7 +11,7 @@ final class WhisperKitTranscriberTests: XCTestCase {
     private var sut: WhisperKitTranscriber!
     private var downloadsReported = 0
 
-    override func setUp() async throws {
+    override func setUpWithError() throws {
         root = try makeTemporaryDirectory().appendingPathComponent("whisper-models", isDirectory: true)
         client = FakeWhisperKitClient()
         sut = WhisperKitTranscriber(client: client, modelsFolder: root)
@@ -54,6 +54,62 @@ final class WhisperKitTranscriberTests: XCTestCase {
         for row in rows {
             XCTAssertEqual(WhisperKitTranscriber.languageCode(for: Locale(identifier: row.tag)), row.code, row.tag)
         }
+    }
+
+    func testSampleAndFileSessionsShareTheLoadedModelUntilTheLastSessionEnds() async throws {
+        client.segments = [TranscriptionSegment(start: 0, end: 0.5, text: " Thank you.")]
+        var sampleSession: (any SampleTranscriptionSession)? = try await sut.loadSamples(for: english)
+        var fileSession: (any TranscriptionSession)? = try await sut.load(for: english)
+        let text = try await sampleSession!.transcribe(samples: [0.1, 0.2])
+        XCTAssertEqual(text, " Thank you.")
+        XCTAssertEqual(client.loads.count, 1)
+        sampleSession = nil
+        let audio = try makeAudioFile(named: "me.caf", seconds: 1)
+        let transcript = try await fileSession!.transcribe(audio)
+        XCTAssertEqual(transcript.segments.map(\.text), [" Thank you."])
+        XCTAssertEqual(client.sampleInputs, [[0.1, 0.2]])
+        fileSession = nil
+        _ = try await sut.loadSamples(for: english)
+        XCTAssertEqual(client.loads.count, 2)
+    }
+
+    func testConcurrentAcquisitionCoalescesAndCancelledLoadDoesNotPoisonRetry() async throws {
+        let loading = ControlledWhisperClient()
+        let transcriber = WhisperKitTranscriber(client: loading, modelsFolder: root)
+        let first = Task { try await transcriber.loadSamples(for: english) }
+        await loading.entered.value()
+        let second = Task { try await transcriber.load(for: english) }
+        for _ in 0..<1_000 {
+            if await transcriber.pendingLoads == 2 { break }
+            await Task.yield()
+        }
+        let pending = await transcriber.pendingLoads
+        XCTAssertEqual(pending, 2)
+        first.cancel()
+        await loading.finish.send()
+        do { _ = try await first.value; XCTFail("Cancelled acquisition succeeded") } catch is CancellationError {}
+        var session: (any TranscriptionSession)? = try await second.value
+        let audio = try makeAudioFile(named: "me.caf", seconds: 1)
+        let result = try await session!.transcribe(audio)
+        XCTAssertEqual(result.segments.map(\.text), ["Shared speech"])
+        let loads = await loading.loads
+        XCTAssertEqual(loads, 1)
+        session = nil
+    }
+
+    func testFailedSharedLoadCanBeRetried() async throws {
+        let loading = ControlledWhisperClient()
+        await loading.setFailure(true)
+        await loading.finish.send()
+        let transcriber = WhisperKitTranscriber(client: loading, modelsFolder: root)
+        do { _ = try await transcriber.loadSamples(for: english); XCTFail("Load did not fail") }
+        catch { XCTAssertEqual(error.localizedDescription, "Load failed.") }
+        await loading.setFailure(false)
+        let session = try await transcriber.loadSamples(for: english)
+        let text = try await session.transcribe(samples: [0.2])
+        XCTAssertEqual(text, "Shared speech")
+        let loads = await loading.loads
+        XCTAssertEqual(loads, 2)
     }
 
     func testThankYouCountsAsSilenceFromEightSecondsOn() {
@@ -180,24 +236,51 @@ final class WhisperKitTranscriberTests: XCTestCase {
 
     func testSuccessfulWhisperChunksKeepTheirAbsoluteTrackTimes() async throws {
         let model = try await ChunkResultWhisperKit(WhisperKitConfig(verbose: false, load: false, download: false))
-        let audio = try makeAudioFile(named: "them.caf", seconds: 60, sample: 3_277)
+        let audio = try makeAudioFile(named: "them.caf", seconds: 122, sample: 3_277)
         let adapter = WhisperKitLibrary.LoadedModel(whisperKit: model)
 
         let segments = try await adapter.transcribe(audio, languageCode: "en")
 
-        XCTAssertEqual(segments.map(\.start), [0.5, 30.5])
-        XCTAssertEqual(segments.map(\.end), [1.5, 31.5])
-        XCTAssertEqual(segments.map(\.text), ["Synthetic speech", "Synthetic speech"])
+        XCTAssertEqual(segments.map(\.start), [0.5, 30.5, 60.5, 90.5, 120.5])
+        XCTAssertEqual(segments.map(\.end), [1.5, 31.5, 61.5, 91.5, 121.5])
+        XCTAssertEqual(segments.map(\.text), Array(repeating: "Synthetic speech", count: 5))
+        XCTAssertEqual(model.batchSizes, [4, 1])
+    }
+}
+
+private actor ControlledWhisperClient: WhisperKitClient {
+    let entered = AudioTestSignal()
+    let finish = AudioTestSignal()
+    var loads = 0
+    var failure = false
+    func setFailure(_ failure: Bool) { self.failure = failure }
+    func download(model: String, into base: URL) async throws { XCTFail("Unexpected download") }
+    func load(model: String, from base: URL) async throws -> any WhisperModel {
+        loads += 1
+        await entered.send()
+        await finish.value()
+        if failure { throw MeetingStepError("Load failed.") }
+        return Model()
+    }
+    private struct Model: WhisperModel {
+        func transcribe(_ audio: URL, languageCode: String) async throws -> [TranscriptionSegment] {
+            [TranscriptionSegment(start: 0, end: 0.5, text: "Shared speech")]
+        }
+        func transcribe(samples: [Float], languageCode: String) async throws -> [TranscriptionSegment] {
+            [TranscriptionSegment(start: 0, end: 0.5, text: "Shared speech")]
+        }
     }
 }
 
 private final class ChunkResultWhisperKit: WhisperKit {
     var failChunks = false
+    var batchSizes: [Int] = []
 
     override func transcribeWithOptions(audioArrays: [[Float]], decodeOptionsArray: [DecodingOptions?] = [nil],
                                          seekOffsets: [Int]? = nil, callback: TranscriptionCallback? = nil)
         async -> [Result<[TranscriptionResult], Error>] {
-        audioArrays.enumerated().map { index, _ in
+        batchSizes.append(audioArrays.count)
+        return audioArrays.enumerated().map { index, _ in
             if failChunks && index == 1 { return .failure(MeetingStepError("Chunk failed.")) }
             return .success([TranscriptionResult(text: "Synthetic speech", segments: [
                 TranscriptionSegment(start: 0.5, end: 1.5, text: "Synthetic speech")
@@ -212,6 +295,7 @@ private final class FakeWhisperKitClient: WhisperKitClient {
     private(set) var downloads: [String] = []
     private(set) var loads: [String] = []
     private(set) var transcriptions: [String] = []
+    var sampleInputs: [[Float]] = []
 
     func download(model: String, into base: URL) async throws {
         downloads.append(base.path)
@@ -225,6 +309,11 @@ private final class FakeWhisperKitClient: WhisperKitClient {
 
     private struct Model: WhisperModel {
         let client: FakeWhisperKitClient
+
+        func transcribe(samples: [Float], languageCode: String) async throws -> [TranscriptionSegment] {
+            client.sampleInputs.append(samples)
+            return client.segments
+        }
 
         func transcribe(_ audio: URL, languageCode: String) async throws -> [TranscriptionSegment] {
             client.transcriptions.append("\(audio.lastPathComponent) in \(languageCode)")

@@ -31,6 +31,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private let clipboardHistory = ClipboardHistoryController()
     private lazy var clipboardPanel = ClipboardPanel(controller: clipboardHistory)
     private lazy var knownWords = KnownWordsFile(url: { [settings] in settings.knownWordsFile })
+    private let whisperTranscriber = WhisperKitTranscriber()
     private lazy var meetingRecorder = MeetingRecorder(
         permissions: permissions,
         root: { [settings] in settings.meetingsFolder },
@@ -40,7 +41,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private lazy var meetingNotes = MeetingNotesController(
         recorder: meetingRecorder,
         root: { [settings] in settings.meetingsFolder },
-        processor: MeetingProcessor(roomLabeller: SpeakerKitRoomLabeller(),
+        processor: MeetingProcessor(transcribers: [whisperTranscriber, SpeechTranscriberAdapter()],
+                                    roomLabeller: SpeakerKitRoomLabeller(),
                                     summarizer: Summarizer(context: MeetingContextFile(url: { [settings] in settings.meetingContextFile })),
                                     knownWords: { [knownWords] in knownWords.read() },
                                     locale: { [settings] in settings.meetingLocale }),

@@ -14,6 +14,10 @@ protocol TranscriptionSession {
     func transcribe(_ audio: URL) async throws -> TrackTranscript
 }
 
+protocol SampleTranscriptionSession {
+    func transcribe(samples: [Float]) async throws -> String
+}
+
 struct TranscriberFailure: Equatable, CustomStringConvertible {
     enum Stage: Equatable {
         case unavailable

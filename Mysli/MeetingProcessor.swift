@@ -170,8 +170,8 @@ struct MeetingProcessor {
         try meeting.write(heard, to: .transcript)
     }
 
-    /// The session lives only in here, so the Whisper model is released
-    /// before the room labeller loads its own model. A transcription error
+    /// This session ends before room labelling. Dictation can retain the shared
+    /// Whisper model independently. A transcription error
     /// fails the step with no fallback, so both tracks come from one transcriber.
     private func transcribeTracks(_ meeting: MeetingFolder, progress: (MeetingProgress) -> Void)
         async throws -> (tracks: [MeetingTrack: TrackTranscript], transcriber: String, failures: [TranscriberFailure]) {
