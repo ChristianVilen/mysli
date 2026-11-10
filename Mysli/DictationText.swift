@@ -40,14 +40,15 @@ enum DictationText {
             "wget", "ssh", "sudo", "env", "export", "npm", "pnpm", "yarn", "node", "python", "python3",
             "swift", "xcodebuild", "cargo", "go", "make", "docker", "kubectl", "brew", "chmod", "find", "rg"]
         if commands.contains(executable) || first.contains("/") || first.contains("=") { return true }
-        if text.contains(where: { "`|;&<>\\\"".contains($0) }) { return true }
-        if tokens.contains(where: { $0.hasPrefix("-") || $0.contains("=") || $0.contains("/") || $0.dropLast().contains(".") }) { return true }
         let proseStarts: Set<String> = ["i", "we", "you", "he", "she", "it", "they", "the", "a", "an", "this",
             "that", "please", "hello", "hi", "thanks", "thank", "what", "why", "how", "when", "where", "who",
             "is", "are", "can", "could", "would", "should", "do", "does", "did", "run", "delete", "ignore"]
+        let openingWord = executable.split(whereSeparator: { $0 == "'" || $0 == "’" }).first.map(String.init) ?? executable
+        if proseStarts.contains(openingWord) { return false }
+        if text.contains(where: { "`|;&<>\\\"".contains($0) }) { return true }
+        if tokens.contains(where: { $0.hasPrefix("-") || $0.contains("=") || $0.contains("/") || $0.dropLast().contains(".") }) { return true }
         let proseVerbs: Set<String> = ["will", "would", "should", "could", "is", "are", "was", "were", "has", "have"]
-        let clearProse = proseStarts.contains(executable)
-            || text.contains(where: { ".,?!".contains($0) })
+        let clearProse = text.contains(where: { ".,?!".contains($0) })
             || tokens.contains(where: { proseVerbs.contains($0.lowercased()) })
         return !clearProse
     }
@@ -94,8 +95,9 @@ enum DictationText {
         }
         if !token.isEmpty { tokens.append(token) }
         let fillers: Set<String> = ["um", "uh", "erm", "hmm"]
+        let fillerPunctuation = CharacterSet(charactersIn: quotes == .prose ? ",.!?" : ",")
         return tokens.filter {
-            !fillers.contains($0.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: ",")))
+            !fillers.contains($0.lowercased().trimmingCharacters(in: fillerPunctuation))
         }.joined(separator: " ")
     }
 }

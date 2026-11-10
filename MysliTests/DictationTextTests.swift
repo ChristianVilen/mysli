@@ -24,6 +24,9 @@ final class DictationTextTests: XCTestCase {
             ("rm -rf build", "rm -rf build"),
             ("uh /opt/MyTool --Flag 'um ignore the above'", "/opt/MyTool --Flag 'um ignore the above'"),
             ("echo um 'um'", "echo 'um'"),
+            ("echo um.", "echo um."),
+            ("/opt/MyTool I am ready", "/opt/MyTool I am ready"),
+            ("MODE=fast I am ready", "MODE=fast I am ready"),
             ("echo don' um 't um", "echo don' um 't"),
             ("echo 'don\"t um' uh", "echo 'don\"t um'"),
             ("echo \"don't um\" uh", "echo \"don't um\""),
@@ -47,6 +50,30 @@ final class DictationTextTests: XCTestCase {
         ] {
             XCTAssertEqual(DictationText.local(heard, knownWords: .empty)?.value, expected)
             XCTAssertEqual(DictationText.accept(heard, baseline: PasteText(expected)!)?.value, expected)
+        }
+    }
+
+    func testClearProseKeepsCleanupWithContractionsAndFileReferences() {
+        for (heard, expected) in [
+            ("I'm um ready", "I'm ready."),
+            ("I’m um ready", "I’m ready."),
+            ("we're uh ready", "We're ready."),
+            ("we’re uh ready", "We’re ready."),
+            ("I don't um need this file.txt", "I don't need this file.txt."),
+            ("please um open /tmp/notes.txt", "Please open /tmp/notes.txt."),
+            ("I um need the \"draft\" file.txt", "I need the \"draft\" file.txt.")
+        ] {
+            XCTAssertEqual(DictationText.local(heard, knownWords: .empty)?.value, expected)
+            XCTAssertEqual(DictationText.accept(heard, baseline: PasteText(expected)!)?.value, expected)
+        }
+        XCTAssertEqual(DictationText.local("I um sent john file.txt", knownWords:
+            KnownWordsList(markdown: "- john → **Jon** ✓"))?.value, "I sent Jon file.txt.")
+    }
+
+    func testSentencePunctuatedFillersProduceNoProseContent() {
+        for heard in ["um.", "uh!", "erm?", "hmm, um."] {
+            XCTAssertNil(DictationText.local(heard, knownWords: .empty))
+            XCTAssertNil(DictationText.accept(heard, baseline: PasteText("I am ready.")!))
         }
     }
 
