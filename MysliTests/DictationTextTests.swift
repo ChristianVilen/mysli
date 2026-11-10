@@ -2,6 +2,15 @@ import XCTest
 @testable import Mysli
 
 final class DictationTextTests: XCTestCase {
+    func testProviderControlsAreRejectedBeforeCleanup() {
+        let baseline = PasteText("I am ready.")!
+        for scalar in ["\u{0000}", "\u{0001}", "\u{001B}", "\u{007F}", "\u{0080}", "\u{009F}"] {
+            XCTAssertNil(DictationText.accept("I am" + scalar + " ready.", baseline: baseline))
+            XCTAssertEqual(DictationText.local("I am" + scalar + " ready.", knownWords: .empty)?.value, "I am ready.")
+        }
+        XCTAssertEqual(DictationText.accept("I am\tready.\r\n", baseline: baseline)?.value, "I am ready.")
+    }
+
     func testLocalProseCleanupUsesOnlyConfirmedSpellings() {
         let words = KnownWordsList(markdown: "- john → **Jon** ✓\n- lunch → **launch**")
         XCTAssertEqual(DictationText.local("um john will will send the lunch notes", knownWords: words)?.value,

@@ -128,6 +128,37 @@ final class DictationPolisherTests: XCTestCase {
         assertUnavailable(await polisher.polish(request()))
     }
 
+    func testCancelledPreparationBeforeEntryDoesNotLaunchOrEnable() async {
+        let child = Child()
+        var launches = 0
+        let polisher = DictationPolisher(launch: { launches += 1; return child }, schedule: DictationTestClock().schedule)
+        let task = Task { await polisher.prepare() }
+        task.cancel()
+        polisher.stop()
+        await task.value
+        XCTAssertEqual(launches, 0)
+        if launches == 0 { assertUnavailable(await polisher.polish(request())) }
+        polisher.stop()
+    }
+
+    func testUnsafeProviderOutputFallsBackToRecoverableLocalText() async {
+        let child = Child()
+        let polisher = DictationPolisher(launch: { child }, schedule: DictationTestClock().schedule)
+        let input = request("I am\u{001B} ready.")
+        XCTAssertEqual(input.localText.value, "I am ready.")
+        await polisher.prepare()
+        let task = Task { await polisher.polish(input) }
+        await child.waitForSend()
+        child.receive?(.success("I am\u{0000} ready."))
+        let selected: PasteText
+        switch await task.value {
+        case .polished(let text): selected = text; XCTFail("Expected unavailable")
+        case .unavailable: selected = input.localText
+        }
+        XCTAssertEqual(selected.value, "I am ready.")
+        polisher.stop()
+    }
+
     func testNotReadyLaunchFailureAndRejectedOutputAreUnavailable() async {
         enum Failure: Error { case launch }
         let clock = DictationTestClock()

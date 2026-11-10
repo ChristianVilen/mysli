@@ -138,6 +138,11 @@ The pasted text never ends in a newline. Mysli never sends Return. Run hard
 command and instruction cases once against real Haiku through an opt-in
 `Real*Tests` check. Normal tests never start Claude.
 
+Delivery accepts passive text only. Whitespace controls become spaces. Other
+Unicode control scalars are rejected, while printable Unicode and emoji sequences
+stay intact. Local cleanup replaces unsafe controls with spaces to keep the heard
+words recoverable. Unsafe Claude output uses that local fallback.
+
 The builder keeps delivery on one line in this version. An internal line break
 can also submit a command in a terminal. Local line breaks become spaces, and a
 command result that introduces a line break is rejected. Multiline voice commands

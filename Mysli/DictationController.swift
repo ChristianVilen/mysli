@@ -157,7 +157,13 @@ final class DictationController {
             keys.stop()
         }
         guard ownsKeys(preparation) else { return }
-        if preparation.inputReady { preparation.polishTask = Task { [polisher] in await polisher.prepare() } }
+        if preparation.inputReady {
+            preparation.polishTask = Task { [weak self, polisher] in
+                guard let self, !Task.isCancelled, self.ownsKeys(preparation),
+                      self.hasAccess, preparation.inputReady else { return }
+                await polisher.prepare()
+            }
+        }
         preparation.task = Task { [weak self, speech] in
             do {
                 let session = try await speech.prepare()
@@ -194,7 +200,11 @@ final class DictationController {
             do { try startKeys(preparation) }
             catch { receive(.unavailable); return }
             guard ownsKeys(preparation), hasAccess else { return }
-            preparation.polishTask = Task { [polisher] in await polisher.prepare() }
+            preparation.polishTask = Task { [weak self, polisher] in
+                guard let self, !Task.isCancelled, self.ownsKeys(preparation),
+                      self.hasAccess, preparation.inputReady else { return }
+                await polisher.prepare()
+            }
         } else {
             guard changed else { return }
             preparation.inputReady = false

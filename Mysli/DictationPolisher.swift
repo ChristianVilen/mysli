@@ -45,6 +45,7 @@ final class DictationPolisher: DictationPolishing {
     }
 
     func prepare() async {
+        guard !Task.isCancelled else { return }
         enabled = true
         await prepareIfEnabled()
     }

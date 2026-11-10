@@ -4,10 +4,20 @@ struct PasteText: Equatable, Sendable {
     let value: String
 
     init?(_ text: String) {
-        let value = String(text.map { $0.isNewline ? " " : $0 })
+        guard !Self.containsUnsafeControls(text) else { return nil }
+        let value = String(text.map { character in
+            let whitespaceControl = character.unicodeScalars.contains {
+                $0.properties.generalCategory == .control && $0.properties.isWhitespace
+            }
+            return character.isNewline || whitespaceControl ? " " : character
+        })
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard !value.isEmpty else { return nil }
         self.value = value
+    }
+
+    static func containsUnsafeControls(_ text: String) -> Bool {
+        text.unicodeScalars.contains { $0.properties.generalCategory == .control && !$0.properties.isWhitespace }
     }
 }
 

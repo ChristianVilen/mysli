@@ -2,12 +2,16 @@ import Foundation
 
 enum DictationText {
     static func local(_ heard: String, knownWords: KnownWordsList) -> PasteText? {
-        let withoutFillers = removeFillers(heard)
+        let safe = String(String.UnicodeScalarView(heard.unicodeScalars.map {
+            $0.properties.generalCategory == .control ? Unicode.Scalar(" ") : $0
+        }))
+        let withoutFillers = removeFillers(safe)
         if isCommand(withoutFillers) { return PasteText(withoutFillers) }
         return PasteText(cleanProse(knownWords.corrector.correct(withoutFillers).text))
     }
 
     static func accept(_ output: String, baseline: PasteText) -> PasteText? {
+        guard !PasteText.containsUnsafeControls(output) else { return nil }
         let source = baseline.value
         if isCommand(source) {
             guard !output.contains(where: \.isNewline),
