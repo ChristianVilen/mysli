@@ -200,4 +200,67 @@ screen, dictation during a meeting, and VoiceOver. Unit tests do not prove these
 
 ## Measurements
 
-Not run yet. Engine choice and fresh-process timing remain measurement gates.
+Measured on 2026-11-10 on an Apple silicon Mac,
+using Release whole-module `-O` builds with testability enabled.
+Desktop apps remained open. Initial load averages were 3.01, 3.64, and 3.51.
+No microphone or speech-model download was used.
+
+Select Whisper under the agreed rule. Its loaded ten-second clip took a median
+of 0.496 seconds after release, with all five measured runs below 0.7 seconds.
+The range was 0.463 to 0.509 seconds.
+
+The opt-in `RealDictationSpeechTests` check in
+`MysliTests/WhisperKitTranscriberTests.swift` compares the loaded production
+Whisper turbo configuration with the progressive Apple API path used in
+`LiveTranscriber.swift`. It uses the same synthetic English Samantha clips for
+both engines. Clips are padded with leading silence to 5, 10, and 30 seconds,
+so speech ends at release. They contain 10, 19, and 63 source words. One warmup
+per engine and clip precedes five measured runs. Engine order reverses each
+repeat. Model loading and audio decoding are outside the timed interval.
+
+Whisper performs all inference after the timer starts. Apple receives 20 ms
+buffers at real-time pace. Its timer starts after the analyzer consumes all
+input buffers and includes end-of-input delivery, finalization, and completed
+final results. Apple therefore performs recognition work during the hold.
+Its post-release time does not measure its total recognition time.
+
+| Clip | Whisper median and range | Apple median and range | Literal word edits per run |
+| --- | --- | --- | --- |
+| 5 seconds | 0.405 s, 0.378 to 0.408 s | 0.052 s, 0.049 to 0.056 s | Both 0 of 10 |
+| 10 seconds | 0.496 s, 0.463 to 0.509 s | 0.068 s, 0.051 to 0.072 s | Both 1 of 19 |
+| 30 seconds | 1.117 s, 1.085 to 1.153 s | 0.074 s, 0.060 to 0.095 s | Both 3 of 63 |
+
+Both engines return the full five- and ten-second scripts. The ten-second edit
+is the formatting change from `nine` to `9`. Word edits use lowercase
+alphanumeric Levenshtein distance, so case and punctuation do not count.
+At 30 seconds, Whisper changes `lunch` to `launch` and `examples` to `example`,
+as well as `nine` to `9`. Apple changes `examples` to `example` and formats
+`nine` as `9` and `first` as `1st`. Outputs are the same across all five runs
+of each engine and clip. All 36 runs, including warmups, complete with text.
+Synthetic speech cannot prove accuracy with the user's microphone, accent,
+room, or names. An earlier trailing-silence run is excluded from selection
+because it let Apple finalize before release.
+
+`scripts/measure-dictation-claude.mjs` uses the `Summarizer` binary search paths,
+an empty folder per process, and the exact safe flags above. It sends only synthetic text. One warmup pair precedes five measured
+pairs for each idle duration. Timing starts at the stdin write and ends at the
+successful `result` event.
+
+| Idle before first input | Fresh-process median and range | Next-message median and range |
+| --- | --- | --- |
+| 5 seconds | 0.830 s, 0.747 to 1.580 s | 0.817 s, 0.718 to 1.254 s |
+| 0.3 seconds | 0.945 s, 0.775 to 4.063 s | 0.814 s, 0.659 to 4.185 s |
+
+All 24 API results, including warmups, completed successfully. There were no
+process failures or diagnostic timeouts. All 12 outputs at five seconds idle
+were `Please send the draft before lunch.` At 0.3 seconds idle, one fresh reply
+kept `Um,` at the start. The other 11 matched the expected cleanup.
+
+One measured request on each side of the short-idle comparison exceeded the
+2.5-second product deadline. Both were in the same pair. CLI-reported API times
+accounted for almost all of their wall time. The local fallback remains
+necessary. Median differences are smaller than run variation. These runs do
+not show a material fresh-process penalty and support retiring each used
+process and starting a fresh one in the background. They do not prove latency
+with the full known-words list and cursor context, or the chance of a deadline
+miss. No conversation reuse is needed by this measurement.
