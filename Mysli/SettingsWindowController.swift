@@ -12,6 +12,11 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     let clipboardHistory = NSSwitch()
     let keepAwakeEnabled = NSSwitch()
     let meetingsEnabled = NSSwitch()
+    let dictationEnabled = NSSwitch()
+    let dictationNearbyText = NSSwitch()
+    let dictationKey = NSPopUpButton()
+    let dictationSetup = NSButton(title: "Set Up Permissions…", target: nil, action: nil)
+    let dictationKeyboard = NSButton(title: "Open Keyboard Settings…", target: nil, action: nil)
     let keepScreenOn = NSSwitch()
     let calendarReminders = NSSwitch()
     let teamsSpeakerNames = NSSwitch()
@@ -51,6 +56,9 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     var onMeetingsFolderChanged: ((URL) -> Void)?
     var onCalendarRemindersChanged: ((Bool) -> Void)?
     var onCalendarReminderRulesChanged: (() -> Void)?
+    var onDictationSetup: (() -> Void)?
+    var onDictationKeyChanged: (() -> Void)?
+    var onDictationKeyboardSettings: (() -> Void)?
 
     init(settings: Settings,
          onboarding: Onboarding? = nil,
@@ -157,7 +165,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     func windowDidDeminiaturize(_ notification: Notification) { refreshPermissionsVisibility() }
 
     private func refreshPermissionsVisibility() {
-        let needsPolling = onboarding?.isFinished == false ? onboarding?.step == .permissions : selectedPage == .permissions
+        let needsPolling = onboarding?.isFinished == false ? onboarding?.step == .permissions
+            : selectedPage == .permissions || selectedPage == .dictation
         setPermissionsVisible(needsPolling && window.map(isWindowVisible) == true)
     }
 
@@ -200,6 +209,10 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         clipboardHistory.state = settings.clipboardHistoryEnabled ? .on : .off
         keepAwakeEnabled.state = settings.keepAwakeEnabled ? .on : .off
         meetingsEnabled.state = settings.meetingsEnabled ? .on : .off
+        dictationEnabled.state = settings.dictationEnabled ? .on : .off
+        dictationNearbyText.state = settings.dictationNearbyText ? .on : .off
+        dictationKey.selectItem(at: settings.dictationKeyMode == .fn ? 0 : 1)
+        dictationSetup.isEnabled = settings.dictationEnabled
         calendarReminders.isEnabled = settings.meetingsEnabled
         keepScreenOn.state = settings.keepDisplayAwake ? .on : .off
         calendarReminders.state = settings.calendarRecordingRemindersEnabled ? .on : .off
@@ -232,7 +245,10 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             (calendarReminderEvents, #selector(calendarReminderEventsChanged)),
             (chooseMeetingsFolder, #selector(folderClicked)), (chooseBackground, #selector(contextClicked)),
             (clearBackground, #selector(clearClicked)), (thumbnailDuration, #selector(durationChanged)),
-            (summaryTool, #selector(toolChanged))
+            (summaryTool, #selector(toolChanged)),
+            (dictationEnabled, #selector(dictationChanged)), (dictationNearbyText, #selector(nearbyTextChanged)),
+            (dictationKey, #selector(dictationKeyChanged)), (dictationSetup, #selector(setUpDictation)),
+            (dictationKeyboard, #selector(openDictationKeyboard))
         ] as [(NSControl, Selector)] {
             control.target = self
             control.action = action
@@ -244,6 +260,12 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         clipboardHistory.setAccessibilityLabel("Record clipboard history")
         keepAwakeEnabled.setAccessibilityLabel("Enable Keep Awake")
         meetingsEnabled.setAccessibilityLabel("Enable Meetings")
+        dictationEnabled.setAccessibilityLabel("Enable Dictation and send dictated words to Claude")
+        dictationNearbyText.setAccessibilityLabel("Send text near the cursor")
+        dictationKey.setAccessibilityLabel("Dictation key")
+        dictationSetup.setAccessibilityLabel("Set up dictation permissions")
+        dictationKeyboard.setAccessibilityLabel("Open Keyboard Settings for Fn")
+        dictationKey.addItems(withTitles: ["Fn / Globe", "Control + Option + D"])
         keepScreenOn.setAccessibilityLabel("Keep screen on")
         calendarReminders.setAccessibilityLabel("Calendar recording reminders")
         teamsSpeakerNames.setAccessibilityLabel("Teams speaker names")
@@ -348,6 +370,17 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
                                        control: teamsSpeakerNames)
                 ])
             ]),
+            .dictation: toolPage(.dictation, [
+                SettingsLayout.group([
+                    SettingsLayout.row("Dictation", detail: "Send dictated words to Claude Haiku for polish, then paste them.", control: dictationEnabled),
+                    SettingsLayout.row("Hold to dictate", control: dictationKey),
+                    SettingsLayout.row("Send text near the cursor", detail: "Share up to 500 characters before the cursor with Claude. Secure fields are excluded.", control: dictationNearbyText)
+                ]),
+                note("Fn needs Input Monitoring. Both options need Microphone and Accessibility. Choose Set Up Permissions to retry after a change."),
+                dictationSetup,
+                note("For Fn, set ‘Press 🌐 key to’ to ‘Do Nothing’ in Keyboard Settings. Mysli never changes this setting."),
+                dictationKeyboard
+            ]),
             .permissions: permissions,
             .help: helpPage
         ]
@@ -400,6 +433,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         case .windows: [windowTiling]
         case .keepAwake: [keepAwakeEnabled, keepScreenOn]
         case .meetings: [meetingsEnabled, chooseMeetingsFolder, summaryTool, chooseBackground, clearBackground, calendarReminders, calendarReminderTime, calendarReminderEvents, teamsSpeakerNames]
+        case .dictation: [dictationEnabled, dictationKey, dictationNearbyText, dictationSetup, dictationKeyboard]
         case .permissions: permissionsPage.controls
         case .help: helpPage.controls
         }
@@ -439,6 +473,23 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     @objc private func meetingsChanged() {
         onToolChanged?(.meetings, meetingsEnabled.state == .on)
     }
+
+    @objc private func dictationChanged() {
+        onToolChanged?(.dictation, dictationEnabled.state == .on)
+    }
+
+    @objc private func nearbyTextChanged() {
+        settings.dictationNearbyText = dictationNearbyText.state == .on
+    }
+
+    @objc private func dictationKeyChanged() {
+        settings.dictationKeyMode = dictationKey.indexOfSelectedItem == 0 ? .fn : .carbon
+        refreshPermissionRequirements()
+        onDictationKeyChanged?()
+    }
+
+    @objc private func setUpDictation() { onDictationSetup?() }
+    @objc private func openDictationKeyboard() { onDictationKeyboardSettings?() }
 
     @objc private func tilingChanged() {
         onToolChanged?(.windows, windowTiling.state == .on)

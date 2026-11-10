@@ -23,7 +23,7 @@
 	<key>NSScreenCaptureUsageDescription</key>
 	<string>Mysli needs Screen Recording permission to take screenshots and to record call audio for Meeting Notes.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Mysli records your microphone only while you record a meeting. It transcribes the audio on this Mac.</string>
+	<string>Mysli records your microphone for meeting notes and while you hold the dictation key. It transcribes the audio on this Mac.</string>
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>Mysli reads calendar event titles and times, and checks events for a video meeting link, to offer recording reminders. It never changes your calendars or starts or stops recording automatically.</string>
 </dict>

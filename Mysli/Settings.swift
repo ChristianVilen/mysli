@@ -74,6 +74,21 @@ final class Settings {
         set { defaults.set(newValue, forKey: "meetingsEnabled") }
     }
 
+    var dictationEnabled: Bool {
+        get { defaults.bool(forKey: "dictationEnabled") }
+        set { defaults.set(newValue, forKey: "dictationEnabled") }
+    }
+
+    var dictationKeyMode: DictationKeyMode {
+        get { defaults.string(forKey: "dictationKeyMode").flatMap(DictationKeyMode.init(rawValue:)) ?? .fn }
+        set { defaults.set(newValue.rawValue, forKey: "dictationKeyMode") }
+    }
+
+    var dictationNearbyText: Bool {
+        get { defaults.object(forKey: "dictationNearbyText") as? Bool ?? true }
+        set { defaults.set(newValue, forKey: "dictationNearbyText") }
+    }
+
     var enabledTools: Set<MysliTool> {
         var tools: Set<MysliTool> = []
         if screenshotShortcutsEnabled { tools.insert(.screenshots) }
@@ -81,6 +96,7 @@ final class Settings {
         if windowTilingEnabled { tools.insert(.windows) }
         if keepAwakeEnabled { tools.insert(.keepAwake) }
         if meetingsEnabled { tools.insert(.meetings) }
+        if dictationEnabled { tools.insert(.dictation) }
         return tools
     }
 
@@ -91,11 +107,13 @@ final class Settings {
         case .windows: windowTilingEnabled = enabled
         case .keepAwake: keepAwakeEnabled = enabled
         case .meetings: meetingsEnabled = enabled
+        case .dictation: dictationEnabled = enabled
         }
     }
 
     var requiredPermissions: RequiredPermissions {
-        RequiredPermissions(tools: enabledTools, calendarReminders: calendarRecordingRemindersEnabled)
+        RequiredPermissions(tools: enabledTools, calendarReminders: calendarRecordingRemindersEnabled,
+                            dictationKeyMode: dictationKeyMode)
     }
 
     /// On by default: a dark, locked screen looks like Keep Awake did not work.

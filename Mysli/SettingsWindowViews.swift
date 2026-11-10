@@ -2,7 +2,7 @@ import Cocoa
 
 /// The pages of the Mysli window: General, one page for each tool, then Permissions and Help.
 enum SettingsPage: Int, CaseIterable {
-    case general, screenshots, clipboard, windows, keepAwake, meetings, permissions, help
+    case general, screenshots, clipboard, windows, keepAwake, meetings, dictation, permissions, help
 
     var tool: MysliTool? {
         switch self {
@@ -11,6 +11,7 @@ enum SettingsPage: Int, CaseIterable {
         case .windows: .windows
         case .keepAwake: .keepAwake
         case .meetings: .meetings
+        case .dictation: .dictation
         case .general, .permissions, .help: nil
         }
     }
@@ -32,6 +33,7 @@ enum SettingsPage: Int, CaseIterable {
         case .windows: "Move the active window with the keyboard."
         case .keepAwake: "Keep your Mac awake while a long task runs."
         case .meetings: "Record a call. Mysli writes a transcript and a summary on this Mac."
+        case .dictation: "Hold a key, speak, then release to paste."
         case .permissions, .help: ""
         }
     }
@@ -51,6 +53,7 @@ enum SettingsPage: Int, CaseIterable {
         case .screenshots: [("Capture an area", [.captureArea]), ("Capture the screen under the pointer", [.captureFullScreen])]
         case .clipboard: [("Open clipboard history", [.clipboardHistory])]
         case .windows: [("Tile left or right", [.tileLeft, .tileRight]), ("Maximize or restore", [.maximize]), ("Center window", [.center])]
+        case .dictation: [("Alternative dictation key", [.dictation]), ("Cancel dictation", [.dictationEscape])]
         default: []
         }
     }
@@ -74,7 +77,10 @@ enum SettingsPage: Int, CaseIterable {
             ("Meeting notes", "Choose Start Recording Meeting in the menu. Allow Microphone and Screen Recording access when asked. The microphone records Me; Mac audio records Them. Use Pause, Resume, and Stop on the floating controls. The live draft stays in memory. The pencil button opens a separate notes window. Typed notes save to notes.md and remain editable while paused and after Stop. Recent Meeting Notes reopens them. Update summary includes later edits without changing the transcript or word review. Save errors keep your draft; Retry save tries again. After Stop, Mysli transcribes on this Mac and sends the transcript and saved typed notes to the summary tool. The complete optional background file goes too; Automatic may use both providers. Find transcript.md and summary.md in the dated meeting folder. Audio goes to the Trash after transcription. Check Words lets you correct suspect words; Update Notes rebuilds the transcript and summary from the heard copy and replaces transcript edits. With Calendar reminders on, a calendar event offers to start and stop recording; Mysli never records on its own. Teams speaker names is experimental and can name remote speakers after Stop.")
         ]
         case .permissions: [
-            ("Permissions and shortcut setup", "Accessibility allows window tiling and paste; Screen Recording allows screenshots and Mac audio. Microphone is needed only for meetings. Grant access in System Settings. If macOS already uses the screenshot shortcuts, follow Mysli's shortcut setup instructions to turn those system shortcuts off. Registration warnings appear in the Mysli menu. You can use this window without these permissions.")
+            ("Permissions and shortcut setup", "Accessibility allows window tiling and paste; Screen Recording allows screenshots and Mac audio. Microphone is needed for meetings and dictation. Fn dictation also needs Input Monitoring. Grant access in System Settings. If macOS already uses the screenshot shortcuts, follow Mysli's shortcut setup instructions to turn those system shortcuts off. Registration warnings appear in the Mysli menu. You can use this window without these permissions.")
+        ]
+        case .dictation: [
+            ("Dictate and paste", "Hold Fn or Control + Option + D for at least 0.3 seconds. Release to transcribe and polish the words with Claude Haiku. Escape cancels. A hold stops after two minutes. A triangle means local text was pasted without Claude polish; a cross means an error. Paste last dictation again in the menu uses the last text in memory. Dictation never sends Return. During a meeting, the meeting microphone also records your dictated words.")
         ]
         case .general, .help: []
         }

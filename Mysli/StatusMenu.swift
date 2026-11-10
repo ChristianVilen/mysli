@@ -45,16 +45,16 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         build()
     }
 
-    /// Separate corners let all three marks show at once. Recording and pause also have
+    /// Separate corners let all four marks show at once. Recording and pause also have
     /// different shapes, so the state does not rely on colour alone. The recording mark covers
     /// the berry in `MenuBarIcon.svg`, so keep the berry inside the mark's rectangle.
-    func icon(keepAwakeActive: Bool, recording: RecordingMark?, warning: StatusWarning?) -> NSImage {
+    func icon(keepAwakeActive: Bool, recording: RecordingMark?, warning: StatusWarning?, dictationListening: Bool = false) -> NSImage {
         guard let base = NSImage(named: "MenuBarIcon") else {
             return NSImage(systemSymbolName: "camera.viewfinder", accessibilityDescription: "Mysli") ?? NSImage()
         }
         let size = NSSize(width: 18, height: 18)
 
-        guard keepAwakeActive || recording != nil || warning != nil else {
+        guard keepAwakeActive || recording != nil || warning != nil || dictationListening else {
             let icon = (base.copy() as? NSImage) ?? base
             icon.size = size
             icon.isTemplate = true
@@ -90,6 +90,13 @@ final class StatusMenu: NSObject, NSMenuDelegate {
                     NSBezierPath(rect: bar).fill()
                     NSBezierPath(rect: bar.offsetBy(dx: 2, dy: 0)).fill()
                 }
+            }
+            if dictationListening {
+                let mark = NSRect(x: rect.minX + 1, y: rect.maxY - 8, width: 6, height: 7)
+                NSColor.white.setFill()
+                NSBezierPath(roundedRect: mark.insetBy(dx: -1, dy: -1), xRadius: 2, yRadius: 2).fill()
+                NSColor.systemIndigo.setFill()
+                NSBezierPath(roundedRect: mark, xRadius: 1, yRadius: 1).fill()
             }
             let corner = NSRect(x: rect.minX + 1, y: rect.minY + 1, width: 7, height: 7)
             switch warning {

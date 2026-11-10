@@ -7,6 +7,7 @@ struct PermissionActions {
     let calendar: () -> Void
     let notifications: () -> Void
     let keyboardSettings: () -> Void
+    var inputMonitoring: () -> Void = {}
 
     static let inert = Self(accessibility: {}, screenRecording: {}, microphone: {}, calendar: {}, notifications: {}, keyboardSettings: {})
 }
@@ -101,6 +102,7 @@ final class PermissionListView: NSView {
             case .microphone: actions.microphone
             case .calendar: actions.calendar
             case .notifications: actions.notifications
+            case .inputMonitoring: actions.inputMonitoring
             }
             return (permission, PermissionRowView(title: permission.title, explanation: permission.explanation, grant: grant))
         }

@@ -1,7 +1,7 @@
 import Cocoa
 import Carbon.HIToolbox
 
-enum DictationKeyMode { case fn, carbon }
+enum DictationKeyMode: String, CaseIterable { case fn, carbon }
 enum DictationKeyFailure: Error, Equatable { case permission, source, carbon }
 
 enum FnKeyEvent {

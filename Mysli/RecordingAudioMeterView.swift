@@ -35,6 +35,15 @@ final class RecordingAudioMeterView: NSView {
         label.font = .menuFont(ofSize: 12)
         label.textColor = .secondaryLabelColor
         label.widthAnchor.constraint(equalToConstant: 80).isActive = true
+        Self.configure(indicator, accessibilityLabel: accessibilityLabel)
+        indicator.widthAnchor.constraint(equalToConstant: 132).isActive = true
+        let row = NSStackView(views: [label, indicator])
+        row.spacing = 10
+        row.alignment = .centerY
+        return row
+    }
+
+    static func configure(_ indicator: NSLevelIndicator, accessibilityLabel: String) {
         indicator.levelIndicatorStyle = .continuousCapacity
         indicator.minValue = 0
         indicator.maxValue = 1
@@ -43,10 +52,5 @@ final class RecordingAudioMeterView: NSView {
         indicator.isEditable = false
         indicator.controlSize = .small
         indicator.setAccessibilityLabel(accessibilityLabel)
-        indicator.widthAnchor.constraint(equalToConstant: 132).isActive = true
-        let row = NSStackView(views: [label, indicator])
-        row.spacing = 10
-        row.alignment = .centerY
-        return row
     }
 }

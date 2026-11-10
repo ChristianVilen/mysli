@@ -32,6 +32,26 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private lazy var clipboardPanel = ClipboardPanel(controller: clipboardHistory)
     private lazy var knownWords = KnownWordsFile(url: { [settings] in settings.knownWordsFile })
     private let whisperTranscriber = WhisperKitTranscriber()
+    private lazy var dictationKeys = SystemDictationKeyInput(manager: hotkeyManager, mode: settings.dictationKeyMode)
+    private lazy var dictationContext = DictationContext(knownWords: knownWords,
+        nearbyText: { [settings] in settings.dictationNearbyText })
+    private lazy var dictationPasteboard = DictationPasteboard(schedule: { DictationPolisher.schedule($0, $1) },
+        adoptOwnWrite: { [clipboardHistory] in clipboardHistory.adoptOwnWrite($0) })
+    private lazy var dictation = DictationController(
+        keys: dictationKeys, recorder: DictationMicrophone(), speech: DictationSpeech(transcriber: whisperTranscriber),
+        polisher: DictationPolisher(), paster: dictationPasteboard,
+        now: { ProcessInfo.processInfo.systemUptime }, schedule: { DictationPolisher.schedule($0, $1) },
+        prepareText: { [dictationContext] in await dictationContext.prepareText($0) })
+    private lazy var dictationPanel = DictationPanel()
+    private lazy var dictationSetup = DictationSetup(settings: settings, permissions: permissions, controller: dictation,
+        configureKey: { [dictationKeys] in
+            // Setup stops the controller before changing modes, so no input callback can restart here.
+            try? dictationKeys.configure(mode: $0)
+        }, requestFnPermission: { [weak self] in
+            guard let self else { return }
+            if !dictationKeys.requestPermission() { permissions.openSettings(.inputMonitoring) }
+        })
+    private var dictationPermissionTask: Task<Void, Never>?
     private lazy var meetingRecorder = MeetingRecorder(
         permissions: permissions,
         root: { [settings] in settings.meetingsFolder },
@@ -70,7 +90,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private lazy var statusMenu = StatusMenu(sections: [
         toolActions,
         EnabledMenuSection(keepAwake, isEnabled: { [settings] in settings.keepAwakeEnabled }),
-        EnabledMenuSection(meetingNotes, isEnabled: { [settings] in settings.meetingsEnabled })
+        EnabledMenuSection(meetingNotes, isEnabled: { [settings] in settings.meetingsEnabled }),
+        EnabledMenuSection(DictationMenuSection(controller: dictation), isEnabled: { [settings] in settings.dictationEnabled })
     ])
     private lazy var onboarding = Onboarding(settings: settings, defaults: .standard)
     private lazy var settingsWindow = SettingsWindowController(settings: settings, onboarding: onboarding, permissionActions: .init(
@@ -79,7 +100,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         microphone: { [weak self] in Task { _ = await self?.permissions.requestMicrophone() } },
         calendar: { [weak self] in Task { await self?.permissions.requestCalendar() } },
         notifications: { [weak self] in Task { await self?.permissions.requestNotifications() } },
-        keyboardSettings: { [weak self] in self?.permissions.openSettings(.keyboardShortcuts) }))
+        keyboardSettings: { [weak self] in self?.permissions.openSettings(.keyboardShortcuts) },
+        inputMonitoring: { [weak self] in self?.requestDictationAccess() }))
     private lazy var calendarSource = EventKitCalendarSource()
     private lazy var permissions = PermissionsManager(
         calendarAccess: { [unowned self] in calendarSource.authorization },
@@ -105,21 +127,32 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             alert.addButton(withTitle: "Keep editing")
             alert.addButton(withTitle: "Quit without saving")
             NSApp.activate()
-            if alert.runModal() == .alertSecondButtonReturn { return .terminateNow }
+            if alert.runModal() == .alertSecondButtonReturn { return finishTermination() }
             for meeting in meetingNotes.unsavedNotesMeetings { openTypedNotes(meeting) }
             return .terminateCancel
         }
-        guard meetingRecorder.phase.isCapturing else { return .terminateNow }
+        guard meetingRecorder.phase.isCapturing else { return finishTermination() }
         let alert = NSAlert()
         alert.messageText = "Stop Recording and Quit?"
         alert.informativeText = "Mysli is recording a meeting. If you quit, the recording stops, and Mysli makes the notes the next time it opens."
         alert.addButton(withTitle: "Quit")
         alert.addButton(withTitle: "Cancel")
         NSApp.activate()
-        return alert.runModal() == .alertFirstButtonReturn ? .terminateNow : .terminateCancel
+        return alert.runModal() == .alertFirstButtonReturn ? finishTermination() : .terminateCancel
+    }
+
+    private func finishTermination() -> NSApplication.TerminateReply {
+        dictationPermissionTask?.cancel()
+        let pending = dictation.shutDownForTermination {
+            NSApp.reply(toApplicationShouldTerminate: true)
+        }
+        return pending ? .terminateLater : .terminateNow
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        dictationPermissionTask?.cancel()
+        dictation.shutdown()
+        dictationPanel.close()
         hotkeyManager.stop()
         keepAwake.deactivate()
         clipboardHistory.disable()
@@ -144,6 +177,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         SystemNotifier.shared.onCheckWords = { [weak self] in self?.wordReviewWindow.show($0) }
         setupCalendarReminders()
         setupHotkey()
+        setupDictation()
         onboarding.onApplyChoices = { [weak self] in self?.tools.apply($0) }
         setupPermissions()
         if settings.clipboardHistoryEnabled {
@@ -212,14 +246,41 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             if !enabled { keepAwake.deactivate() }
         case .meetings:
             if enabled { meetingNotes.resumeUnfinished() }
+        case .dictation:
+            dictationPermissionTask?.cancel()
+            dictationSetup.refresh()
+            if enabled { requestDictationAccess() }
         }
     }
 
     private func permissionsChanged() {
+        dictationSetup.refresh()
         updateStatus()
         settingsWindow.renderPermissions(permissions.snapshot)
         // A calendar grant from the Permissions page lets reminders that wait for access start.
         Task { await calendarReminders?.refresh() }
+    }
+
+    private func setupDictation() {
+        dictation.onChange = { [weak self] in
+            guard let self else { return }
+            dictationPanel.show(dictation.presentation)
+            updateStatus()
+        }
+        dictationKeys.onAvailabilityChange = { [weak self] in self?.updateStatus() }
+        settingsWindow.onDictationSetup = { [weak self] in self?.requestDictationAccess() }
+        settingsWindow.onDictationKeyChanged = { [weak self] in
+            guard let self else { return }
+            dictationPermissionTask?.cancel()
+            dictationSetup.refresh()
+            if settings.dictationEnabled { requestDictationAccess() }
+        }
+        settingsWindow.onDictationKeyboardSettings = { [weak self] in self?.permissions.openSettings(.keyboard) }
+    }
+
+    private func requestDictationAccess() {
+        dictationPermissionTask?.cancel()
+        dictationPermissionTask = Task { [weak self] in await self?.dictationSetup.requestAccess() }
     }
 
     private func showScreenshotSetupIfNeeded() {
@@ -408,9 +469,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem.button?.image = statusMenu.icon(
             keepAwakeActive: keepAwake.isActive,
             recording: phase.recordingMark,
-            warning: warning
+            warning: warning,
+            dictationListening: dictation.isListening
         )
-        statusItem.button?.setAccessibilityLabel(phase.statusDescription.map { "Mysli, \($0)" } ?? "Mysli")
+        let status = [phase.statusDescription, dictation.isListening ? "dictation listening" : nil].compactMap { $0 }
+        statusItem.button?.setAccessibilityLabel((["Mysli"] + status).joined(separator: ", "))
         statusItem.button?.toolTip = phase.statusDescription.map { "Mysli: \($0)" }
         scheduleScreenshotSetup()
     }

@@ -3,7 +3,9 @@ import Cocoa
 /// A tool that the menu and the window group their items by. The square colours are the pieces
 /// of the app icon.
 enum MysliTool: String, CaseIterable {
-    case screenshots, clipboard, windows, keepAwake, meetings
+    case screenshots, clipboard, windows, keepAwake, meetings, dictation
+
+    static let defaultSelection: Set<Self> = [.screenshots, .clipboard, .windows, .keepAwake, .meetings]
 
     var title: String {
         switch self {
@@ -12,6 +14,7 @@ enum MysliTool: String, CaseIterable {
         case .windows: "Windows"
         case .keepAwake: "Keep Awake"
         case .meetings: "Meetings"
+        case .dictation: "Dictation"
         }
     }
 
@@ -22,6 +25,7 @@ enum MysliTool: String, CaseIterable {
         case .windows: "rectangle.split.2x1"
         case .keepAwake: "cup.and.saucer.fill"
         case .meetings: "waveform"
+        case .dictation: "mic.fill"
         }
     }
 
@@ -32,6 +36,7 @@ enum MysliTool: String, CaseIterable {
         case .windows: (Self.rgb(0xD9A441), Self.roast)
         case .keepAwake: (Self.rgb(0x5A3A24), .white)
         case .meetings: (Self.rgb(0xB4233C), .white)
+        case .dictation: (Self.rgb(0x465C78), .white)
         }
     }
 

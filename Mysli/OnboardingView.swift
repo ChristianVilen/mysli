@@ -192,6 +192,7 @@ final class OnboardingView: NSView {
             case .windows: "Tile windows with Control + Option and the arrow keys."
             case .keepAwake: "Keep the Mac awake for a set time."
             case .meetings: "Record calls into transcripts and summaries on this Mac."
+            case .dictation: "Hold a key to dictate. Send the words to Claude, then paste them."
             }
             let button = NSButton(checkboxWithTitle: "", target: self, action: #selector(toolChanged(_:)))
             button.tag = index

@@ -18,14 +18,15 @@ final class Onboarding {
         self.defaults = defaults
         step = defaults.string(forKey: "onboardingStep").flatMap(Step.init(rawValue:)) ?? .welcome
         selectedTools = defaults.stringArray(forKey: "onboardingTools")
-            .map { Set($0.compactMap(MysliTool.init(rawValue:))) } ?? Set(MysliTool.allCases)
+            .map { Set($0.compactMap(MysliTool.init(rawValue:))) } ?? MysliTool.defaultSelection
         calendarReminders = selectedTools.contains(.meetings) && defaults.bool(forKey: "onboardingCalendarReminders")
         isFinished = defaults.bool(forKey: "onboardingFinished")
         wasResumed = step == .permissions && !isFinished
     }
 
     var requiredPermissions: RequiredPermissions {
-        RequiredPermissions(tools: selectedTools, calendarReminders: calendarReminders)
+        RequiredPermissions(tools: selectedTools, calendarReminders: calendarReminders,
+                            dictationKeyMode: settings.dictationKeyMode)
     }
 
     func advance() {
@@ -65,7 +66,7 @@ final class Onboarding {
 
     func skip() {
         guard !isFinished else { return }
-        selectedTools = Set(MysliTool.allCases)
+        selectedTools = MysliTool.defaultSelection
         calendarReminders = settings.calendarRecordingRemindersEnabled
         saveChoices()
         finish()
