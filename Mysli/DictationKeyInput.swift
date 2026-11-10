@@ -30,6 +30,7 @@ final class SystemDictationKeyInput: DictationKeyInput {
     private var updatingCarbon = false
     private(set) var mode: DictationKeyMode
     private(set) var failure: DictationKeyFailure?
+    private var retainedIssues: [HotkeyRegistrationIssue] = []
     var onAvailabilityChange: (() -> Void)?
 
     init(manager: HotkeyManager, source: any FnEventSource = PassiveFnEventSource(),
@@ -63,6 +64,7 @@ final class SystemDictationKeyInput: DictationKeyInput {
         guard mode != self.mode else { return }
         let callback = receive
         stop()
+        retainedIssues = []
         self.mode = mode
         onAvailabilityChange?()
         if let callback { try start(callback) }
@@ -70,6 +72,7 @@ final class SystemDictationKeyInput: DictationKeyInput {
 
     func start(_ receive: @escaping @MainActor (DictationKeyEvent) -> Void) throws {
         stop()
+        retainedIssues = []
         failure = nil
         let token = UUID()
         generation = token
@@ -99,6 +102,7 @@ final class SystemDictationKeyInput: DictationKeyInput {
                 guard isAvailable, self.receive != nil else { throw DictationKeyFailure.carbon }
             }
         } catch {
+            retainedIssues = manager.issues.filter { $0.shortcut == .dictation || $0.shortcut == .dictationEscape }
             stop()
             failure = error as? DictationKeyFailure
             onAvailabilityChange?()
@@ -119,13 +123,21 @@ final class SystemDictationKeyInput: DictationKeyInput {
         manager.dictationCancellable = cancellable
         updatingCarbon = false
         guard !cancellable || isAvailable else {
+            retainedIssues = manager.issues.filter { $0.shortcut == .dictation || $0.shortcut == .dictationEscape }
             self.cancellable = false
             manager.dictationCancellable = false
             failure = .carbon
             onAvailabilityChange?()
             throw DictationKeyFailure.carbon
         }
-        if cancellable { failure = nil }
+        if cancellable {
+            failure = nil
+            retainedIssues = []
+        }
+    }
+
+    func registrationIssues(enabled: Bool) -> [HotkeyRegistrationIssue] {
+        enabled && mode == .carbon ? retainedIssues : []
     }
 
     func stop() {
@@ -144,6 +156,7 @@ final class SystemDictationKeyInput: DictationKeyInput {
     }
 
     private func fail() {
+        retainedIssues = manager.issues.filter { $0.shortcut == .dictation || $0.shortcut == .dictationEscape }
         let callback = receive
         receive = nil
         stop()

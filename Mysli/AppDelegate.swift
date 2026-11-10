@@ -449,9 +449,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func updateStatus() {
+        let issues = hotkeyManager.issues + dictationKeys.registrationIssues(enabled: settings.dictationEnabled)
+            .filter { !hotkeyManager.issues.contains($0) }
         let health = permissionHandlingEnabled
             ? HotkeyHealth(accessibilityMissing: settings.requiredPermissions.permissions.contains(.accessibility)
-                           && !permissions.accessibility, issues: hotkeyManager.issues)
+                           && !permissions.accessibility,
+                           issues: issues)
             : .healthy
         statusMenu.updateHotkeyHealth(health)
         settingsWindow.permissionsPage.showShortcutConflicts(

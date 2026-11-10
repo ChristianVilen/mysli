@@ -3,6 +3,38 @@ import XCTest
 
 @MainActor
 final class DictationKeyInputTests: XCTestCase {
+    func testCarbonConflictSurvivesCleanupAndClearsOnRetryModeChangeAndDisable() throws {
+        let system = FakeHotkeySystem()
+        let manager = HotkeyManager(registrar: CarbonHotkeyRegistrar(api: system.api))
+        manager.screenshotsEnabled = false
+        manager.tilingEnabled = false
+        manager.start()
+        defer { manager.stop() }
+        let keys = SystemDictationKeyInput(manager: manager, source: FakeFnSource(), mode: .carbon)
+        system.failures[.dictation] = -50
+        XCTAssertThrowsError(try keys.start { _ in XCTFail("Failed input delivered an event") })
+        XCTAssertEqual(keys.registrationIssues(enabled: true), [.init(shortcut: .dictation, failure: .registrationFailed(-50))])
+        keys.stop()
+        XCTAssertEqual(keys.registrationIssues(enabled: true), [.init(shortcut: .dictation, failure: .registrationFailed(-50))])
+        XCTAssertTrue(system.reservedShortcuts.isEmpty)
+        XCTAssertNil(manager.onDictation)
+        XCTAssertNil(manager.onDictationAvailabilityChange)
+        system.failures = [:]
+        try keys.start { _ in }
+        XCTAssertEqual(keys.registrationIssues(enabled: true), [])
+        XCTAssertEqual(system.reservedShortcuts, [.dictation])
+        keys.stop()
+        system.conflicts.insert(.dictation)
+        XCTAssertThrowsError(try keys.start { _ in })
+        XCTAssertEqual(keys.registrationIssues(enabled: true), [.init(shortcut: .dictation, failure: .systemConflict)])
+        try keys.configure(mode: .fn)
+        XCTAssertEqual(keys.registrationIssues(enabled: true), [])
+        try keys.configure(mode: .carbon)
+        XCTAssertThrowsError(try keys.start { _ in })
+        keys.stop()
+        XCTAssertEqual(keys.registrationIssues(enabled: false), [])
+    }
+
     func testCarbonEscapeLifecycleFailureAndModeChange() throws {
         let system = FakeHotkeySystem()
         let manager = HotkeyManager(registrar: CarbonHotkeyRegistrar(api: system.api))
@@ -17,9 +49,11 @@ final class DictationKeyInputTests: XCTestCase {
         XCTAssertEqual(system.reservedShortcuts, [.dictation])
         system.failures[.dictationEscape] = -50
         XCTAssertThrowsError(try keys.setCancellable(true))
+        XCTAssertEqual(keys.registrationIssues(enabled: true), [.init(shortcut: .dictationEscape, failure: .registrationFailed(-50))])
         XCTAssertEqual(system.reservedShortcuts, [.dictation])
         system.failures = [:]
         try keys.setCancellable(true)
+        XCTAssertEqual(keys.registrationIssues(enabled: true), [])
         system.press(.dictationEscape)
         XCTAssertEqual(system.reservedShortcuts, [.dictation, .dictationEscape])
         try keys.setCancellable(false)

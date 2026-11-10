@@ -392,7 +392,7 @@ Mysli retries within a few seconds. The menu warnings disappear when the shortcu
 
 To keep the macOS screenshot tool instead, turn off **Use Mysli for screenshots** in Settings. Mysli then releases both shortcuts and shows no conflict for them.
 
-All Mysli shortcuts use registered macOS hotkeys instead of a keyboard event tap. The menu lists registration failures for each shortcut; other registered shortcuts remain available. If a shortcut cannot be released, Mysli reports it and retries while running. Opening clipboard history and pasting are separate operations, so automatic paste can still fail in protected fields.
+Mysli shortcuts use registered macOS hotkeys, except for Fn dictation, which uses one passive keyboard event tap. The menu lists registration failures for each shortcut; other registered shortcuts remain available. If a shortcut cannot be released, Mysli reports it and retries while running. Opening clipboard history and pasting are separate operations, so automatic paste can still fail in protected fields.
 
 ### Screen Recording
 
