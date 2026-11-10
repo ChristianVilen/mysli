@@ -29,8 +29,9 @@ final class DictationPasteboard: DictationPasting {
     private let schedule: DictationSchedule
     private let settleInterval: Double
     private let adoptOwnWrite: (Int) -> Void
-    private var busy = false
+    private(set) var isBusy = false
     private var waiting: [CheckedContinuation<Void, Never>] = []
+    private var idleWaiters: [CheckedContinuation<Void, Never>] = []
 
     init(board: any DictationPasteboardAccess = NativeDictationPasteboard(),
          keystrokes: any KeystrokeSending = CGEventKeystrokeSender(),
@@ -44,12 +45,21 @@ final class DictationPasteboard: DictationPasting {
         self.adoptOwnWrite = adoptOwnWrite
     }
 
+    func whenIdle() async {
+        guard isBusy else { return }
+        await withCheckedContinuation { idleWaiters.append($0) }
+    }
+
     func paste(_ text: PasteText) async throws {
-        if busy { await withCheckedContinuation { waiting.append($0) } }
-        busy = true
+        if isBusy { await withCheckedContinuation { waiting.append($0) } }
+        isBusy = true
         defer {
-            if waiting.isEmpty { busy = false }
-            else { waiting.removeFirst().resume() }
+            if waiting.isEmpty {
+                isBusy = false
+                let idle = idleWaiters
+                idleWaiters = []
+                idle.forEach { $0.resume() }
+            } else { waiting.removeFirst().resume() }
         }
         try Task.checkCancellation()
         let baseline = board.changeCount

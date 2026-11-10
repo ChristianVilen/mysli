@@ -45,6 +45,34 @@ final class DictationSetupTests: XCTestCase {
         f.controller.shutdown()
     }
 
+    func testKeyModeChangeRestartsInputAndKeepsSpeechLoaded() async {
+        let suite = "DictationSetupTests.\(UUID())"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let settings = Settings(defaults: defaults, loginItem: FakeLoginItem())
+        settings.dictationEnabled = true
+        let permissions = PermissionsManager(isAccessibilityTrusted: { true }, hasScreenCaptureAccess: { false },
+            microphoneAccess: { .granted }, inputMonitoringAccess: { true }, defaults: defaults)
+        let f = DictationFixture()
+        var modes: [DictationKeyMode] = []
+        let setup = DictationSetup(settings: settings, permissions: permissions, controller: f.controller,
+                                   configureKey: { modes.append($0) }, requestFnPermission: {})
+        await permissions.refreshAndWait()
+        setup.refresh()
+        await f.waitFor(.idle)
+        let oldKeys = f.keys.receive
+        settings.dictationKeyMode = .carbon
+        setup.refresh()
+        XCTAssertEqual(modes, [.fn, .carbon])
+        XCTAssertEqual(f.controller.presentation, .idle)
+        XCTAssertFalse(f.speech.session.released)
+        oldKeys?(.pressed)
+        XCTAssertTrue(f.recorder.captures.isEmpty)
+        f.keys.receive?(.pressed)
+        XCTAssertEqual(f.controller.presentation, .listening(level: 0, warning: false))
+        f.controller.shutdown()
+    }
+
     func testExplicitSetupRequestsOnlyThePermissionsForChosenMode() async {
         for mode in DictationKeyMode.allCases {
             let suite = "DictationSetupTests.\(UUID())"

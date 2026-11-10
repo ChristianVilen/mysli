@@ -60,14 +60,13 @@ final class SystemDictationKeyInput: DictationKeyInput {
         return granted
     }
 
-    func configure(mode: DictationKeyMode) throws {
+    /// Stops input. The owner starts it again in the new mode.
+    func configure(mode: DictationKeyMode) {
         guard mode != self.mode else { return }
-        let callback = receive
         stop()
         retainedIssues = []
         self.mode = mode
         onAvailabilityChange?()
-        if let callback { try start(callback) }
     }
 
     func start(_ receive: @escaping @MainActor (DictationKeyEvent) -> Void) throws {
@@ -141,8 +140,6 @@ final class SystemDictationKeyInput: DictationKeyInput {
     }
 
     func stop() {
-        let callback = receive
-        let wasHeld = hold == .down || cancellable
         receive = nil
         generation = UUID()
         hold = .up
@@ -152,7 +149,6 @@ final class SystemDictationKeyInput: DictationKeyInput {
         manager.onDictationAvailabilityChange = nil
         manager.dictationCancellable = false
         manager.dictationEnabled = false
-        if wasHeld { callback?(.cancelled) }
     }
 
     private func fail() {

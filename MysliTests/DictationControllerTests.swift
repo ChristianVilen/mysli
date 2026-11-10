@@ -4,7 +4,7 @@ import AppKit
 
 @MainActor
 final class DictationControllerTests: XCTestCase {
-    func testRevokedAccessAndShutdownWaitForOwedPasteCleanup() async {
+    func testRevokedAccessAndShutdownDuringPasteStayDisabled() async {
         let f = DictationFixture()
         let cleanup = DictationTestGate<Void>()
         f.paste.gate = cleanup
@@ -13,24 +13,14 @@ final class DictationControllerTests: XCTestCase {
         await cleanup.waitUntilEntered()
         f.controller.setAccess(false)
         XCTAssertFalse(f.controller.canPasteLast)
-        XCTAssertTrue(f.controller.hasPendingPaste)
-        let reply = DictationTestGate<Void>()
-        var replies = 0
-        XCTAssertTrue(f.controller.shutDownForTermination { replies += 1; reply.resume(()) })
-        XCTAssertTrue(f.controller.shutDownForTermination { replies += 1 })
+        f.controller.shutDownForTermination()
         f.controller.setEnabled(true)
         XCTAssertEqual(f.controller.presentation, .disabled)
-        XCTAssertEqual(replies, 0)
         XCTAssertTrue(f.speech.session.released)
         XCTAssertNil(f.keys.receive)
         cleanup.resume(())
-        await reply.value()
-        XCTAssertEqual(replies, 1)
-        XCTAssertFalse(f.controller.hasPendingPaste)
+        await f.paste.whenIdle()
         XCTAssertEqual(f.controller.presentation, .disabled)
-        XCTAssertTrue(f.speech.session.released)
-        XCTAssertFalse(f.controller.shutDownForTermination { replies += 1 })
-        XCTAssertEqual(replies, 1)
     }
     func testMissingAccessRetainsModelAndGrantStartsInputWithoutReload() async {
         let f = DictationFixture()
@@ -83,7 +73,7 @@ final class DictationControllerTests: XCTestCase {
         f.controller.cancel()
         XCTAssertFalse(f.controller.canPasteLast)
         gate.resume(())
-        await f.waitFor(.idle)
+        await f.paste.whenIdle()
         XCTAssertTrue(f.controller.canPasteLast)
         f.controller.shutdown()
     }
@@ -417,18 +407,19 @@ final class DictationControllerTests: XCTestCase {
         f.hold()
         await gate.waitUntilEntered()
         f.controller.cancel()
+        XCTAssertEqual(f.controller.presentation, .idle)
         f.controller.pasteLastAgain()
         f.controller.receive(.pressed)
         XCTAssertEqual(f.recorder.captures.count, 1)
         f.controller.setEnabled(false)
-        await f.enableSettling()
+        await f.enable()
         f.controller.pasteLastAgain()
         f.controller.receive(.pressed)
         XCTAssertEqual(f.recorder.captures.count, 1)
         XCTAssertEqual(f.paste.texts.count, 1)
         f.paste.gate = nil
         gate.resume(())
-        await f.waitFor(.idle)
+        await f.paste.whenIdle()
         f.controller.pasteLastAgain()
         await f.waitFor(.idle)
         XCTAssertEqual(f.paste.texts.map(\.value), ["polished", "polished"])

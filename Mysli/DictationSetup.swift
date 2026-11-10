@@ -20,13 +20,15 @@ final class DictationSetup {
 
     func refresh() {
         let mode = settings.dictationKeyMode
-        if configuredMode != mode {
-            controller.setEnabled(false)
+        let modeChanged = configuredMode != mode
+        if modeChanged {
             configuredMode = mode
             configureKey(mode)
         }
         let required = RequiredPermissions(tools: [.dictation], calendarReminders: false, dictationKeyMode: mode)
         controller.setAccess(required.allGranted(in: permissions.snapshot))
+        // After setAccess, so a new mode without its permission shows no error.
+        if modeChanged { controller.restartInput() }
         controller.setEnabled(settings.dictationEnabled)
     }
 

@@ -142,10 +142,22 @@ final class DictationTestPaste: DictationPasting {
     var texts: [PasteText] = []
     var fails = false
     var gate: DictationTestGate<Void>?
+    private(set) var isBusy = false
+    private var idle: [CheckedContinuation<Void, Never>] = []
     func paste(_ text: PasteText) async throws {
         texts.append(text)
+        isBusy = true
+        defer {
+            isBusy = false
+            idle.forEach { $0.resume() }
+            idle = []
+        }
         if let gate { await gate.value() }
         if fails { throw DictationTestError.failed }
+    }
+    func whenIdle() async {
+        guard isBusy else { return }
+        await withCheckedContinuation { idle.append($0) }
     }
 }
 
@@ -197,10 +209,5 @@ final class DictationFixture {
                 }
             }
         }
-    }
-
-    func enableSettling() async {
-        controller.setEnabled(true)
-        await waitFor(.transcribing)
     }
 }

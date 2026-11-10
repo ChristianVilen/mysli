@@ -27,9 +27,9 @@ final class DictationKeyInputTests: XCTestCase {
         system.conflicts.insert(.dictation)
         XCTAssertThrowsError(try keys.start { _ in })
         XCTAssertEqual(keys.registrationIssues(enabled: true), [.init(shortcut: .dictation, failure: .systemConflict)])
-        try keys.configure(mode: .fn)
+        keys.configure(mode: .fn)
         XCTAssertEqual(keys.registrationIssues(enabled: true), [])
-        try keys.configure(mode: .carbon)
+        keys.configure(mode: .carbon)
         XCTAssertThrowsError(try keys.start { _ in })
         keys.stop()
         XCTAssertEqual(keys.registrationIssues(enabled: false), [])
@@ -59,13 +59,14 @@ final class DictationKeyInputTests: XCTestCase {
         try keys.setCancellable(false)
         XCTAssertEqual(system.reservedShortcuts, [.dictation])
         try keys.setCancellable(true)
-        try keys.configure(mode: .fn)
+        keys.configure(mode: .fn)
         XCTAssertEqual(system.reservedShortcuts, [])
-        XCTAssertEqual(events, [.cancelled, .cancelled])
+        XCTAssertEqual(events, [.cancelled])
         XCTAssertEqual(source.requests, 0)
+        try keys.start { events.append($0) }
         source.send(.flagsChanged(keyCode: 63, fn: true))
         keys.stop()
-        XCTAssertEqual(events, [.cancelled, .cancelled, .pressed, .cancelled])
+        XCTAssertEqual(events, [.cancelled, .pressed])
     }
 
     func testCarbonLossCancelsWorkAndUnregistersEscape() throws {
@@ -131,7 +132,7 @@ final class DictationKeyInputTests: XCTestCase {
         source.send(.flagsChanged(keyCode: 63, fn: true))
         keys.stop()
         stale(.flagsChanged(keyCode: 63, fn: true))
-        XCTAssertEqual(events, [.pressed, .unavailable, .pressed, .cancelled])
+        XCTAssertEqual(events, [.pressed, .unavailable, .pressed])
     }
 
     func testStartChecksPermissionButOnlySetupRequestsIt() throws {
@@ -159,9 +160,10 @@ final class DictationKeyInputTests: XCTestCase {
         try keys.start { events.append($0) }
         let stale = source.receive!
         source.send(.flagsChanged(keyCode: 63, fn: true))
-        XCTAssertThrowsError(try keys.configure(mode: .carbon))
+        keys.configure(mode: .carbon)
+        XCTAssertNil(source.receive)
         stale(.flagsChanged(keyCode: 63, fn: true))
-        XCTAssertEqual(events, [.pressed, .cancelled])
+        XCTAssertEqual(events, [.pressed])
     }
 }
 

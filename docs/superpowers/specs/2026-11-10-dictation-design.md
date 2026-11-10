@@ -212,9 +212,10 @@ message format, and words-only prompt data. Run the full suite and then
 The implementation now connects the native Dictation page, opt-in onboarding,
 permission setup, wordless pill, listening mark, and replay menu. One shared
 Whisper owner serves meetings and dictation. Missing grants block input and
-replay while dictation keeps its speech session. Grant changes retry input
-without reloading it. Quit releases input and model resources immediately and
-waits only if a clipboard restore is still owed.
+replay while dictation keeps its speech session. Grant changes and key mode
+changes restart input without reloading it. Quit releases input and model
+resources immediately and waits only if `DictationPasteboard` still owes a
+clipboard restore.
 
 The pill uses the screen with the largest overlap with the focused window.
 A read-only Accessibility failure falls back to the main screen, then the first

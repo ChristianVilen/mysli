@@ -82,6 +82,28 @@ final class DictationPasteTests: XCTestCase {
         XCTAssertEqual(board.writes, 4)
     }
 
+    func testWhenIdleWaitsForTheOwedRestore() async throws {
+        let board = DictationTestPasteboard()
+        board.contents = [[.string: Data("original".utf8)]]
+        let keys = DictationPasteTestKeys()
+        let clock = DictationTestClock()
+        let sent = DictationTestGate<Void>()
+        keys.sent = { sent.resume(()) }
+        let paster = DictationPasteboard(board: board, keystrokes: keys, schedule: clock.schedule, adoptOwnWrite: { _ in })
+        await paster.whenIdle()
+        let paste = Task { try await paster.paste(PasteText("hello")!) }
+        await sent.value()
+        paste.cancel()
+        XCTAssertTrue(paster.isBusy)
+        var restoredWhenIdle: DictationPasteSnapshot?
+        let idle = Task { await paster.whenIdle(); restoredWhenIdle = board.contents }
+        clock.advance(to: 1)
+        await idle.value
+        XCTAssertEqual(restoredWhenIdle, [[.string: Data("original".utf8)]])
+        XCTAssertFalse(paster.isBusy)
+        _ = try? await paste.value
+    }
+
     func testExternalCopyDuringSettleWins() async throws {
         let board = DictationTestPasteboard()
         let keys = DictationPasteTestKeys()

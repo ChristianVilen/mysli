@@ -70,6 +70,7 @@ enum DictationKeyEvent: Equatable { case pressed, released, cancelled, unavailab
 protocol DictationKeyInput: AnyObject {
     func start(_ receive: @escaping @MainActor (DictationKeyEvent) -> Void) throws
     func setCancellable(_ cancellable: Bool) throws
+    /// Sends no event after it returns, not even a cancel for a held key. The caller cancels its own work.
     func stop()
 }
 
@@ -112,8 +113,11 @@ protocol DictationPolishing: AnyObject {
 
 @MainActor
 protocol DictationPasting: AnyObject {
+    /// True while a paste runs or waits, until its clipboard cleanup ends.
+    var isBusy: Bool { get }
     /// Returns only after clipboard cleanup, including when cancelled or failed.
     func paste(_ text: PasteText) async throws
+    func whenIdle() async
 }
 
 struct LastDictation: Equatable {

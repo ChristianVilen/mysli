@@ -44,13 +44,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         prepareText: { [dictationContext] in await dictationContext.prepareText($0) })
     private lazy var dictationPanel = DictationPanel()
     private lazy var dictationSetup = DictationSetup(settings: settings, permissions: permissions, controller: dictation,
-        configureKey: { [dictationKeys] in
-            try? dictationKeys.configure(mode: $0)
-        }, requestFnPermission: { [weak self] in
+        configureKey: { [dictationKeys] in dictationKeys.configure(mode: $0) },
+        requestFnPermission: { [weak self] in
             guard let self else { return }
             if !dictationKeys.requestPermission() { permissions.openSettings(.inputMonitoring) }
         })
     private var dictationPermissionTask: Task<Void, Never>?
+    private var dictationQuitWait: Task<Void, Never>?
     private lazy var meetingRecorder = MeetingRecorder(
         permissions: permissions,
         root: { [settings] in settings.meetingsFolder },
@@ -142,10 +142,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func finishTermination() -> NSApplication.TerminateReply {
         dictationPermissionTask?.cancel()
-        let pending = dictation.shutDownForTermination {
-            NSApp.reply(toApplicationShouldTerminate: true)
+        dictation.shutDownForTermination()
+        guard dictationPasteboard.isBusy else { return .terminateNow }
+        if dictationQuitWait == nil {
+            dictationQuitWait = Task { [dictationPasteboard] in
+                await dictationPasteboard.whenIdle()
+                NSApp.reply(toApplicationShouldTerminate: true)
+            }
         }
-        return pending ? .terminateLater : .terminateNow
+        return .terminateLater
     }
 
     func applicationWillTerminate(_ notification: Notification) {
