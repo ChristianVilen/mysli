@@ -258,6 +258,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         settingsWindow.onCalendarRemindersChanged = { [weak self] enabled in
             self?.tools.setCalendarReminders(enabled)
         }
+        settingsWindow.onCalendarReminderRulesChanged = { [weak self] in
+            Task { await self?.calendarReminders?.refresh() }
+        }
         settingsWindow.onPermissionsVisibilityChanged = { [weak self] visible in
             guard let self else { return }
             if visible {

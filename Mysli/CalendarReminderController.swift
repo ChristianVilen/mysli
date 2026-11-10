@@ -1,5 +1,29 @@
 import Foundation
 
+/// Which events get a start offer, and when. Read from the saved preferences at each check.
+private struct StartOfferRule {
+    /// A start this far in the past still gets its offer, for a Mac that wakes late.
+    static let grace: TimeInterval = 120
+    let lead: TimeInterval
+    let needsVideoLink: Bool
+
+    init(_ settings: Settings) {
+        lead = TimeInterval(settings.calendarReminderLeadMinutes * 60)
+        needsVideoLink = settings.calendarRemindersNeedVideoLink
+    }
+
+    func wants(_ event: CalendarOccurrence) -> Bool {
+        event.eligible && (event.videoLink || !needsVideoLink)
+    }
+
+    func offerTime(_ event: CalendarOccurrence) -> Date { event.start.addingTimeInterval(-lead) }
+
+    func isDue(_ event: CalendarOccurrence, at now: Date) -> Bool {
+        wants(event) && offerTime(event) <= now && event.start >= now.addingTimeInterval(-Self.grace)
+            && event.end > now
+    }
+}
+
 @MainActor
 final class CalendarReminderController {
     enum Status: Equatable {
@@ -133,7 +157,7 @@ final class CalendarReminderController {
         let revision = refreshRevision
         do {
             let date = now()
-            let events = try await source.occurrences(from: date.addingTimeInterval(-120),
+            let events = try await source.occurrences(from: date.addingTimeInterval(-StartOfferRule.grace),
                                                       to: date.addingTimeInterval(86_400))
             guard valid(stamp), revision == refreshRevision, await accessIsReady(stamp),
                   revision == refreshRevision else { return }
@@ -156,6 +180,7 @@ final class CalendarReminderController {
                 }
             }
             let current = now()
+            let rule = StartOfferRule(settings)
             invalidate { item in
                 switch item.kind {
                 case .end(let event, let session):
@@ -164,14 +189,12 @@ final class CalendarReminderController {
                         || link.endReminder == .continued || event.end > current
                 case .start(let event):
                     return recorder.activeSessionID != nil || event.end <= current
-                        || !events.contains(event) || !event.eligible
+                        // The fresh copy decides, because the offer holds the link fact from when it was posted.
+                        || !events.contains { $0 == event && rule.wants($0) }
                 }
             }
             let consumed = store.consumed(at: current)
-            let due = events.filter {
-                $0.eligible && $0.start <= current && $0.start >= current.addingTimeInterval(-120)
-                    && $0.end > current && !consumed.contains($0.id)
-            }.sorted { $0.start == $1.start ? $0.id < $1.id : $0.start < $1.start }
+            let due = events.filter { rule.isDue($0, at: current) && !consumed.contains($0.id) }.sorted { $0.start == $1.start ? $0.id < $1.id : $0.start < $1.start }
             let canOffer = recorder.activeSessionID == nil && offer == nil
             store.consume(due + events.filter { consumed.contains($0.id) }, at: current)
             if canOffer, let event = due.first {
@@ -186,7 +209,7 @@ final class CalendarReminderController {
                 await post(.end(link.event, session: link.session))
             }
             guard valid(stamp), revision == refreshRevision else { return }
-            let future = events.filter { $0.eligible && $0.start > now() }.map(\.start)
+            let future = events.filter(rule.wants).map(rule.offerTime).filter { $0 > now() }
             var end: Date?
             if case .associated(let link) = recordingLink, link.endReminder != .continued, link.event.end > now() {
                 end = link.event.end
@@ -208,7 +231,12 @@ final class CalendarReminderController {
         let item = Offer(token: token, kind: kind)
         offer = item
         let reminderKind: CalendarReminder.Kind
-        switch kind { case .start: reminderKind = .start; case .end: reminderKind = .end }
+        switch kind {
+        case .start(let event):
+            let wait = event.start.timeIntervalSince(now())
+            reminderKind = .start(minutesUntilStart: max(0, Int((wait / 60).rounded(.up))))
+        case .end: reminderKind = .end
+        }
         do {
             try await notifications.add(CalendarReminder(token: token, kind: reminderKind,
                                                          title: item.event.displayTitle))
@@ -313,7 +341,9 @@ final class CalendarReminderController {
                 default: break
                 }
             case .start:
-                guard action == .start, item.event.start <= now(), item.event.end > now(),
+                // No start-time check: an early reminder records at once, and a moved event has
+                // already failed the comparison above.
+                guard action == .start, item.event.end > now(),
                       recorder.activeSessionID == nil else { return }
                 let session = await recorder.startRecording(title: item.event.displayTitle)
                 guard valid(stamp), await accessIsReady(stamp), let session,

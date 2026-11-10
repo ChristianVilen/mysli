@@ -38,6 +38,17 @@ final class Settings {
         set { defaults.set(newValue, forKey: "calendarRecordingRemindersEnabled") }
     }
 
+    /// Minutes before an event start at which the start reminder arrives. 0 means at the start.
+    var calendarReminderLeadMinutes: Int {
+        get { max(0, defaults.integer(forKey: "calendarReminderLeadMinutes")) }
+        set { defaults.set(newValue, forKey: "calendarReminderLeadMinutes") }
+    }
+
+    var calendarRemindersNeedVideoLink: Bool {
+        get { defaults.bool(forKey: "calendarRemindersNeedVideoLink") }
+        set { defaults.set(newValue, forKey: "calendarRemindersNeedVideoLink") }
+    }
+
     var screenshotShortcutsEnabled: Bool {
         get { defaults.object(forKey: "screenshotShortcutsEnabled") as? Bool ?? true }
         set { defaults.set(newValue, forKey: "screenshotShortcutsEnabled") }

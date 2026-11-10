@@ -15,6 +15,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     let keepScreenOn = NSSwitch()
     let calendarReminders = NSSwitch()
     let teamsSpeakerNames = NSSwitch()
+    let calendarReminderTime = NSPopUpButton()
+    let calendarReminderEvents = NSPopUpButton()
     let thumbnailDuration = NSPopUpButton()
     let summaryTool = NSPopUpButton()
     let chooseMeetingsFolder = NSButton(title: "Choose…", target: nil, action: nil)
@@ -48,6 +50,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     var onPermissionsVisibilityChanged: ((Bool) -> Void)?
     var onMeetingsFolderChanged: ((URL) -> Void)?
     var onCalendarRemindersChanged: ((Bool) -> Void)?
+    var onCalendarReminderRulesChanged: (() -> Void)?
 
     init(settings: Settings,
          onboarding: Onboarding? = nil,
@@ -201,19 +204,14 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         keepScreenOn.state = settings.keepDisplayAwake ? .on : .off
         calendarReminders.state = settings.calendarRecordingRemindersEnabled ? .on : .off
         teamsSpeakerNames.state = settings.teamsSpeakerNamesEnabled ? .on : .off
+        refreshCalendarReminderRules()
         let duration = settings.thumbnailDuration
         thumbnailDuration.removeAllItems()
         for choice in Self.thumbnailChoices {
             thumbnailDuration.addItem(withTitle: choice.title)
             thumbnailDuration.lastItem?.representedObject = choice.duration
         }
-        if let item = thumbnailDuration.itemArray.first(where: { $0.representedObject as? Double == duration }) {
-            thumbnailDuration.select(item)
-        } else {
-            thumbnailDuration.addItem(withTitle: "Custom (\(duration) seconds)")
-            thumbnailDuration.lastItem?.representedObject = duration
-            thumbnailDuration.select(thumbnailDuration.lastItem)
-        }
+        Self.select(duration, in: thumbnailDuration, customTitle: "Custom (\(duration) seconds)")
         summaryTool.select(summaryTool.itemArray.first { $0.representedObject as? SummaryTool == settings.summaryTool })
         folderPath.stringValue = settings.meetingsFolder.path
         backgroundPath.stringValue = settings.meetingContextFile?.path ?? "None"
@@ -230,6 +228,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             (windowTiling, #selector(tilingChanged)), (clipboardHistory, #selector(clipboardChanged)),
             (keepAwakeEnabled, #selector(keepAwakeChanged)), (meetingsEnabled, #selector(meetingsChanged)),
             (keepScreenOn, #selector(keepScreenOnChanged)), (calendarReminders, #selector(calendarChanged)), (teamsSpeakerNames, #selector(teamsChanged)),
+            (calendarReminderTime, #selector(calendarReminderTimeChanged)),
+            (calendarReminderEvents, #selector(calendarReminderEventsChanged)),
             (chooseMeetingsFolder, #selector(folderClicked)), (chooseBackground, #selector(contextClicked)),
             (clearBackground, #selector(clearClicked)), (thumbnailDuration, #selector(durationChanged)),
             (summaryTool, #selector(toolChanged))
@@ -247,6 +247,17 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         keepScreenOn.setAccessibilityLabel("Keep screen on")
         calendarReminders.setAccessibilityLabel("Calendar recording reminders")
         teamsSpeakerNames.setAccessibilityLabel("Teams speaker names")
+        calendarReminderTime.setAccessibilityLabel("Remind me")
+        calendarReminderEvents.setAccessibilityLabel("Remind for")
+        for minutes in [0, 1, 2, 5] {
+            calendarReminderTime.addItem(withTitle: minutes == 0 ? "At start"
+                                         : "\(minutes) \(minutes == 1 ? "minute" : "minutes") before")
+            calendarReminderTime.lastItem?.representedObject = minutes
+        }
+        for (title, needsLink) in [("All events", false), ("Only events with a video meeting link", true)] {
+            calendarReminderEvents.addItem(withTitle: title)
+            calendarReminderEvents.lastItem?.representedObject = needsLink
+        }
         summaryTool.setAccessibilityLabel("Summary tool")
         chooseMeetingsFolder.setAccessibilityLabel("Choose meetings folder")
         chooseBackground.setAccessibilityLabel("Choose background file")
@@ -330,6 +341,9 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
                 SettingsLayout.group([
                     column([SettingsLayout.row("Calendar reminders", detail: "Calendar events offer recording reminders. Mysli never starts or stops recording automatically.",
                                                control: calendarReminders), calendarStatus]),
+                    SettingsLayout.row("Remind me", control: calendarReminderTime),
+                    SettingsLayout.row("Remind for", detail: "A video meeting link is a Teams, Google Meet, or Zoom link in the event notes, location, or URL.",
+                                       control: calendarReminderEvents),
                     SettingsLayout.row("Teams speaker names", detail: "Experimental. After Stop, names remote speakers from the Teams app. Applies from the next recording.",
                                        control: teamsSpeakerNames)
                 ])
@@ -385,7 +399,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         case .clipboard: [clipboardHistory]
         case .windows: [windowTiling]
         case .keepAwake: [keepAwakeEnabled, keepScreenOn]
-        case .meetings: [meetingsEnabled, chooseMeetingsFolder, summaryTool, chooseBackground, clearBackground, calendarReminders, teamsSpeakerNames]
+        case .meetings: [meetingsEnabled, chooseMeetingsFolder, summaryTool, chooseBackground, clearBackground, calendarReminders, calendarReminderTime, calendarReminderEvents, teamsSpeakerNames]
         case .permissions: permissionsPage.controls
         case .help: helpPage.controls
         }
@@ -438,9 +452,40 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         onCalendarRemindersChanged?(calendarReminders.state == .on)
     }
 
+    @objc private func calendarReminderTimeChanged() {
+        guard let minutes = calendarReminderTime.selectedItem?.representedObject as? Int else { return }
+        settings.calendarReminderLeadMinutes = minutes
+        onCalendarReminderRulesChanged?()
+    }
+
+    @objc private func calendarReminderEventsChanged() {
+        guard let needsLink = calendarReminderEvents.selectedItem?.representedObject as? Bool else { return }
+        settings.calendarRemindersNeedVideoLink = needsLink
+        onCalendarReminderRulesChanged?()
+    }
+
+    /// Selects the item that holds `value`. A saved value that no item holds gets its own item.
+    private static func select<Value: Equatable>(_ value: Value, in menu: NSPopUpButton, customTitle: String) {
+        if !menu.itemArray.contains(where: { $0.representedObject as? Value == value }) {
+            menu.addItem(withTitle: customTitle)
+            menu.lastItem?.representedObject = value
+        }
+        menu.select(menu.itemArray.first { $0.representedObject as? Value == value })
+    }
+
+    private func refreshCalendarReminderRules() {
+        let lead = settings.calendarReminderLeadMinutes
+        Self.select(lead, in: calendarReminderTime, customTitle: "\(lead) minutes before")
+        Self.select(settings.calendarRemindersNeedVideoLink, in: calendarReminderEvents, customTitle: "")
+        for control in [calendarReminderTime, calendarReminderEvents] {
+            control.isEnabled = settings.meetingsEnabled && settings.calendarRecordingRemindersEnabled
+        }
+    }
+
     func showCalendarStatus(_ status: CalendarReminderController.Status) {
         refreshPermissionRequirements()
         calendarReminders.state = settings.calendarRecordingRemindersEnabled ? .on : .off
+        refreshCalendarReminderRules()
         let text = switch status {
         case .off, .ready: ""
         case .requestingAccess: "Asking for Calendar access…"

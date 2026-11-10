@@ -65,7 +65,7 @@ final class CalendarReminderTests: XCTestCase {
         XCTAssertEqual(driver.next, time.addingTimeInterval(30))
         time += 30
         await sut.refresh()
-        XCTAssertEqual(notices.visible.map(\.kind), [.start])
+        XCTAssertEqual(notices.visible.map(\.kind), [.start(minutesUntilStart: 0)])
         await sut.refresh()
         XCTAssertEqual(notices.added.count, 1)
         sut.shutDown()
@@ -84,9 +84,50 @@ final class CalendarReminderTests: XCTestCase {
                          event("old", start: -121), event("ended", start: -20, end: -1),
                          event("grace", start: -120)]
         await sut.setEnabled(true)
-        XCTAssertEqual(notices.visible.map(\.kind), [.start])
+        XCTAssertEqual(notices.visible.map(\.kind), [.start(minutesUntilStart: 0)])
         let token = notices.visible.first?.token ?? UUID()
         time += 300
+        await sut.handle(.start, token: token)
+        XCTAssertEqual(recorder.titles, ["Planning"])
+    }
+
+    func testLeadTimeOffersEarlyAndAcceptedStartRecordsBeforeTheEvent() async {
+        settings.calendarReminderLeadMinutes = 5
+        source.events = [event(start: 600, end: 1_200)]
+        await sut.setEnabled(true)
+        XCTAssertTrue(notices.visible.isEmpty)
+        XCTAssertEqual(driver.next, time.addingTimeInterval(300))
+        time += 300
+        await sut.refresh()
+        XCTAssertEqual(notices.visible.map(\.kind), [.start(minutesUntilStart: 5)])
+        await sut.handle(.start, token: notices.visible.first?.token ?? UUID())
+        XCTAssertEqual(recorder.titles, ["Planning"])
+        time += 300
+        await sut.refresh()
+        XCTAssertEqual(notices.added.count, 1)
+        time += 600
+        await sut.refresh()
+        XCTAssertEqual(notices.visible.map(\.kind), [.end])
+    }
+
+    func testVideoLinkChoiceSkipsEventsWithoutALink() async {
+        settings.calendarRemindersNeedVideoLink = true
+        var online = event("online")
+        online.title = "Online"
+        online.videoLink = true
+        source.events = [event("inPerson"), online, event("laterInPerson", start: 60)]
+        await sut.setEnabled(true)
+        XCTAssertEqual(notices.visible.map(\.title), ["Online"])
+        XCTAssertNotEqual(driver.next, time.addingTimeInterval(60))
+    }
+
+    func testALinkThatAppearsLaterKeepsTheVisibleStartOffer() async {
+        source.events = [event()]
+        await sut.setEnabled(true)
+        let token = notices.visible.first?.token ?? UUID()
+        source.events[0].videoLink = true
+        await sut.refresh()
+        XCTAssertEqual(notices.visible.map(\.token), [token])
         await sut.handle(.start, token: token)
         XCTAssertEqual(recorder.titles, ["Planning"])
     }
@@ -376,7 +417,7 @@ final class CalendarReminderTests: XCTestCase {
         source.events = [event()]
         driver.change?()
         await sut.refresh()
-        XCTAssertEqual(notices.visible.map(\.kind), [.start])
+        XCTAssertEqual(notices.visible.map(\.kind), [.start(minutesUntilStart: 0)])
         XCTAssertEqual(source.prompts, 0)
     }
 
@@ -461,7 +502,7 @@ final class CalendarReminderTests: XCTestCase {
         source.events[0].title = "Renamed"
         await sut.refresh()
         await sut.handle(.stop, token: token)
-        XCTAssertEqual(notices.added.map(\.kind), [.start, .end])
+        XCTAssertEqual(notices.added.map(\.kind), [.start(minutesUntilStart: 0), .end])
         XCTAssertTrue(notices.visible.isEmpty)
         XCTAssertNotNil(recorder.activeSessionID)
     }
@@ -503,7 +544,7 @@ final class CalendarReminderTests: XCTestCase {
         XCTAssertEqual(driver.next, Date(timeIntervalSince1970: 10_600))
         time += 600
         await sut.refresh()
-        XCTAssertEqual(notices.added.map(\.kind), [.start, .end])
+        XCTAssertEqual(notices.added.map(\.kind), [.start(minutesUntilStart: 0), .end])
         await sut.handle(.stop, token: notices.visible.first?.token ?? UUID())
         XCTAssertNil(recorder.activeSessionID)
         XCTAssertEqual(recorder.stops, 1)

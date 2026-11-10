@@ -21,6 +21,15 @@ struct CalendarOccurrence: Equatable, Sendable {
     var cancelled = false
     var declined = false
     var free = false
+    var videoLink = false
+
+    /// Two values are equal when the event did not change in a way that ends an offer or a recording
+    /// association. `videoLink` is left out, because an edit to the event notes can add or remove a link.
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.id == rhs.id && lhs.title == rhs.title && lhs.start == rhs.start && lhs.end == rhs.end
+            && lhs.allDay == rhs.allDay && lhs.cancelled == rhs.cancelled
+            && lhs.declined == rhs.declined && lhs.free == rhs.free
+    }
 
     var eligible: Bool { end > start && !allDay && !cancelled && !declined && !free }
     var displayTitle: String {
@@ -39,7 +48,11 @@ protocol CalendarEventSource: AnyObject {
 }
 
 struct CalendarReminder: Equatable {
-    enum Kind { case start, end }
+    enum Kind: Equatable {
+        /// Whole minutes until the event starts, rounded up. 0 when the event has started.
+        case start(minutesUntilStart: Int)
+        case end
+    }
     let token: UUID
     let kind: Kind
     let title: String

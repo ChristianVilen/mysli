@@ -109,6 +109,27 @@ final class SettingsWindowControllerTests: XCTestCase {
         XCTAssertEqual(sut.calendarReminders.state, .on)
     }
 
+    func testReminderRulesSaveUnderTheirDefaultsKeysAndAskForARefresh() {
+        var refreshes = 0
+        sut.onCalendarReminderRulesChanged = { refreshes += 1 }
+        settings.calendarRecordingRemindersEnabled = true
+        sut.show()
+        XCTAssertEqual(sut.calendarReminderTime.selectedItem?.representedObject as? Int, 0)
+        XCTAssertEqual(sut.calendarReminderEvents.selectedItem?.representedObject as? Bool, false)
+        let fiveMinutes = sut.calendarReminderTime.itemArray.firstIndex { $0.representedObject as? Int == 5 } ?? -1
+        sut.calendarReminderTime.selectItem(at: fiveMinutes)
+        sut.calendarReminderTime.sendAction(sut.calendarReminderTime.action, to: sut.calendarReminderTime.target)
+        sut.calendarReminderEvents.selectItem(at: 1)
+        sut.calendarReminderEvents.sendAction(sut.calendarReminderEvents.action, to: sut.calendarReminderEvents.target)
+        XCTAssertEqual(defaults.integer(forKey: "calendarReminderLeadMinutes"), 5)
+        XCTAssertTrue(defaults.bool(forKey: "calendarRemindersNeedVideoLink"))
+        XCTAssertEqual(refreshes, 2)
+        settings.calendarRecordingRemindersEnabled = false
+        sut.refresh()
+        XCTAssertFalse(sut.calendarReminderTime.isEnabled)
+        XCTAssertFalse(sut.calendarReminderEvents.isEnabled)
+    }
+
     func testChooseCancelClearAndFolderCallback() {
         var folders: [URL] = []
         sut.onMeetingsFolderChanged = { folders.append($0) }
@@ -233,7 +254,8 @@ final class SettingsWindowControllerTests: XCTestCase {
             .windows: [sut.windowTiling] + guides(.windows),
             .keepAwake: [sut.keepAwakeEnabled, sut.keepScreenOn] + guides(.keepAwake),
             .meetings: [sut.meetingsEnabled, sut.chooseMeetingsFolder, sut.summaryTool, sut.chooseBackground, sut.clearBackground,
-                        sut.calendarReminders, sut.teamsSpeakerNames] + guides(.meetings),
+                        sut.calendarReminders, sut.calendarReminderTime, sut.calendarReminderEvents,
+                        sut.teamsSpeakerNames] + guides(.meetings),
             .permissions: sut.permissionsPage.controls + guides(.permissions),
             .help: sut.helpPage.controls
         ]

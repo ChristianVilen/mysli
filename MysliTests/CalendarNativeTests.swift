@@ -27,6 +27,21 @@ final class CalendarNativeTests: XCTestCase {
         XCTAssertNil(event.occurrence.id.originalOccurrence)
     }
 
+    func testVideoMeetingLinkIsFoundInAnyFieldForTeamsMeetAndZoomOnly() {
+        for link in ["https://teams.microsoft.com/l/meetup-join/19%3ameeting_abc/0",
+                     "https://teams.microsoft.com/meet/123456789?p=abc",
+                     "https://teams.live.com/meet/9876543210",
+                     "https://eur01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fteams.microsoft.com%2Fl%2Fmeetup-join%2F19",
+                     "Join: HTTPS://MEET.GOOGLE.COM/abc-defg-hij",
+                     "https://company.zoom.us/j/123456789?pwd=abc"] {
+            XCTAssertTrue(VideoMeetingLink.found(in: [nil, "Room 4", "Agenda\n\(link)\nBring a laptop"]), link)
+        }
+        for text in ["", "Room 4, Helsinki", "https://events.example.com/teams-day", "https://zoom.us/pricing",
+                     "Read https://support.google.com/meet before the workshop", "teams.microsoft.com"] {
+            XCTAssertFalse(VideoMeetingLink.found(in: [text, nil]), text)
+        }
+    }
+
     func testReadAuthorizationNeverRequestsAccessAndFullAccessIsRequired() async throws {
         var status: EKAuthorizationStatus = .notDetermined
         var requests = 0
@@ -146,7 +161,7 @@ final class CalendarNativeTests: XCTestCase {
         center.addWait = { await withCheckedContinuation { continuation = $0 } }
         let adapter = CalendarReminderNotifications(calls: center.calls)
         let token = UUID()
-        let operation = Task { try await adapter.add(.init(token: token, kind: .start, title: "Planning")) }
+        let operation = Task { try await adapter.add(.init(token: token, kind: .start(minutesUntilStart: 0), title: "Planning")) }
         for _ in 0..<100 where continuation == nil { await Task.yield() }
         XCTAssertNotNil(continuation)
         adapter.cancel(tokens: [token])
@@ -165,7 +180,7 @@ final class CalendarNativeTests: XCTestCase {
         let adapter = CalendarReminderNotifications(calls: center.calls)
         let token = UUID()
         do {
-            try await adapter.add(.init(token: token, kind: .start, title: "Planning"))
+            try await adapter.add(.init(token: token, kind: .start(minutesUntilStart: 0), title: "Planning"))
             XCTFail("The native add must fail")
         } catch {}
         XCTAssertTrue(center.pendingIDs.isEmpty)
@@ -178,7 +193,7 @@ final class CalendarNativeTests: XCTestCase {
         center.prepareWait = { await withCheckedContinuation { release = $0 } }
         let adapter = CalendarReminderNotifications(calls: center.calls)
         let token = UUID()
-        let operation = Task { try await adapter.add(.init(token: token, kind: .start, title: "Planning")) }
+        let operation = Task { try await adapter.add(.init(token: token, kind: .start(minutesUntilStart: 0), title: "Planning")) }
         for _ in 0..<100 where release == nil { await Task.yield() }
         XCTAssertNotNil(release)
         adapter.cancel(tokens: [token])
@@ -191,7 +206,7 @@ final class CalendarNativeTests: XCTestCase {
         let center = CalendarCenterFake()
         let adapter = CalendarReminderNotifications(calls: center.calls)
         let token = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
-        try await adapter.add(.init(token: token, kind: .start, title: "Planning"))
+        try await adapter.add(.init(token: token, kind: .start(minutesUntilStart: 0), title: "Planning"))
         let request = try XCTUnwrap(center.requests.first)
         XCTAssertEqual(request.identifier, "calendar-recording.11111111-1111-1111-1111-111111111111")
         XCTAssertEqual(request.content.title, "Planning")
@@ -268,7 +283,7 @@ final class CalendarNativeTests: XCTestCase {
         XCTAssertEqual(center.removedPending, ["calendar-recording.old-pending"])
         XCTAssertEqual(center.removedDelivered, ["calendar-recording.old-delivered"])
         let token = UUID()
-        try await adapter.add(.init(token: token, kind: .start, title: "Planning"))
+        try await adapter.add(.init(token: token, kind: .start(minutesUntilStart: 0), title: "Planning"))
         adapter.cancel(tokens: [token])
         XCTAssertEqual(center.removedPending.last, "calendar-recording.\(token.uuidString)")
         XCTAssertEqual(center.removedDelivered.last, "calendar-recording.\(token.uuidString)")

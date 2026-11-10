@@ -22,7 +22,7 @@ Onboarding offers reminders as an unchecked choice under Meetings. Continue send
 
 ## Ownership and shared files
 
-`EventKitCalendarSource` is the only production EventKit reader. It requests full access and calls no save or remove API. It converts identity, title, dates, recurrence, availability, cancellation, and the current user's decline status. It reads no notes, locations, or attendee names.
+`EventKitCalendarSource` is the only production EventKit reader. It requests full access and calls no save or remove API. It converts identity, title, dates, recurrence, availability, cancellation, and the current user's decline status. `VideoMeetingLink` looks in the notes, location, and URL for a Teams, Google Meet, or Zoom link, and the source keeps only the yes or no. It keeps no other part of that text, and it reads no attendee names.
 
 `CalendarReminderController` owns policy, receipts, event revisions, tokens, and recording associations. `CalendarReminderNotifications` builds native requests and categories through injectable `Calls`. `SystemNotifier` remains the only delegate. Its `onCalendarReminder` callback awaits the controller before the delegate completes the response. Existing file and Check Words routes remain available.
 
@@ -36,7 +36,9 @@ The Settings work in #43 reconciled `AppDelegate.swift` and `Settings.swift` wit
 
 ## Eligibility and limits
 
-The controller queries from two minutes before now through 24 hours ahead and reads its associated occurrence separately. All-day, cancelled, declined, explicitly free, and nonpositive-duration events are excluded. Tentative events and events without attendees are eligible. Overlapping starts yield one offer. A starting, recording, or paused session consumes due starts without replaying them later.
+The controller queries from two minutes before now through 24 hours ahead and reads its associated occurrence separately. All-day, cancelled, declined, explicitly free, and nonpositive-duration events are excluded. Tentative events and events without attendees are eligible. Overlapping starts yield one offer.
+
+Two preferences change the start offer. Settings writes them and then calls `refresh()`. `Settings.calendarReminderLeadMinutes` (default 0) moves the offer to that many minutes before the start, and the two-minute grace period after the start stays. An accepted early offer starts the recording immediately. `Settings.calendarRemindersNeedVideoLink` (default false) limits start offers to events with a video meeting link. It does not end the association of a recording that already started. A starting, recording, or paused session consumes due starts without replaying them later.
 
 Recurring identities include the original recurrence date, including detached occurrences whose start moved. Nonrecurring identities never use the mutable start date. Exact recurrence reads use fresh predicates around the original date and last observed start. They never accept the first series occurrence merely because its identifier matches.
 

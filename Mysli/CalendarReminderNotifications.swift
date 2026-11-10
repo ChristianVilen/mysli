@@ -69,8 +69,15 @@ final class CalendarReminderNotifications: CalendarReminderNotifying {
         guard !invalidated.contains(reminder.token) else { return }
         let content = UNMutableNotificationContent()
         content.title = reminder.title
-        content.body = reminder.kind == .start ? "Record this calendar meeting?" : "The calendar meeting has ended."
-        content.categoryIdentifier = reminder.kind == .start ? Self.startCategory : Self.endCategory
+        switch reminder.kind {
+        case .start(let minutes):
+            let wait = minutes > 0 ? "Starts in \(minutes) \(minutes == 1 ? "minute" : "minutes"). " : ""
+            content.body = wait + "Record this calendar meeting?"
+            content.categoryIdentifier = Self.startCategory
+        case .end:
+            content.body = "The calendar meeting has ended."
+            content.categoryIdentifier = Self.endCategory
+        }
         content.userInfo = ["calendarToken": reminder.token.uuidString]
         do {
             try await calls.add(UNNotificationRequest(identifier: Self.prefix + reminder.token.uuidString,

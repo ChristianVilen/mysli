@@ -14,12 +14,13 @@ struct CalendarEventFields {
     var cancelled = false
     var declined = false
     var free = false
+    var videoLink = false
 
     var occurrence: CalendarOccurrence {
         CalendarOccurrence(id: .init(calendar: calendar, item: item,
                                     originalOccurrence: recurring ? originalOccurrence : nil),
                            title: title, start: start, end: end, allDay: allDay,
-                           cancelled: cancelled, declined: declined, free: free)
+                           cancelled: cancelled, declined: declined, free: free, videoLink: videoLink)
     }
 
     init(calendar: String, item: String, originalOccurrence: Date? = nil, recurring: Bool = false,
@@ -46,6 +47,21 @@ struct CalendarEventFields {
         cancelled = event.status == .canceled
         declined = event.attendees?.contains { $0.isCurrentUser && $0.participantStatus == .declined } ?? false
         free = event.availability == .free
+        videoLink = VideoMeetingLink.found(in: [event.notes, event.location, event.url?.absoluteString])
+    }
+}
+
+/// Answers only "is there a Teams, Google Meet, or Zoom meeting link". The event text is never kept.
+enum VideoMeetingLink {
+    // A slash can arrive as %2F when a mail filter wraps the link in its own URL.
+    private static let pattern = [
+        #"teams\.(microsoft|live)\.(com|us)(/|%2F)(l(/|%2F)meetup-join|meet)(/|%2F)"#,
+        #"meet\.google\.com(/|%2F)[a-z]"#,
+        #"zoom(gov)?\.(us|com)(/|%2F)(j|my|w|s)(/|%2F)"#
+    ].joined(separator: "|")
+
+    static func found(in texts: [String?]) -> Bool {
+        texts.contains { $0?.range(of: pattern, options: [.regularExpression, .caseInsensitive]) != nil }
     }
 }
 
@@ -139,7 +155,8 @@ final class EventKitCalendarSource: CalendarEventSource {
             }
             observed[id] = event
             return CalendarOccurrence(id: id, title: raw.title, start: raw.start, end: raw.end,
-                                      allDay: raw.allDay, cancelled: raw.cancelled, declined: raw.declined, free: raw.free)
+                                      allDay: raw.allDay, cancelled: raw.cancelled, declined: raw.declined,
+                                      free: raw.free, videoLink: raw.videoLink)
         }
     }
 

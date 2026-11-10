@@ -76,7 +76,7 @@ Use the **Clipboard history** switch on the Clipboard page in **Settings…** to
 
 The **Meetings** switch on its Settings page turns the tool on or off. Turning it off hides the meeting menu group and turns reminders off. An active recording and queued processing continue. Use the floating controls to stop, or turn Meetings on again to use its menu. At launch, unfinished meetings resume only while Meetings is on.
 
-Calendar recording reminders are off by default and need Meetings to be on. Eligible events offer **Start Recording**, then **Stop Recording** or **Continue Recording** at the end. Mysli never starts or stops automatically. A calendar recording keeps the event title in its menu status and note headings. Select **Calendar reminders** during setup and click **Continue**, or turn it on on the Meetings page. The first time, macOS asks for Calendar and notification access. Settings says what to allow when access is missing. See the [integration contract and limits](docs/calendar-recording-reminders.md).
+Calendar recording reminders are off by default and need Meetings to be on. Eligible events offer **Start Recording**, then **Stop Recording** or **Continue Recording** at the end. Mysli never starts or stops automatically. **Remind me** sets the reminder to the event start or to 1, 2, or 5 minutes before it. **Start Recording** on an early reminder starts the recording immediately. **Remind for** can limit reminders to events that have a Teams, Google Meet, or Zoom link, so meetings in a room get no reminder. A calendar recording keeps the event title in its menu status and note headings. Select **Calendar reminders** during setup and click **Continue**, or turn it on on the Meetings page. The first time, macOS asks for Calendar and notification access. Settings says what to allow when access is missing. See the [integration contract and limits](docs/calendar-recording-reminders.md).
 
 When a call starts, open the Mysli menu and choose **Start Recording Meeting**. Mysli records your microphone and the sound your Mac plays, so any call app works. If Start cannot record, for example because a permission is missing, an alert says why.
 
@@ -358,7 +358,7 @@ Microphone access is required while Meetings is on. It records your voice. **All
 
 ### Calendar (calendar reminders)
 
-Calendar is required only while calendar reminders are on. It lets Mysli read event titles and times. Mysli never changes your calendar. **Allow** shows the first Calendar prompt; after a refusal, **Grant** opens the Calendars pane. Granting access does not turn reminders on.
+Calendar is required only while calendar reminders are on. It lets Mysli read event titles and times. Mysli also looks in the notes, location, and URL of each event for a video meeting link. It keeps only a yes or no, and never stores, logs, or sends that text. Mysli never changes your calendar. **Allow** shows the first Calendar prompt; after a refusal, **Grant** opens the Calendars pane. Granting access does not turn reminders on.
 
 **System Settings → Privacy & Security → Calendars** → Enable Mysli (full access)
 
@@ -435,6 +435,8 @@ Until setup is finished, **Settings…** and Command-comma return to the saved s
 | Summary tool | Automatic tries Antigravity, then Claude Code. Antigravity (agy) and Claude Code (claude) each use only that tool. |
 | Background file | None. Choose an optional file, or Clear the preference without deleting the file. The complete accepted file goes to the selected provider with the transcript. |
 | Calendar reminders | Off. Available while Meetings is on. Turning it on asks for Calendar and notification access. |
+| Remind me | At start. The other choices are 1, 2, or 5 minutes before the event starts. |
+| Remind for | All events. The other choice is only events with a video meeting link (Teams, Google Meet, or Zoom). |
 | Teams speaker names | Off. Experimental. Applies from the next recording. |
 
 The summary tool is read when each queued job starts. A running job keeps its choice. Opening Settings does not write preferences.
