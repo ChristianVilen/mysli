@@ -53,7 +53,6 @@ final class RealDictationPolisherTests: XCTestCase {
                 DictationPolisher.schedule(delay) { timedOut = true; work() }
             })
             await polisher.prepare()
-            // This wait is exclusive to the opt-in real process check.
             try await Task.sleep(for: .milliseconds(300))
             let baseline = try XCTUnwrap(DictationText.local(heard, knownWords: .empty))
             let request = DictationPolishRequest(heardText: heard, localText: baseline,

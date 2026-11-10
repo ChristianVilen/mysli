@@ -13,8 +13,6 @@ enum SettingsPane {
     case keyboard
     case inputMonitoring
 
-    /// Privacy panes try the modern identifier first. Shortcut conflicts try the
-    /// shortcuts link, then the main Keyboard pane. Fn setup opens the main pane.
     var urls: [URL] {
         let anchor: String
         switch self {

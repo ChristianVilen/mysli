@@ -45,7 +45,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private lazy var dictationPanel = DictationPanel()
     private lazy var dictationSetup = DictationSetup(settings: settings, permissions: permissions, controller: dictation,
         configureKey: { [dictationKeys] in
-            // Setup stops the controller before changing modes, so no input callback can restart here.
             try? dictationKeys.configure(mode: $0)
         }, requestFnPermission: { [weak self] in
             guard let self else { return }
