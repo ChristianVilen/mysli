@@ -124,4 +124,4 @@ Own `DictationPanel.swift`, its menu section, and the small integration edits in
 - [x] Run the full test suite and scripts/check-tests.sh against its result. Run a Release build.
 - [x] Review the whole branch independently, including memory-only I/O, no tools, command preservation, cancellation, and preference side effects. Fix accepted findings and recheck the affected paths.
 - [x] Add measurement and verification results to the spec. Keep manual checks that nobody did separate from test results.
-- [ ] Remove this task's temporary files after all children and commands stop. Report working behavior, numbers, manual checks not done, open issues, and builder choices.
+- [x] Remove this task's temporary files after all children and commands stop. Report working behavior, numbers, manual checks not done, open issues, and builder choices.
