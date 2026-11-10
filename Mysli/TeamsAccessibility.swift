@@ -19,11 +19,13 @@ struct TeamsAXMetadata {
 }
 
 func makeNativeTeamsSnapshotSource() -> any TeamsSnapshotReading {
-    TeamsAccessibility(reader: NativeTeamsAX())
+    TeamsWebContentSource(source: TeamsAccessibility(reader: NativeTeamsAX()), webContent: TeamsWebContentSwitch())
 }
 
 /// How `NativeTeamsAX` reads the status and the counts that the AX API gives back.
 enum TeamsAXRules {
+    static let bundleIdentifier = "com.microsoft.teams2"
+
     /// False for an attribute that the element does not have; any other failure ends the scan.
     static func hasValue(_ status: AXError) throws -> Bool {
         switch status {
@@ -50,7 +52,7 @@ private final class NativeTeamsAX: TeamsAXReading {
 
     func windows(timeout: TimeInterval) throws -> [Node] {
         let deadline = ProcessInfo.processInfo.systemUptime + timeout
-        let apps = NSRunningApplication.runningApplications(withBundleIdentifier: "com.microsoft.teams2")
+        let apps = NSRunningApplication.runningApplications(withBundleIdentifier: TeamsAXRules.bundleIdentifier)
         guard !apps.isEmpty else { throw TeamsScanReason.noTeamsApp }
         var result: [Node] = []
         for app in apps {

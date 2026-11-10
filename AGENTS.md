@@ -81,7 +81,7 @@ Keep this file short. Add a rule only when an agent would break it without being
 ## Teams speaker names
 
 - Nobody has checked Teams names in a real call. They are best effort, approved by the user on 2026-10-29. Fake trees prove the policy only. Run the real probe only after the user confirms a call.
-- Mysli only reads the Teams Accessibility tree. Never write attributes, perform actions, or ask for permission. Missing permission never stops a recording. Never guess a name from chat, a roster, or nearby text.
+- Mysli reads the Teams Accessibility tree. Its only write is `AXEnhancedUserInterface` on the Teams app, through `TeamsWebContentSwitch` (decided by the user, 2026-11-09). Never write other attributes, perform actions, or ask for permission. Missing permission never stops a recording. Never guess a name from chat, a roster, or nearby text.
 - Only validated final names reach the transcript and the summary tool. Never save AX trees, observations, rosters, or voice profiles.
 - A Teams name alone never makes someone an action owner. Keep the evidence rule and `Unclear`. Never split or stretch a segment without word times.
 

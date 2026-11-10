@@ -43,6 +43,8 @@ The recorder owns a per-recording collection object outside equatable panel stat
 
 ## Read-only Teams adapter
 
+On 2026-11-09 the user allowed one write. A real call showed that current Teams hides its web content from Accessibility until a client sets `AXEnhancedUserInterface` on the Teams app. `TeamsWebContentSwitch` turns the flag on during the scans and off again after them, only when Mysli turned it on. The [research note](../research/2026-11-09-teams-ax-tree.md) has the evidence. All other rules in this section stay read-only.
+
 The source baseline is [Thread's monitor](https://github.com/salesforce-misc/thread/blob/730cab97a3a32ffb48501527183e689c850d5c18/Thread/SpeakerVisionMonitor.swift) and [Anarlog's call-control checks](https://github.com/fastrepl/anarlog/blob/a7dadfbb9477177723cab1e140ae06b4e868ecc5/crates/detect/src/meeting_ax/node.rs). Reimplement the small necessary rules. Do not copy their broad scans or AX writes.
 
 Target only `com.microsoft.teams2`. Check Accessibility trust without prompting on every scan. Require exactly one meeting window. Recognize a visible enabled `Hang up` or `Leave` button inside a visible enabled `AXToolbar` identified by `meeting-controls` or `calling-controls`, or labelled `Meeting controls` or `Calling controls`. Both the toolbar and button need finite positive bounds. Requiring toolbar ownership is a deliberate privacy restriction beyond the public source's broader call-control checks. These roles, identifiers, and English labels are compatibility limitations. A roster, window title, generic web area, or button outside that toolbar is insufficient.

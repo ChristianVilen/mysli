@@ -45,6 +45,15 @@ final class TeamsSpeakerObserverTests: XCTestCase {
         await fulfillment(of: [released], timeout: 2)
     }
 
+    func testFinishesTheSourceAfterTheStreamEnds() async {
+        let finished = expectation(description: "source finished")
+        let source = FinishingSource(finished: finished)
+        let observer = TeamsSpeakerObserver(makeSource: { source })
+        for await _ in observer.observations() { break }
+        await fulfillment(of: [finished], timeout: 2)
+        XCTAssertEqual(source.events, ["scan", "finish"])
+    }
+
     func testCancelledScanCannotYieldItsLateResult() async {
         let began = expectation(description: "scan began")
         let released = expectation(description: "source released")
@@ -97,6 +106,28 @@ private final class ReleasingSource: TeamsSnapshotReading {
         return TeamsAXSnapshot(sourceID: "window", result: .named(TeamsSpeakerName("Ada")!))
     }
     deinit { released.fulfill() }
+}
+
+private final class FinishingSource: TeamsSnapshotReading, @unchecked Sendable {
+    private let lock = NSLock()
+    private let finished: XCTestExpectation
+    private var recorded: [String] = []
+    init(finished: XCTestExpectation) { self.finished = finished }
+    var events: [String] {
+        lock.lock(); defer { lock.unlock() }
+        return recorded
+    }
+    private func record(_ event: String) {
+        lock.lock(); recorded.append(event); lock.unlock()
+    }
+    func snapshot() -> TeamsAXSnapshot {
+        record("scan")
+        return TeamsAXSnapshot(result: .unnamed(.noHighlightedTile))
+    }
+    func finish() {
+        record("finish")
+        finished.fulfill()
+    }
 }
 
 private final class BufferedPollState: TeamsSnapshotReading, @unchecked Sendable {

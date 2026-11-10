@@ -6,6 +6,12 @@ protocol TeamsSpeakerObserving: Sendable {
 
 protocol TeamsSnapshotReading {
     func snapshot() -> TeamsAXSnapshot
+    /// Called one time, after the last snapshot.
+    func finish()
+}
+
+extension TeamsSnapshotReading {
+    func finish() {}
 }
 
 extension TeamsAccessibility: TeamsSnapshotReading {}
@@ -47,6 +53,7 @@ struct TeamsSpeakerObserver: TeamsSpeakerObserving {
                     if case .terminated = continuation.yield(sample) { break }
                     do { try await wait(0.3) } catch { break }
                 }
+                source.finish()
                 continuation.finish()
             }
             continuation.onTermination = { @Sendable _ in task.cancel() }
