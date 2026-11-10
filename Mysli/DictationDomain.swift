@@ -4,9 +4,9 @@ struct PasteText: Equatable, Sendable {
     let value: String
 
     init?(_ text: String) {
-        let value = String(text.reversed()
-            .drop(while: { $0.isNewline }).reversed())
-        guard !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        let value = String(text.map { $0.isNewline ? " " : $0 })
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return nil }
         self.value = value
     }
 }
@@ -82,6 +82,7 @@ protocol DictationSpeechSession: AnyObject {
 protocol DictationPolishing: AnyObject {
     func prepare() async
     func polish(_ request: DictationPolishRequest) async -> DictationPolishResult
+    /// Invalidates pending preparation as well as the active request.
     func stop()
 }
 
