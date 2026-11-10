@@ -2,6 +2,16 @@ import XCTest
 @testable import Mysli
 
 final class DictationContextTests: XCTestCase {
+    func testNativeProtectionQueryUsesPublicAttributeAndRequiresBoolean() {
+        let cases: [(CFTypeRef?, Bool?)] = [(kCFBooleanFalse, false), (kCFBooleanTrue, true), ("false" as CFString, nil), (nil, nil)]
+        for (value, expected) in cases {
+            let node = DictationAXNode(attribute: { name in
+                name == "AXContainsProtectedContent" ? value : nil
+            })
+            XCTAssertEqual(node.protected, expected)
+        }
+    }
+
     func testRangeReadUsesSelectionStartAndRejectsUnsafeFields() {
         let node = ContextNode()
         node.selection = CFRange(location: 700, length: 20)
@@ -12,13 +22,16 @@ final class DictationContextTests: XCTestCase {
         for protection in [true, nil] as [Bool?] {
             node.protected = protection
             node.ranges = []
+            node.selectionReads = 0
             XCTAssertNil(DictationContext.precedingText(in: node))
             XCTAssertTrue(node.ranges.isEmpty)
+            XCTAssertEqual(node.selectionReads, 0)
         }
         node.protected = false
         node.subrole = "AXSecureTextField"
         XCTAssertNil(DictationContext.precedingText(in: node))
         XCTAssertTrue(node.ranges.isEmpty)
+        XCTAssertEqual(node.selectionReads, 0)
     }
 
     func testMalformedRangesAndUnicode() {
@@ -119,7 +132,12 @@ private final class ContextNode: DictationContextNode {
     var role: String? = "AXTextArea"
     var subrole: String? = "AXUnknown"
     var protected: Bool? = false
-    var selection: CFRange? = CFRange(location: 0, length: 0)
+    var selectionReads = 0
+    var selectionValue: CFRange? = CFRange(location: 0, length: 0)
+    var selection: CFRange? {
+        get { selectionReads += 1; return selectionValue }
+        set { selectionValue = newValue }
+    }
     var text: String? = ""
     var ranges: [CFRange] = []
     func string(for range: CFRange) -> String? { ranges.append(range); return text }

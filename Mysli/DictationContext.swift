@@ -92,12 +92,34 @@ private struct DictationAXContext: DictationContextAccessibility {
     }
 }
 
-private struct DictationAXNode: DictationContextNode {
-    let element: AXUIElement
+struct DictationAXNode: DictationContextNode {
+    private let attribute: (String) -> CFTypeRef?
+    private let readString: (CFRange) -> String?
+
+    init(attribute: @escaping (String) -> CFTypeRef?, readString: @escaping (CFRange) -> String? = { _ in nil }) {
+        self.attribute = attribute
+        self.readString = readString
+    }
+
+    init(element: AXUIElement) {
+        self.init(attribute: { name in
+            var value: CFTypeRef?
+            guard AXUIElementCopyAttributeValue(element, name as CFString, &value) == .success else { return nil }
+            return value
+        }, readString: { range in
+            var range = range
+            guard let parameter = AXValueCreate(.cfRange, &range) else { return nil }
+            var value: CFTypeRef?
+            guard AXUIElementCopyParameterizedAttributeValue(element, kAXStringForRangeParameterizedAttribute as CFString,
+                                                             parameter, &value) == .success else { return nil }
+            return value as? String
+        })
+    }
     var role: String? { attribute(kAXRoleAttribute) as? String }
     var subrole: String? { attribute(kAXSubroleAttribute) as? String }
     var protected: Bool? {
-        guard let value = attribute("AXProtectedContent"), CFGetTypeID(value) == CFBooleanGetTypeID() else { return nil }
+        guard let value = attribute(NSAccessibility.Attribute.containsProtectedContent.rawValue),
+              CFGetTypeID(value) == CFBooleanGetTypeID() else { return nil }
         return (value as? Bool)
     }
     var selection: CFRange? {
@@ -110,17 +132,6 @@ private struct DictationAXNode: DictationContextNode {
     }
 
     func string(for range: CFRange) -> String? {
-        var range = range
-        guard let parameter = AXValueCreate(.cfRange, &range) else { return nil }
-        var value: CFTypeRef?
-        guard AXUIElementCopyParameterizedAttributeValue(element, kAXStringForRangeParameterizedAttribute as CFString,
-                                                         parameter, &value) == .success else { return nil }
-        return value as? String
-    }
-
-    private func attribute(_ name: String) -> CFTypeRef? {
-        var value: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, name as CFString, &value) == .success else { return nil }
-        return value
+        readString(range)
     }
 }
