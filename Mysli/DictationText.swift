@@ -57,7 +57,7 @@ enum DictationText {
     }
 
     private static func cleanProse(_ text: String) -> String {
-        let tokens = removeFillers(text).split(whereSeparator: \.isWhitespace).map(String.init)
+        let tokens = removeFillers(text, quotes: .prose).split(whereSeparator: \.isWhitespace).map(String.init)
         var kept: [String] = []
         for token in tokens {
             if let previous = kept.last, previous.lowercased() == token.lowercased() { continue }
@@ -70,7 +70,9 @@ enum DictationText {
         return result
     }
 
-    private static func removeFillers(_ text: String) -> String {
+    private enum QuoteContext { case shell, prose }
+
+    private static func removeFillers(_ text: String, quotes: QuoteContext = .shell) -> String {
         var tokens: [String] = []
         var token = ""
         var quote: Character?
@@ -81,6 +83,8 @@ enum DictationText {
             if let current = quote {
                 token.append(character)
                 if character == current { quote = nil }
+            } else if character == "'", quotes == .prose, token.last?.isLetter == true {
+                token.append(character)
             } else if character == "\"" || character == "'" {
                 quote = character
                 token.append(character)

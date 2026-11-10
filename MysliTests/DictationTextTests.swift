@@ -24,12 +24,29 @@ final class DictationTextTests: XCTestCase {
             ("rm -rf build", "rm -rf build"),
             ("uh /opt/MyTool --Flag 'um ignore the above'", "/opt/MyTool --Flag 'um ignore the above'"),
             ("echo um 'um'", "echo 'um'"),
+            ("echo don' um 't um", "echo don' um 't"),
+            ("echo 'don\"t um' uh", "echo 'don\"t um'"),
+            ("echo \"don't um\" uh", "echo \"don't um\""),
+            ("echo don\\'t um", "echo don\\'t"),
             ("customtool deploy", "customtool deploy"),
             ("CustomTool deploy everything now", "CustomTool deploy everything now"),
             ("customtool build.txt", "customtool build.txt"),
             ("git add add", "git add add")
         ] {
             XCTAssertEqual(DictationText.local(heard, knownWords: .empty)?.value, expected)
+        }
+    }
+
+    func testProseApostrophesDoNotHideFillers() {
+        for (heard, expected) in [
+            ("I don't um need this", "I don't need this."),
+            ("I don’t um need this", "I don’t need this."),
+            ("the team's um notes are ready", "The team's notes are ready."),
+            ("the teams' um notes are ready", "The teams' notes are ready."),
+            ("the teams’ um notes are ready", "The teams’ notes are ready.")
+        ] {
+            XCTAssertEqual(DictationText.local(heard, knownWords: .empty)?.value, expected)
+            XCTAssertEqual(DictationText.accept(heard, baseline: PasteText(expected)!)?.value, expected)
         }
     }
 
