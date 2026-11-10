@@ -103,7 +103,8 @@ the unpolished state. The user's words are retained.
 Local cleanup uses confirmed replacements from `KnownWordsList.corrector`, removes
 simple fillers and doubled words, and adds an initial capital and final full stop
 for ordinary prose. Commands retain their spelling and structure. Neither local
-cleanup nor Claude completes or changes a command.
+cleanup nor Claude completes or changes a command. Because Claude may not change
+a command, a command never goes to Claude, and Mysli pastes its local text.
 
 ## Data sent to Claude
 
@@ -136,7 +137,8 @@ A rejection pastes locally cleaned text and shows the unpolished state.
 
 The pasted text never ends in a newline. Mysli never sends Return. Run hard
 command and instruction cases once against real Haiku through an opt-in
-`Real*Tests` check. Normal tests never start Claude.
+`Real*Tests` check. Normal tests never start Claude. Since the review on
+2026-11-10, command cases stop before Claude.
 
 Delivery accepts passive text only. Whitespace controls become spaces. Other
 Unicode control scalars are rejected, while printable Unicode and emoji sequences
@@ -257,7 +259,7 @@ speech and cannot distinguish every background noise from speech.
 The prose guard keeps at least one third of baseline words and at least 70 percent
 overlap with output words. Output has at most `floor(1.5 * baseline words) + 1`
 words. Its length is between one fifth of the baseline and twice the baseline
-plus 16 characters. Commands use exact preservation instead. Valid large changes
+plus 16 characters. Commands skip Claude and the guard. Valid large changes
 can fall back, and subtle prose meaning changes can pass. The classifier also
 cannot distinguish every custom executable from ordinary English.
 

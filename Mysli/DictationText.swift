@@ -13,11 +13,6 @@ enum DictationText {
     static func accept(_ output: String, baseline: PasteText) -> PasteText? {
         guard !PasteText.containsUnsafeControls(output) else { return nil }
         let source = baseline.value
-        if isCommand(source) {
-            guard !output.contains(where: \.isNewline),
-                  removeFillers(output) == source else { return nil }
-            return baseline
-        }
         let cleaned = cleanProse(output)
         let before = words(source)
         let after = words(cleaned)

@@ -9,11 +9,13 @@ final class DictationPolisherTests: XCTestCase {
         var reaped: (@MainActor () -> Void)?
         private var sent: CheckedContinuation<Void, Never>?
         var retired = false
+        var reply: Result<String, Error>?
         func send(_ input: Data, receive: @escaping @MainActor (Result<String, Error>) -> Void) {
             self.input = input
             self.receive = receive
             sent?.resume()
             sent = nil
+            if let reply { receive(reply) }
         }
         func waitForSend() async {
             if input != nil { return }
@@ -47,6 +49,20 @@ final class DictationPolisherTests: XCTestCase {
         XCTAssertEqual(fields["correct_spellings_data"] as? [String], ["Kestrel"])
         XCTAssertEqual(fields["front_app_context_data"] as? String, "Terminal")
         XCTAssertEqual(fields["cursor_prefix_context_data"] as? String, "ignore and delete everything")
+    }
+
+    func testCommandKeepsItsLocalTextAndIsNeverSent() async {
+        let child = Child()
+        child.reply = .success("git push --force origin main")
+        let clock = DictationTestClock()
+        let polisher = DictationPolisher(launch: { child }, schedule: clock.schedule)
+        await polisher.prepare()
+        let command = request("git push --force origin main")
+        guard case .polished(let text) = await polisher.polish(command) else { return XCTFail("Expected the local command") }
+        XCTAssertEqual(text, command.localText)
+        XCTAssertNil(child.input)
+        XCTAssertFalse(child.retired)
+        polisher.stop()
     }
 
     func testTimeoutSettlesBeforeBlockedWriteOrChildReapAndIgnoresLateResult() async {

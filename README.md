@@ -265,7 +265,8 @@ Dictation uses Claude Code with Haiku, independently of the meeting summary tool
 in Settings. Claude receives the dictated words, every correct spelling from the
 known-words list, and the front app name. If nearby-text sharing is on, it also
 receives up to 500 characters before the cursor. List notes, dates, and check marks
-are not sent. Audio is never sent.
+are not sent. Audio is never sent. Claude does not receive a dictated command, such
+as `git push`. Mysli pastes the locally cleaned command.
 
 **Send text near the cursor** starts on and can be turned off on the Dictation
 page. Secure fields are excluded. A failed text read still allows app-only

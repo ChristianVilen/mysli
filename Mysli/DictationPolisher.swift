@@ -73,6 +73,8 @@ final class DictationPolisher: DictationPolishing {
     }
 
     func polish(_ request: DictationPolishRequest) async -> DictationPolishResult {
+        // Claude may not change a command, so the local text is already final.
+        if DictationText.isCommand(request.localText.value) { return .polished(request.localText) }
         guard !Task.isCancelled, enabled, active == nil, let child = idle,
               let input = try? DictationClaudeWire.input(request) else {
             startSuccessor()
