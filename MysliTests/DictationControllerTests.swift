@@ -3,6 +3,30 @@ import XCTest
 
 @MainActor
 final class DictationControllerTests: XCTestCase {
+    func testNoContentReturnsIdleAndKeepsLastDictation() async {
+        let f = DictationFixture()
+        await f.enable()
+        f.hold()
+        await f.waitFor(.idle)
+        let last = f.controller.lastDictation
+        f.noContent = true
+        f.speech.session.result = .text("um.")
+        let completed = DictationTestGate<Void>()
+        f.controller.onChange = {
+            if f.controller.presentation == .idle || f.controller.presentation == .error {
+                completed.resume(())
+            }
+        }
+        f.hold()
+        await completed.value()
+        XCTAssertEqual(f.controller.presentation, .idle)
+        XCTAssertEqual(f.controller.lastDictation, last)
+        XCTAssertEqual(f.paste.texts.map(\.value), ["polished"])
+        XCTAssertEqual(f.polisher.requests.map(\.heardText), ["as heard"])
+        f.controller.onChange = nil
+        f.controller.shutdown()
+    }
+
     func testCaptureFailureCancelsItsHoldAndIgnoresAnOldFailure() async {
         let f = DictationFixture()
         await f.enable()

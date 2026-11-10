@@ -73,7 +73,7 @@ final class DictationController {
     private let paster: any DictationPasting
     private let now: () -> Double
     private let schedule: Schedule
-    private let prepareText: (String) async throws -> DictationPolishRequest
+    private let prepareText: (String) async throws -> DictationPolishRequest?
     private var state = State.disabled(nil)
 
     private(set) var lastDictation: LastDictation?
@@ -83,7 +83,7 @@ final class DictationController {
          speech: any DictationSpeechPreparing, polisher: any DictationPolishing,
          paster: any DictationPasting, now: @escaping () -> Double,
          schedule: @escaping Schedule,
-         prepareText: @escaping (String) async throws -> DictationPolishRequest) {
+         prepareText: @escaping (String) async throws -> DictationPolishRequest?) {
         self.keys = keys
         self.recorder = recorder
         self.speech = speech
@@ -244,6 +244,11 @@ final class DictationController {
             case .text(let heard):
                 let request = try await prepareText(heard)
                 guard owns(work) else { return }
+                guard let request else {
+                    state = .ready(ready, .idle)
+                    publish()
+                    return
+                }
                 state = .ready(ready, .polishing(work))
                 publish()
                 guard owns(work) else { return }

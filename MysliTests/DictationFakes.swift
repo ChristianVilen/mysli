@@ -159,12 +159,14 @@ final class DictationFixture {
     let paste = DictationTestPaste()
     var preparedHeard: [String] = []
     var textGate: DictationTestGate<Void>?
+    var noContent = false
     lazy var controller = DictationController(
         keys: keys, recorder: recorder, speech: speech, polisher: polisher, paster: paste,
         now: { self.clock.now }, schedule: clock.schedule,
         prepareText: { heard in
             self.preparedHeard.append(heard)
             if let textGate = self.textGate { await textGate.value() }
+            if self.noContent { return nil }
             return DictationPolishRequest(heardText: heard, localText: PasteText("local")!,
                                          correctSpellings: ["Mysli"], appName: "Editor", precedingText: nil)
         }
