@@ -4,6 +4,18 @@ import AppKit
 
 @MainActor
 final class DictationControllerTests: XCTestCase {
+    func testFinalPreparationPastesWithoutPolishing() async {
+        let f = DictationFixture()
+        f.finalText = PasteText("\n")!
+        await f.enable()
+        f.hold()
+        await f.waitFor(.idle)
+        XCTAssertEqual(f.paste.texts.map(\.value), ["\n"])
+        XCTAssertTrue(f.polisher.requests.isEmpty)
+        XCTAssertEqual(f.controller.lastDictation?.heardText, "as heard")
+        f.controller.shutdown()
+    }
+
     func testRevokedAccessAndShutdownDuringPasteStayDisabled() async {
         let f = DictationFixture()
         let cleanup = DictationTestGate<Void>()
@@ -96,7 +108,7 @@ final class DictationControllerTests: XCTestCase {
         XCTAssertEqual(f.controller.presentation, .idle)
         XCTAssertEqual(f.controller.lastDictation, last)
         XCTAssertEqual(f.paste.texts.map(\.value), ["polished"])
-        XCTAssertEqual(f.polisher.requests.map(\.heardText), ["as heard"])
+        XCTAssertEqual(f.polisher.requests.count, 1)
         f.controller.onChange = nil
         f.controller.shutdown()
     }
@@ -169,7 +181,7 @@ final class DictationControllerTests: XCTestCase {
         f.speech.session.result = .text("kept")
         f.hold()
         await f.waitFor(.idle)
-        XCTAssertEqual(f.polisher.requests.map(\.heardText), ["kept"])
+        XCTAssertEqual(f.polisher.requests.count, 1)
         XCTAssertEqual(f.controller.lastDictation?.heardText, "kept")
         f.controller.shutdown()
     }

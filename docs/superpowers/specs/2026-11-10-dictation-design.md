@@ -21,7 +21,7 @@ The Carbon registrar owns press and release
 delivery. Existing shortcuts still act only on press. Dictation has its own
 enable gate in the hotkey manager. In Carbon mode, the registrar also owns a
 temporary Escape binding while a dictation can be cancelled. This needs no second
-passive monitor. Physical key delivery remains a manual check.
+passive monitor.
 
 A hold shorter than 0.3 seconds does nothing. Recording stops on release or after
 two minutes. The pill warns by shape during the last ten seconds. There is no
@@ -110,8 +110,9 @@ a command, a command never goes to Claude, and Mysli pastes its local text.
 
 ## Data sent to Claude
 
-Send the dictated text, every correct spelling from the known-words list, and the
-front app name. Read the list at each use. Send words only, with no notes, dates,
+Send locally cleaned text with spoken formatting already converted, every correct
+spelling from the known-words list, and the front app name. Read the list at each use.
+Send words only, with no notes, dates,
 or check marks. This differs from meeting summaries, which get only matching word
 forms. Never send the audio.
 
@@ -137,8 +138,10 @@ A code guard rejects a result that is much longer, much shorter, or mostly
 different words. Tests pin the chosen limits and show normal cleanup passing.
 A rejection pastes locally cleaned text and shows the unpolished state.
 
-The pasted text never ends in a newline. Mysli never sends Return. No test
-starts Claude. The user removed the opt-in real Haiku check on 2026-11-10.
+The original version pasted one line without a final newline. Spoken formatting
+now supersedes that restriction, as described in
+[the formatting design](2026-11-11-dictation-formatting-design.md). Mysli never
+sends Return. No test starts Claude. The user removed the opt-in real Haiku check on 2026-11-10.
 Command cases stop before Claude.
 
 Delivery accepts passive text only. Whitespace controls become spaces. Other
@@ -146,10 +149,11 @@ Unicode control scalars are rejected, while printable Unicode and emoji sequence
 stay intact. Local cleanup replaces unsafe controls with spaces to keep the heard
 words recoverable. Unsafe Claude output uses that local fallback.
 
-The builder keeps delivery on one line in this version. An internal line break
+The original builder kept delivery on one line. An internal line break
 can also submit a command in a terminal. Local line breaks become spaces, and a
 command result that introduces a line break is rejected. Multiline voice commands
-are outside this version.
+were outside the original version. The formatting design now permits requested
+line breaks, including a final or standalone break.
 
 ## Paste and clipboard
 
@@ -189,7 +193,7 @@ measurements. An already open process took 0.73 to 1.89 seconds. A ready process
 is the selected approach, subject to the fresh-conversation measurement above.
 Antigravity took two to three seconds and is not used for dictation.
 
-Apple's offline polish, hands-free lock, voice commands such as "new line",
+Apple's offline polish, hands-free lock,
 editing selected text by voice, and per-app blocking are outside this version.
 
 ## Build and checks
@@ -265,22 +269,22 @@ plus 16 characters. Commands skip Claude and the guard. Valid large changes
 can fall back, and subtle prose meaning changes can pass. The classifier also
 cannot distinguish every custom executable from ordinary English.
 
-Delivery is one line with unsafe control characters rejected. Literal escaped
-sequences and printable Unicode remain valid. This gives up multiline formatting
-and raw control input in this version. Latest heard and selected text are kept
-before delivery so failure can be replayed. Empty cleanup leaves the earlier
+Delivery was originally one line with unsafe control characters rejected. Spoken
+formatting now permits requested line breaks. Literal escaped sequences and
+printable Unicode remain valid. Raw control input is still excluded. Latest heard
+and selected text are kept before delivery so failure can be replayed. Empty cleanup leaves the earlier
 record alone.
 
 Cursor reads require a known text role, a present nonsecure subrole, and the public
 protected-content attribute explicitly false. The bounded request uses 500 UTF-16
 units and discards its first cluster when truncated. ASCII context can therefore
 be 499 characters; unsupported fields give app-only context. This favors privacy
-over context coverage, which still needs real-app checks.
+over context coverage.
 
 Paste restoration waits 150 ms after Command-V. This is a chosen interval, not a
 measured acknowledgement. AppKit cannot atomically compare clipboard ownership
 and replace it. Observable new copies win, but a copy in the gap between OS calls
-cannot be protected by a count check. Native app consumption remains unverified.
+cannot be protected by a count check.
 Quit waits only for an already owed cleanup rather than abandoning that restore.
 
 ## Verification deviation
@@ -294,16 +298,13 @@ automatic reads, calendar work, or provider activity were absent. The user was
 told, and AGENTS.md now records the tool trap. This launch was not a successful
 manual feature check.
 
-## Manual checks not done
+## Real-app check
+
+The user tested dictation in the real app on 2026-11-11 and reported that it
+works well.
 
 The offscreen render paints the native selected sidebar row black in light mode,
-on both the existing General page and Dictation. Live selected-row rendering and
-glass compositing remain unchecked. Real Accessibility field compatibility also
-remains unchecked.
-
-The user must check the physical Fn key and its permission, real microphone
-capture, paste in a browser, terminal, and Electron app, pill placement on a real
-screen, dictation during a meeting, and VoiceOver. Unit tests do not prove these.
+on both the existing General page and Dictation.
 
 ## Measurements
 

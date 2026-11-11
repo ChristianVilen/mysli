@@ -75,7 +75,7 @@ final class DictationController {
     private let paster: any DictationPasting
     private let now: () -> Double
     private let schedule: DictationSchedule
-    private let prepareText: (String) async throws -> DictationPolishRequest?
+    private let prepareText: (String) async throws -> DictationPreparation?
     private var state = State.disabled
     private var hasAccess = true
     private var terminating = false
@@ -101,7 +101,7 @@ final class DictationController {
          speech: any DictationSpeechPreparing, polisher: any DictationPolishing,
          paster: any DictationPasting, now: @escaping () -> Double,
          schedule: @escaping DictationSchedule,
-         prepareText: @escaping (String) async throws -> DictationPolishRequest?) {
+         prepareText: @escaping (String) async throws -> DictationPreparation?) {
         self.keys = keys
         self.recorder = recorder
         self.speech = speech
@@ -301,23 +301,27 @@ final class DictationController {
                 state = .ready(ready, .idle)
                 publish()
             case .text(let heard):
-                let request = try await prepareText(heard)
+                let preparation = try await prepareText(heard)
                 guard owns(work) else { return }
-                guard let request else {
+                guard let preparation else {
                     state = .ready(ready, .idle)
                     publish()
                     return
                 }
-                state = .ready(ready, .polishing(work))
-                publish()
-                guard owns(work) else { return }
-                let result = await polisher.polish(request)
-                guard owns(work) else { return }
                 let selected: PasteText
                 let unpolished: Bool
-                switch result {
-                case .polished(let text): selected = text; unpolished = false
-                case .unavailable: selected = request.localText; unpolished = true
+                switch preparation {
+                case .final(let text): selected = text; unpolished = false
+                case .polish(let request):
+                    state = .ready(ready, .polishing(work))
+                    publish()
+                    guard owns(work) else { return }
+                    let result = await polisher.polish(request)
+                    guard owns(work) else { return }
+                    switch result {
+                    case .polished(let text): selected = text; unpolished = false
+                    case .unavailable: selected = request.localText; unpolished = true
+                    }
                 }
                 lastDictation = LastDictation(heardText: heard, selectedText: selected)
                 await deliver(selected, work: work, ready: ready, unpolished: unpolished)

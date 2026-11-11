@@ -41,9 +41,14 @@ struct DictationContext {
     }
 
     @concurrent
-    func prepareText(_ heard: String) async -> DictationPolishRequest? {
+    func prepareText(_ heard: String) async -> DictationPreparation? {
         let list = knownWords.read()
-        guard let local = DictationText.local(heard, knownWords: list) else { return nil }
+        guard let prepared = DictationText.local(heard, knownWords: list) else { return nil }
+        let local: PasteText
+        switch prepared {
+        case .final(let text): return .final(text)
+        case .prose(let text): local = text
+        }
         var seen = Set<String>()
         let spellings = (list.words.map(\.right) + list.correctAsHeard.map(\.text))
             .filter { seen.insert($0).inserted }
@@ -54,8 +59,8 @@ struct DictationContext {
            let node = accessibility.focusedNode(pid: app.pid) {
             preceding = Self.precedingText(in: node)
         }
-        return DictationPolishRequest(heardText: heard, localText: local, correctSpellings: spellings,
-                                     appName: app?.name ?? "", precedingText: preceding)
+        return .polish(DictationPolishRequest(localText: local, correctSpellings: spellings,
+                                             appName: app?.name ?? "", precedingText: preceding))
     }
 
     static func precedingText(in node: any DictationContextNode) -> String? {

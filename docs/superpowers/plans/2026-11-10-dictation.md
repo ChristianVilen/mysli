@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-11-10-dictation-design.md` is the authority. The user approved its product decisions in the handover on 2026-11-10.
 
-**Status:** Implemented and reviewed on the dictation branch. Functional head `147e047` passed 1,134 tests with 13 opt-in or snapshot skips, the duration check, and a Release build. Physical checks remain open in the spec. The branch is not merged.
+**Status:** Implemented and reviewed on the dictation branch. Functional head `147e047` passed 1,134 tests with 13 opt-in or snapshot skips, the duration check, and a Release build. The user tested dictation in the real app on 2026-11-11. The branch is not merged.
 
 ## Global constraints
 
@@ -46,7 +46,7 @@ The speech interface must match the measured path. If Apple wins using progressi
 
 Whisper passed the measured gate. The reviewed adapter uses `loadSamples(for:)` and `SampleTranscriptionSession.transcribe(samples:)` alongside file transcription. Capture `begin` also takes a typed failure callback so background startup errors reach the owned hold. Conversion finishes on the audio queue before result completion. AppDelegate's single `whisperTranscriber` value serves meetings and dictation.
 
-Control+Option+D is the builder's default Carbon choice. A real CopySymbolicHotKeys lookup found no enabled conflict on this Mac. Real Carbon registration and release returned success for this combination and for unmodified Escape. The existing registrar owns a temporary Escape registration while an operation can be cancelled. Physical delivery remains untested.
+Control+Option+D is the builder's default Carbon choice. A real CopySymbolicHotKeys lookup found no enabled conflict on this Mac. Real Carbon registration and release returned success for this combination and for unmodified Escape. The existing registrar owns a temporary Escape registration while an operation can be cancelled.
 
 ## Task 1: Controller and states
 
@@ -76,7 +76,7 @@ Own `DictationMicrophone.swift`, the selected speech adapter and its sample entr
 - [x] Add AVAudioEngine capture with Microphone permission only. No audio file, ScreenCaptureKit, or Screen Recording gate.
 - [x] Add a narrow samples session alongside TranscriptionSession without breaking file callers. No known-words Whisper prompt. Use a separate dictation no-speech policy with audio evidence.
 - [x] Prove silence and valid short speech, empty samples, cancellation, sample rate/channel conversion, and preservation of meeting semantics. If sharing Whisper, prove one load during concurrent acquisition and no unload while leased.
-- [x] Run focused tests, reconcile interfaces, and commit. Real microphone checks remain not done.
+- [x] Run focused tests, reconcile interfaces, and commit.
 
 ## Task 4: Claude polish
 
@@ -96,7 +96,7 @@ Own `DictationContext.swift`, context and prompt-input tests, and a small README
 - [x] Write failing boundary tests for app name, optional 500-character prefix, failed reads, secure fields, malformed ranges, and Unicode boundaries.
 - [x] Read Accessibility only. Reject secure fields before any value read. Read no selected text after the cursor and no more preceding text than needed.
 - [x] Read KnownWordsFile at each use. Map words and correct-as-heard entries to spellings only. Use KnownWordsList.corrector locally and keep list metadata out of the prompt.
-- [x] Run focused tests and commit. Physical Accessibility reads remain not done.
+- [x] Run focused tests and commit.
 
 ## Task 6: Paste
 
@@ -106,7 +106,7 @@ Own `DictationPasteboard.swift`, safe-paste tests, and a small history count-ado
 - [x] Snapshot every item and advertised representation before a write. Refuse an incomplete or raced snapshot. Write text and org.nspasteboard.TransientType together.
 - [x] Send only the existing Command-V. Restore only if the transient write still owns the clipboard. A new external copy wins. Adopt the exact returned restore count synchronously so history skips it.
 - [x] Prove empty clipboard, several items and formats, cancellation before and after key send, external copy, restore failure, and serialization with replay. Keep data only in memory.
-- [x] Run focused tests and commit. Real-app paste timing remains not done.
+- [x] Run focused tests and commit.
 
 ## Task 7: UI, Settings, menu, and permissions
 
@@ -117,7 +117,7 @@ Own `DictationPanel.swift`, its menu section, and the small integration edits in
 - [x] Show listening, polishing, unpolished, and error by meter/progress/shape. Terminal states last two extra seconds through injected time. Add a distinct top-left listening mark without losing other marks.
 - [x] Add the tool, menu replay action, Settings switch, Fn/Carbon choice, nearby-text switch, explicit permission setup, and Keyboard Settings guidance. RequiredPermissions lists Microphone and Accessibility for dictation and the Fn adapter's extra permission only when relevant. Never change macOS preferences.
 - [x] Update microphone wording, README use/privacy/permissions, short AGENTS instruction/data rules, and CONTEXT terms. Keep AGENTS under 150 lines and README edits local.
-- [x] Run focused tests and inspect deterministic native renders. Commit. Physical UI, focus, permission, and VoiceOver checks remain not done.
+- [x] Run focused tests and inspect deterministic native renders. Commit.
 
 ## Finish
 

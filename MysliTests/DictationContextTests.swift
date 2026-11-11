@@ -2,6 +2,23 @@ import XCTest
 @testable import Mysli
 
 final class DictationContextTests: XCTestCase {
+    @MainActor
+    func testFinalTextDoesNotReadAppOrCursorContext() async {
+        let ax = ContextAX()
+        var appReads = 0
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let context = DictationContext(knownWords: KnownWordsFile(url: { url }), nearbyText: { true },
+            frontApp: { appReads += 1; return .init(pid: 123, name: "Editor") }, accessibility: ax)
+        for (heard, expected) in [("git push", "git push"), ("new line", "\n")] {
+            guard case .final(let text)? = await context.prepareText(heard) else {
+                return XCTFail("Expected final local text")
+            }
+            XCTAssertEqual(text.value, expected)
+        }
+        XCTAssertEqual(appReads, 0)
+        XCTAssertEqual(ax.focusReads, 0)
+    }
+
     func testNativeProtectionQueryUsesPublicAttributeAndRequiresBoolean() {
         let cases: [(CFTypeRef?, Bool?)] = [(kCFBooleanFalse, false), (kCFBooleanTrue, true), ("false" as CFString, nil), (nil, nil)]
         for (value, expected) in cases {
@@ -64,24 +81,22 @@ final class DictationContextTests: XCTestCase {
         let ax = ContextAX()
         let context = DictationContext(knownWords: KnownWordsFile(url: { url }), nearbyText: { false },
                                        frontApp: { .init(pid: 123, name: "Editor") }, accessibility: ax)
-        let polisher = DictationTestPolisher()
         let prepared = await context.prepareText("git checkout kestrell")
-        let first = try XCTUnwrap(prepared)
-        _ = await polisher.polish(first)
-        XCTAssertEqual(polisher.requests.first?.localText.value, "git checkout kestrell")
-        XCTAssertEqual(polisher.requests.first?.correctSpellings, ["Kestrel", "Mysli"])
-        XCTAssertEqual(first.appName, "Editor")
-        XCTAssertNil(first.precedingText)
+        guard case .final(let command)? = prepared else { return XCTFail("Expected a final command") }
+        XCTAssertEqual(command.value, "git checkout kestrell")
         XCTAssertEqual(ax.focusReads, 0)
         let prose = await context.prepareText("please send kestrell")
-        _ = await polisher.polish(try XCTUnwrap(prose))
-        XCTAssertEqual(polisher.requests.last?.heardText, "please send kestrell")
-        XCTAssertEqual(polisher.requests.last?.localText.value, "Please send Kestrel.")
+        guard case .polish(let first)? = prose else { return XCTFail("Expected prose to need polish") }
+        XCTAssertEqual(first.localText.value, "Please send Kestrel.")
+        XCTAssertEqual(first.correctSpellings, ["Kestrel", "Mysli"])
+        XCTAssertEqual(first.appName, "Editor")
+        XCTAssertNil(first.precedingText)
         try "## Correct as heard\n- Updated\n".write(to: url, atomically: true, encoding: .utf8)
-        let second = await context.prepareText("please send this")
-        _ = await polisher.polish(try XCTUnwrap(second))
-        XCTAssertEqual(polisher.requests.last?.correctSpellings, ["Updated"])
-        XCTAssertEqual(second?.localText.value, "Please send this.")
+        guard case .polish(let second)? = await context.prepareText("please send this") else {
+            return XCTFail("Expected prose to need polish")
+        }
+        XCTAssertEqual(second.correctSpellings, ["Updated"])
+        XCTAssertEqual(second.localText.value, "Please send this.")
         let empty = await context.prepareText("um.")
         XCTAssertNil(empty)
     }
@@ -92,14 +107,18 @@ final class DictationContextTests: XCTestCase {
         let context = DictationContext(knownWords: KnownWordsFile(url: { url }),
                                       nearbyText: { true }, frontApp: { .init(pid: 123, name: "Editor") }, accessibility: ax)
         ax.trusted = false
-        let denied = await context.prepareText("please send this")
-        XCTAssertEqual(denied?.appName, "Editor")
-        XCTAssertNil(denied?.precedingText)
+        guard case .polish(let denied)? = await context.prepareText("please send this") else {
+            return XCTFail("Expected prose to need polish")
+        }
+        XCTAssertEqual(denied.appName, "Editor")
+        XCTAssertNil(denied.precedingText)
         XCTAssertEqual(ax.focusReads, 0)
         ax.trusted = true
-        let failed = await context.prepareText("please send this")
-        XCTAssertEqual(failed?.appName, "Editor")
-        XCTAssertNil(failed?.precedingText)
+        guard case .polish(let failed)? = await context.prepareText("please send this") else {
+            return XCTFail("Expected prose to need polish")
+        }
+        XCTAssertEqual(failed.appName, "Editor")
+        XCTAssertNil(failed.precedingText)
     }
 
     func testOptionalNearbyTextAndNoContentAvoidPrivateReads() async {
@@ -114,15 +133,19 @@ final class DictationContextTests: XCTestCase {
         let empty = await context.prepareText("um.")
         XCTAssertNil(empty)
         XCTAssertEqual(ax.focusReads, 0)
-        let request = await context.prepareText("please send this")
-        XCTAssertEqual(request?.precedingText, "before")
+        guard case .polish(let request)? = await context.prepareText("please send this") else {
+            return XCTFail("Expected prose to need polish")
+        }
+        XCTAssertEqual(request.precedingText, "before")
         XCTAssertEqual(node.ranges.map(\.length), [6])
         node.ranges = []
         let off = DictationContext(knownWords: KnownWordsFile(url: { url }), nearbyText: { false },
                                   frontApp: { .init(pid: 1, name: "Editor") }, accessibility: ax)
-        let withoutText = await off.prepareText("please send this")
-        XCTAssertEqual(withoutText?.appName, "Editor")
-        XCTAssertNil(withoutText?.precedingText)
+        guard case .polish(let withoutText)? = await off.prepareText("please send this") else {
+            return XCTFail("Expected prose to need polish")
+        }
+        XCTAssertEqual(withoutText.appName, "Editor")
+        XCTAssertNil(withoutText.precedingText)
         XCTAssertTrue(node.ranges.isEmpty)
         XCTAssertEqual(ax.focusReads, 1)
     }

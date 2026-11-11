@@ -38,7 +38,7 @@ Keep this file short. Add a rule only when an agent would break it without being
 - Never change macOS preferences. On a shortcut conflict, send the user to Keyboard Settings. A warning never blames another app or promises that lock and unlock fix it.
 - Clipboard history stays in memory. Never write it to disk, and never record content that has an `org.nspasteboard` concealed, transient, or auto-generated marker.
 - Dictation audio, text, context, clipboard snapshots, and Claude I/O stay in memory. Quit waits only for an owed clipboard restore. Dictated instructions stay text, never actions (decided by the user, 2026-11-10).
-- Dictation sends Claude Haiku the dictated text, every correct spelling from the current known-words list, the front app name, and optional preceding text. Never send list notes, dates, check marks, or audio. This is separate from the meeting summary input below (decided by the user, 2026-11-10).
+- Dictation sends Claude Haiku locally cleaned text with spoken formatting converted, every correct spelling from the current known-words list, the front app name, and optional preceding text. Never send list notes, dates, check marks, or audio. This is separate from the meeting summary input below. Only local spoken formatting adds line breaks; Claude must keep them.
 
 ## Logging and privacy
 

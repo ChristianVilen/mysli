@@ -20,12 +20,13 @@ struct PasteText: Equatable, Sendable {
     init?(_ text: String) {
         guard !Self.containsUnsafeControls(text) else { return nil }
         let value = String(text.map { character in
+            if character == "\n" { return character }
             let whitespaceControl = character.unicodeScalars.contains {
                 $0.properties.generalCategory == .control && $0.properties.isWhitespace
             }
             return character.isNewline || whitespaceControl ? " " : character
         })
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: .whitespaces)
         guard !value.isEmpty else { return nil }
         self.value = value
     }
@@ -51,8 +52,12 @@ enum DictationSpeechResult: Sendable {
     case text(String)
 }
 
+enum DictationPreparation: Sendable {
+    case final(PasteText)
+    case polish(DictationPolishRequest)
+}
+
 struct DictationPolishRequest: Sendable {
-    let heardText: String
     let localText: PasteText
     let correctSpellings: [String]
     let appName: String

@@ -200,9 +200,9 @@ final class DictationPasteTests: XCTestCase {
         let gate = DictationTestGate<Void>()
         keys.sent = { gate.resume(()) }
         let paster = DictationPasteboard(board: board, keystrokes: keys, schedule: clock.schedule, adoptOwnWrite: { _ in })
-        let task = Task { try await paster.paste(PasteText("hello\n")!) }
+        let task = Task { try await paster.paste(PasteText("hello\n\nworld\n")!) }
         await gate.value()
-        XCTAssertEqual(board.contents, [[.string: Data("hello".utf8), .init("org.nspasteboard.TransientType"): Data()]])
+        XCTAssertEqual(board.contents, [[.string: Data("hello\n\nworld\n".utf8), .init("org.nspasteboard.TransientType"): Data()]])
         XCTAssertEqual(keys.count, 1)
         clock.advance(to: 1)
         try await task.value

@@ -12,13 +12,18 @@ final class PasteTextTests: XCTestCase {
         XCTAssertEqual(PasteText(#"printf 'hello\n'"#)?.value, #"printf 'hello\n'"#)
     }
 
-    func testRejectsEmptyAndProducesTrimmedSingleLineText() {
-        XCTAssertNil(PasteText("\n\r\n"))
-        XCTAssertNil(PasteText("   \n"))
-        XCTAssertEqual(PasteText("line one\nline two\r\n")?.value, "line one line two")
+    func testRejectsEmptyAndNormalizesOtherWhitespaceControls() {
+        XCTAssertNil(PasteText("\r\n"))
+        XCTAssertNil(PasteText("   \t"))
+        XCTAssertEqual(PasteText("line one\nline two\r\n")?.value, "line one\nline two")
         XCTAssertEqual(PasteText(" word ")?.value, "word")
-        XCTAssertEqual(PasteText("git push\n ")?.value, "git push")
-        XCTAssertEqual(PasteText("one\r\ntwo\nthree\rfour")?.value, "one two three four")
-        XCTAssertNil(PasteText("\n \t"))
+        XCTAssertEqual(PasteText("git push\n ")?.value, "git push\n")
+        XCTAssertEqual(PasteText("one\r\ntwo\nthree\rfour")?.value, "one two\nthree four")
+        XCTAssertEqual(PasteText("\n \t")?.value, "\n")
+    }
+
+    func testPreservesRequestedLineBreaksIncludingStandaloneAndTrailingBreaks() {
+        XCTAssertEqual(PasteText("First.\n\nSecond.\n")?.value, "First.\n\nSecond.\n")
+        XCTAssertEqual(PasteText("\n")?.value, "\n")
     }
 }

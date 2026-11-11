@@ -250,6 +250,31 @@ follows release. A triangle after processing means the text was pasted without
 Claude polish. A cross means an error. These notices last two seconds. The
 menu bar icon has a separate top-left mark while listening.
 
+Spoken formatting works locally, including when Claude is unavailable:
+
+| Say | Result |
+| --- | --- |
+| "new line" | One line break |
+| "new paragraph" | A blank line |
+| "comma" | `,` |
+| "period" or "full stop" | `.` |
+| "question mark" | `?` |
+| "exclamation mark" or "exclamation point" | `!` |
+| "colon" | `:` |
+| "semicolon" | `;` |
+
+For example, "hello comma Anna new paragraph are you free question mark" pastes:
+
+```text
+Hello, Anna
+
+Are you free?
+```
+
+A phrase inside quotation marks stays as words. Recognized shell commands, such
+as `git push`, keep their words. You can dictate a line break by itself or at the
+end of your text. A pasted line break can submit input in a terminal.
+
 **Paste last dictation again** in the menu pastes the last selected text without
 transcription or another Claude request. This text stays in memory until quit.
 Mysli restores the previous clipboard after paste, unless you copy something new
@@ -263,11 +288,13 @@ microphone track also records those words. Neither feature pauses the other.
 ## Dictation privacy
 
 Dictation uses Claude Code with Haiku, independently of the meeting summary tool
-in Settings. Claude receives the dictated words, every correct spelling from the
-known-words list, and the front app name. If nearby-text sharing is on, it also
+in Settings. Claude receives locally cleaned text with spoken formatting already
+converted, every correct spelling from the known-words list, and the front app
+name. If nearby-text sharing is on, it also
 receives up to 500 characters before the cursor. List notes, dates, and check marks
 are not sent. Audio is never sent. Claude does not receive a dictated command, such
-as `git push`. Mysli pastes the locally cleaned command.
+as `git push`. Mysli pastes the locally cleaned command. Commands and formatting
+without words do not read app or cursor context.
 
 **Send text near the cursor** starts on and can be turned off on the Dictation
 page. Secure fields are excluded. A failed text read still allows app-only
@@ -277,9 +304,11 @@ write preferences. Launch never asks for dictation permissions.
 Mysli keeps dictation audio, text, nearby text, and Claude input and output only in
 memory. It sends text through pipes to a fresh Claude conversation with no tools
 and no session persistence. The process runs in an empty temporary folder, which
-Mysli removes after it exits. Dictated commands remain text. Mysli pastes one line
-and never sends Return. If polish fails or takes more than 2.5 seconds, Mysli uses
-locally cleaned text.
+Mysli removes after it exits. Dictated instructions remain text. Mysli uses paste
+and never sends the Return key. Claude must keep the requested line breaks and
+empty lines. Formatting without words does not go to Claude. If polish fails,
+changes the line layout, or takes more than 2.5 seconds, Mysli uses locally cleaned
+text with its formatting.
 
 ## Logs
 
