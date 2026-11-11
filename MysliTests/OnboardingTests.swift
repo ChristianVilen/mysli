@@ -21,10 +21,10 @@ final class OnboardingTests: XCTestCase {
 
     private func reload() -> Onboarding { Onboarding(settings: settings, defaults: defaults) }
 
-    func testFirstLaunchSelectsAllToolsWithoutRemindersAndWritesNothing() {
+    func testFirstLaunchSelectsDefaultToolsWithoutRemindersAndWritesNothing() {
         XCTAssertEqual(sut.step, .welcome)
         XCTAssertFalse(sut.isFinished)
-        XCTAssertEqual(sut.selectedTools, Set(MysliTool.allCases))
+        XCTAssertEqual(sut.selectedTools, [.screenshots, .clipboard, .windows, .keepAwake, .meetings])
         XCTAssertFalse(sut.calendarReminders)
         XCTAssertTrue(defaults.persistentDomain(forName: suite)?.isEmpty ?? true)
     }
@@ -55,7 +55,7 @@ final class OnboardingTests: XCTestCase {
         }
         sut.advance()
         XCTAssertEqual(applied, [ToolSelection(tools: [.clipboard, .meetings], calendarReminders: true)])
-        XCTAssertEqual(settings.enabledTools, Set(MysliTool.allCases), "the model does not apply tool preferences")
+        XCTAssertEqual(settings.enabledTools, [.screenshots, .clipboard, .windows, .keepAwake, .meetings], "the model does not apply tool preferences")
         XCTAssertFalse(settings.calendarRecordingRemindersEnabled, "only the reminder controller writes this preference")
         XCTAssertEqual(sut.requiredPermissions.permissions, [.accessibility, .screenRecording, .microphone, .calendar, .notifications])
         XCTAssertTrue(reload().wasResumed)
@@ -97,7 +97,7 @@ final class OnboardingTests: XCTestCase {
         XCTAssertTrue(reload().isFinished)
         XCTAssertEqual(defaults.object(forKey: "onboardingFinished") as? Bool, true)
         XCTAssertFalse(settings.screenshotShortcutsEnabled)
-        XCTAssertEqual(applied, [ToolSelection(tools: Set(MysliTool.allCases), calendarReminders: false)])
+        XCTAssertEqual(applied, [ToolSelection(tools: [.screenshots, .clipboard, .windows, .keepAwake, .meetings], calendarReminders: false)])
     }
 
     func testFinishAllowsMissingAccessAndLaterLaunchUsesEnabledTools() {

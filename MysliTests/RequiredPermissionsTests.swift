@@ -16,9 +16,9 @@ final class RequiredPermissionsTests: XCTestCase {
     func testSharedPermissionsAppearOnceAndRemindersNeedMeetings() {
         let tools = Set(MysliTool.allCases)
         XCTAssertEqual(RequiredPermissions(tools: tools, calendarReminders: false).permissions,
-                       [.accessibility, .screenRecording, .microphone])
+                       [.accessibility, .screenRecording, .microphone, .inputMonitoring])
         XCTAssertEqual(RequiredPermissions(tools: tools, calendarReminders: true).permissions,
-                       [.accessibility, .screenRecording, .microphone, .calendar, .notifications])
+                       [.accessibility, .screenRecording, .microphone, .calendar, .notifications, .inputMonitoring])
         XCTAssertEqual(RequiredPermissions(tools: [.keepAwake], calendarReminders: true).permissions, [])
     }
 
@@ -35,7 +35,7 @@ final class RequiredPermissionsTests: XCTestCase {
         XCTAssertTrue(RequiredPermissions(tools: [.meetings], calendarReminders: false).allGranted(in: meeting))
         XCTAssertFalse(RequiredPermissions(tools: [.meetings], calendarReminders: true).allGranted(in: meeting))
         let complete = PermissionSnapshot(accessibility: true, screenRecording: true,
-                                          microphone: .granted, calendar: .full, notifications: .granted)
+                                          microphone: .granted, calendar: .full, notifications: .granted, inputMonitoring: true)
         XCTAssertTrue(RequiredPermissions(tools: Set(MysliTool.allCases), calendarReminders: true).allGranted(in: complete))
     }
 
@@ -48,6 +48,11 @@ final class RequiredPermissionsTests: XCTestCase {
             .init(accessibility: true, screenRecording: true, microphone: .granted, calendar: .denied, notifications: .granted),
             .init(accessibility: true, screenRecording: true, microphone: .granted, calendar: .full, notifications: .denied)
         ]
-        for snapshot in snapshots { XCTAssertFalse(required.allGranted(in: snapshot)) }
+        for var snapshot in snapshots {
+            snapshot.inputMonitoring = true
+            XCTAssertFalse(required.allGranted(in: snapshot))
+        }
+        XCTAssertFalse(required.allGranted(in: .init(accessibility: true, screenRecording: true,
+            microphone: .granted, calendar: .full, notifications: .granted, inputMonitoring: false)))
     }
 }

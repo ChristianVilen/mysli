@@ -1,0 +1,137 @@
+import Foundation
+
+/// Runs the work on the main actor after the delay in seconds. The returned closure cancels it.
+typealias DictationSchedule = (Double, @escaping @MainActor () -> Void) -> () -> Void
+
+enum DictationTimer {
+    static func schedule(_ delay: Double, _ work: @escaping @MainActor () -> Void) -> () -> Void {
+        let task = Task { @MainActor in
+            do { try await Task.sleep(for: .seconds(delay)) }
+            catch { return }
+            work()
+        }
+        return { task.cancel() }
+    }
+}
+
+struct PasteText: Equatable, Sendable {
+    let value: String
+
+    init?(_ text: String) {
+        guard !Self.containsUnsafeControls(text) else { return nil }
+        let value = String(text.map { character in
+            if character == "\n" { return character }
+            let whitespaceControl = character.unicodeScalars.contains {
+                $0.properties.generalCategory == .control && $0.properties.isWhitespace
+            }
+            return character.isNewline || whitespaceControl ? " " : character
+        })
+            .trimmingCharacters(in: .whitespaces)
+        guard !value.isEmpty else { return nil }
+        self.value = value
+    }
+
+    static func containsUnsafeControls(_ text: String) -> Bool {
+        text.unicodeScalars.contains { $0.properties.generalCategory == .control && !$0.properties.isWhitespace }
+    }
+}
+
+struct DictationAudio: Sendable {
+    /// Mono samples at 16 kHz. The capture adapter owns conversion.
+    let samples: [Float]
+    let evidence: AcousticEvidence
+
+    struct AcousticEvidence: Sendable {
+        let voicedSeconds: Double
+        let peak: Float
+    }
+}
+
+enum DictationSpeechResult: Sendable {
+    case noSpeech
+    case text(String)
+}
+
+enum DictationPreparation: Sendable {
+    case final(PasteText)
+    case polish(DictationPolishRequest)
+}
+
+struct DictationPolishRequest: Sendable {
+    let localText: PasteText
+    let correctSpellings: [String]
+    let appName: String
+    let precedingText: String?
+}
+
+enum DictationPolishResult: Sendable {
+    case polished(PasteText)
+    case unavailable
+}
+
+enum DictationKeyEvent: Equatable { case pressed, released, cancelled, unavailable }
+
+@MainActor
+protocol DictationKeyInput: AnyObject {
+    func start(_ receive: @escaping @MainActor (DictationKeyEvent) -> Void) throws
+    func setCancellable(_ cancellable: Bool) throws
+    /// Sends no event after it returns, not even a cancel for a held key. The caller cancels its own work.
+    func stop()
+}
+
+@MainActor
+protocol DictationCapturing: AnyObject {
+    func begin(level: @escaping @MainActor (Float) -> Void,
+               failed: @escaping @MainActor (DictationCaptureFailure) -> Void) throws -> any DictationCapture
+}
+
+enum DictationCaptureFailure: Error { case permission, device, conversion }
+
+@MainActor
+protocol DictationCapture: AnyObject {
+    /// Closes sample admission synchronously, including while startup is pending.
+    func seal()
+    /// Discards audio and prevents pending startup from reopening admission.
+    func cancel()
+    func audio() async throws -> DictationAudio
+}
+
+@MainActor
+protocol DictationSpeechPreparing: AnyObject {
+    func prepare() async throws -> any DictationSpeechSession
+}
+
+@MainActor
+protocol DictationSpeechSession: AnyObject {
+    func transcribe(_ audio: DictationAudio) async throws -> DictationSpeechResult
+    /// Idempotent. In-flight transcription retains its own resource until it ends.
+    func release()
+}
+
+@MainActor
+protocol DictationPolishing: AnyObject {
+    func prepare() async
+    func polish(_ request: DictationPolishRequest) async -> DictationPolishResult
+    /// Invalidates pending preparation as well as the active request.
+    func stop()
+}
+
+@MainActor
+protocol DictationPasting: AnyObject {
+    /// True while a paste runs or waits, until its clipboard cleanup ends.
+    var isBusy: Bool { get }
+    /// Returns only after clipboard cleanup, including when cancelled or failed.
+    func paste(_ text: PasteText) async throws
+    func whenIdle() async
+}
+
+struct LastDictation: Equatable {
+    let heardText: String
+    let selectedText: PasteText
+}
+
+enum DictationPresentation: Equatable {
+    case disabled, loading, idle
+    case listening(level: Float, warning: Bool)
+    case transcribing, polishing, unpolished, error
+}

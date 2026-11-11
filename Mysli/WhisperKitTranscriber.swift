@@ -8,11 +8,15 @@ struct WhisperKitTranscriber: Transcribing {
 
     private let client: WhisperKitClient
     private let install: ModelInstall
+    private let owner: ModelOwner
+
+    var pendingLoads: Int { get async { await owner.pendingCount } }
 
     init(client: WhisperKitClient = WhisperKitLibrary(),
          modelsFolder: URL = URL.applicationSupportDirectory.appendingPathComponent("Mysli/whisper-models", isDirectory: true)) {
         self.client = client
         install = ModelInstall(root: modelsFolder, name: Self.model, label: "Whisper")
+        owner = ModelOwner()
     }
 
     @concurrent
@@ -33,7 +37,48 @@ struct WhisperKitTranscriber: Transcribing {
     func load(for locale: Locale) async throws -> any TranscriptionSession {
         let languageCode = try Self.supportedLanguageCode(for: locale)
         install.excludeFromBackup()
-        return Session(model: try await client.load(model: Self.model, from: install.folder), languageCode: languageCode)
+        return Session(lease: try await owner.acquire(client: client, folder: install.folder), languageCode: languageCode)
+    }
+
+    @concurrent
+    func loadSamples(for locale: Locale) async throws -> any SampleTranscriptionSession {
+        let languageCode = try Self.supportedLanguageCode(for: locale)
+        install.excludeFromBackup()
+        return Session(lease: try await owner.acquire(client: client, folder: install.folder), languageCode: languageCode)
+    }
+
+    private final class Lease {
+        let model: any WhisperModel
+        init(_ model: any WhisperModel) { self.model = model }
+    }
+
+    private actor ModelOwner {
+        private weak var loaded: Lease?
+        private var loading: (id: UUID, task: Task<Lease, Error>)?
+        private(set) var pendingCount = 0
+
+        func acquire(client: any WhisperKitClient, folder: URL) async throws -> Lease {
+            try Task.checkCancellation()
+            if let loaded { return loaded }
+            pendingCount += 1
+            defer { pendingCount -= 1 }
+            let pending: (id: UUID, task: Task<Lease, Error>)
+            if let loading { pending = loading }
+            else {
+                pending = (UUID(), Task { Lease(try await client.load(model: WhisperKitTranscriber.model, from: folder)) })
+                loading = pending
+            }
+            do {
+                let lease = try await pending.task.value
+                loaded = lease
+                if loading?.id == pending.id { loading = nil }
+                try Task.checkCancellation()
+                return lease
+            } catch {
+                if loading?.id == pending.id { loading = nil }
+                throw error
+            }
+        }
     }
 
     private static func supportedLanguageCode(for locale: Locale) throws -> String {
@@ -67,9 +112,18 @@ struct WhisperKitTranscriber: Transcribing {
         return words.isEmpty || (words == ["thank", "you"] && segment.end - segment.start >= 8)
     }
 
-    private struct Session: TranscriptionSession {
-        let model: any WhisperModel
+    private struct Session: TranscriptionSession, SampleTranscriptionSession {
+        let lease: Lease
         let languageCode: String
+
+        @concurrent
+        func transcribe(samples: [Float]) async throws -> String {
+            try Task.checkCancellation()
+            guard !samples.isEmpty else { return "" }
+            let segments = try await lease.model.transcribe(samples: samples, languageCode: languageCode)
+            try Task.checkCancellation()
+            return segments.map(\.text).joined()
+        }
 
         @concurrent
         func transcribe(_ audio: URL) async throws -> TrackTranscript {
@@ -77,7 +131,7 @@ struct WhisperKitTranscriber: Transcribing {
             guard file.length > 0 else { return TrackTranscript(segments: [], duration: 0) }
             let duration = Double(file.length) / file.processingFormat.sampleRate
             do {
-                let segments = try await model.transcribe(audio, languageCode: languageCode)
+                let segments = try await lease.model.transcribe(audio, languageCode: languageCode)
                 try Task.checkCancellation()
                 return WhisperKitTranscriber.trackTranscript(segments, duration: duration)
             } catch {
@@ -96,6 +150,7 @@ protocol WhisperKitClient {
 protocol WhisperModel {
     /// Segment times are absolute in the file.
     func transcribe(_ audio: URL, languageCode: String) async throws -> [TranscriptionSegment]
+    func transcribe(samples: [Float], languageCode: String) async throws -> [TranscriptionSegment]
 }
 
 struct WhisperKitLibrary: WhisperKitClient {
@@ -144,32 +199,56 @@ struct WhisperKitLibrary: WhisperKitClient {
 
     struct LoadedModel: WhisperModel {
         let whisperKit: WhisperKit
+        let inference = WhisperInferenceQueue()
 
         @concurrent
         func transcribe(_ audio: URL, languageCode: String) async throws -> [TranscriptionSegment] {
             try Task.checkCancellation()
             let samples = try AudioProcessor.loadAudioAsFloatArray(fromPath: audio.path)
+            return try await decode(samples, languageCode: languageCode, priority: false)
+        }
+
+        @concurrent
+        func transcribe(samples: [Float], languageCode: String) async throws -> [TranscriptionSegment] {
+            try await decode(samples, languageCode: languageCode, priority: true)
+        }
+
+        @concurrent
+        private func decode(_ samples: [Float], languageCode: String, priority: Bool) async throws -> [TranscriptionSegment] {
+            try Task.checkCancellation()
+            guard !samples.isEmpty else { return [] }
             let options = WhisperKitLibrary.decodingOptions(languageCode: languageCode)
             let window = whisperKit.featureExtractor.windowSamples ?? Constants.defaultWindowSamples
             if samples.count <= window {
-                let results = try await whisperKit.transcribe(audioArray: samples, decodeOptions: options)
+                let results = try await inference.run(priority: priority) {
+                    try await whisperKit.transcribe(audioArray: samples, decodeOptions: options)
+                }
                 try Task.checkCancellation()
                 return results.flatMap(\.segments)
             }
 
             let chunker = VADAudioChunker(vad: whisperKit.voiceActivityDetector)
-            let chunks = try await chunker.chunkAll(audioArray: samples, maxChunkLength: window, decodeOptions: options)
+            let chunks = try await inference.run(priority: priority) {
+                try await chunker.chunkAll(audioArray: samples, maxChunkLength: window, decodeOptions: options)
+            }
             var chunkOptions = options
             chunkOptions.clipTimestamps = []
-            let results = await whisperKit.transcribeWithOptions(
-                audioArrays: chunks.map(\.audioSamples),
-                decodeOptionsArray: Array(repeating: chunkOptions, count: chunks.count),
-                seekOffsets: chunks.map(\.seekOffsetIndex))
-            try Task.checkCancellation()
-            // WhisperKit 1.1.1's high-level VAD path drops failed chunks. Check
-            // every result before its offset helper can discard any failures.
-            for result in results { _ = try result.get() }
-            return chunker.updateSeekOffsetsForResults(chunkedResults: results, audioChunks: chunks).flatMap(\.segments)
+            var segments: [TranscriptionSegment] = []
+            // Yield between worker-sized batches so dictation cannot wait behind a whole meeting.
+            for start in stride(from: 0, to: chunks.count, by: options.concurrentWorkerCount) {
+                let batch = Array(chunks[start..<min(start + options.concurrentWorkerCount, chunks.count)])
+                let results = try await inference.run(priority: priority) {
+                    await whisperKit.transcribeWithOptions(
+                        audioArrays: batch.map(\.audioSamples),
+                        decodeOptionsArray: Array(repeating: chunkOptions, count: batch.count),
+                        seekOffsets: batch.map(\.seekOffsetIndex))
+                }
+                try Task.checkCancellation()
+                // WhisperKit 1.1.1's offset helper silently drops failed chunks.
+                for result in results { _ = try result.get() }
+                segments += chunker.updateSeekOffsetsForResults(chunkedResults: results, audioChunks: batch).flatMap(\.segments)
+            }
+            return segments
         }
     }
 }

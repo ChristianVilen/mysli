@@ -3,9 +3,12 @@ import Carbon.HIToolbox
 enum HotkeyShortcut: CaseIterable {
     case captureFullScreen, captureArea, clipboardHistory
     case tileLeft, tileRight, maximize, center
+    case dictation, dictationEscape
 
     var keyCode: UInt32 {
         switch self {
+        case .dictation: return UInt32(kVK_ANSI_D)
+        case .dictationEscape: return UInt32(kVK_Escape)
         case .captureFullScreen: return UInt32(kVK_ANSI_3)
         case .captureArea: return UInt32(kVK_ANSI_4)
         case .clipboardHistory, .center: return UInt32(kVK_ANSI_C)
@@ -17,6 +20,8 @@ enum HotkeyShortcut: CaseIterable {
 
     var keycap: Keycap {
         switch self {
+        case .dictation: return Keycap(symbol: "D", name: "D")
+        case .dictationEscape: return Keycap(symbol: "⎋", name: "Escape")
         case .captureFullScreen: return Keycap(symbol: "3", name: "3")
         case .captureArea: return Keycap(symbol: "4", name: "4")
         case .clipboardHistory, .center: return Keycap(symbol: "C", name: "C")
@@ -44,11 +49,14 @@ enum HotkeyShortcut: CaseIterable {
     var isScreenshot: Bool { self == .captureFullScreen || self == .captureArea }
 
     var modifiers: UInt32 {
-        UInt32(isTiling ? controlKey | optionKey : cmdKey | shiftKey)
+        if self == .dictationEscape { return 0 }
+        return UInt32(isTiling || self == .dictation ? controlKey | optionKey : cmdKey | shiftKey)
     }
 
     var label: String {
         switch self {
+        case .dictation: return "⌃⌥D (dictation)"
+        case .dictationEscape: return "Escape (cancel dictation)"
         case .captureFullScreen: return "⇧⌘3 (full screen)"
         case .captureArea: return "⇧⌘4 (selected area)"
         case .clipboardHistory: return "⇧⌘C (clipboard history)"
@@ -59,17 +67,26 @@ enum HotkeyShortcut: CaseIterable {
         }
     }
 
-    var action: HotkeyAction {
+    var binding: HotkeyBinding {
         switch self {
-        case .captureFullScreen: return .captureFullScreen
-        case .captureArea: return .captureArea
-        case .clipboardHistory: return .showClipboardHistory
-        case .tileLeft: return .tile(.leftHalf)
-        case .tileRight: return .tile(.rightHalf)
-        case .maximize: return .tile(.maximize)
-        case .center: return .tile(.center)
+        case .dictation: return .dictationHold
+        case .dictationEscape: return .dictationCancel
+        case .captureFullScreen: return .action(.captureFullScreen)
+        case .captureArea: return .action(.captureArea)
+        case .clipboardHistory: return .action(.showClipboardHistory)
+        case .tileLeft: return .action(.tile(.leftHalf))
+        case .tileRight: return .action(.tile(.rightHalf))
+        case .maximize: return .action(.tile(.maximize))
+        case .center: return .action(.tile(.center))
         }
     }
+}
+
+/// An action fires on press only. The dictation hold also reports its release.
+enum HotkeyBinding {
+    case action(HotkeyAction)
+    case dictationHold
+    case dictationCancel
 }
 
 struct Keycap: Equatable {

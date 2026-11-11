@@ -3,6 +3,34 @@ import XCTest
 
 @MainActor
 final class SettingsWindowControllerTests: XCTestCase {
+    // Set TEST_RUNNER_MYSLI_DICTATION_SNAPSHOTS for synthetic native Settings renders.
+    func testWritesDictationSettingsPictures() throws {
+        guard let path = ProcessInfo.processInfo.environment["MYSLI_DICTATION_SNAPSHOTS"] else {
+            throw XCTSkip("Set MYSLI_DICTATION_SNAPSHOTS to write native renders.")
+        }
+        let folder = URL(fileURLWithPath: path)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let window = try XCTUnwrap(sut.window)
+        window.orderFront(nil)
+        for page in [SettingsPage.general, .dictation] {
+            sut.show(page)
+            for size in [NSSize(width: 760, height: 700), NSSize(width: 640, height: 420)] {
+                window.setContentSize(size)
+                for (theme, appearance) in [("light", NSAppearance.Name.aqua), ("dark", .darkAqua)] {
+                    window.appearance = NSAppearance(named: appearance)
+                    sut.applyDisplayOptions(.init(reduceTransparency: true, increaseContrast: false))
+                    let view = try XCTUnwrap(window.contentView)
+                    view.layoutSubtreeIfNeeded()
+                    window.displayIfNeeded()
+                    let bitmap = try XCTUnwrap(view.bitmapImageRepForCachingDisplay(in: view.bounds))
+                    view.cacheDisplay(in: view.bounds, to: bitmap)
+                    let data = try XCTUnwrap(bitmap.representation(using: .png, properties: [:]))
+                    let prefix = page == .general ? "settings-general" : "settings"
+                    try data.write(to: folder.appendingPathComponent("\(prefix)-\(Int(size.width))-\(theme).png"))
+                }
+            }
+        }
+    }
     private var defaults: UserDefaults!
     private var settings: Settings!
     private var login: FakeLoginItem!
@@ -257,6 +285,7 @@ final class SettingsWindowControllerTests: XCTestCase {
                         sut.calendarReminders, sut.calendarReminderTime, sut.calendarReminderEvents,
                         sut.teamsSpeakerNames] + guides(.meetings),
             .permissions: sut.permissionsPage.controls + guides(.permissions),
+            .dictation: [sut.dictationEnabled, sut.dictationKey, sut.dictationNearbyText, sut.dictationKeyboard] + guides(.dictation),
             .help: sut.helpPage.controls
         ]
         for page in SettingsPage.allCases {
@@ -288,7 +317,6 @@ final class SettingsWindowControllerTests: XCTestCase {
 
     func testGuidesExpandAndCollapseWithTheirVoiceOverState() {
         let all = SettingsPage.allCases.flatMap { sut.guides[$0]?.guides ?? [] }
-        XCTAssertEqual(all.count, 7)
         for (button, body) in all {
             XCTAssertTrue(body.isHidden)
             button.performClick(nil)

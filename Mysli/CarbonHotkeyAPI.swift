@@ -8,9 +8,9 @@ struct CarbonHotkeyAPI {
                             GetApplicationEventTarget(), OptionBits(kEventHotKeyExclusive), &reference)
     }
     var unregister: (EventHotKeyRef) -> OSStatus = { UnregisterEventHotKey($0) }
-    var installHandler: (EventHandlerUPP, UnsafeMutableRawPointer, inout EventHandlerRef?) -> OSStatus = { callback, context, handler in
-        var type = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
-        return InstallEventHandler(GetApplicationEventTarget(), callback, 1, &type, context, &handler)
+    var installHandler: (EventHandlerUPP, [EventTypeSpec], UnsafeMutableRawPointer, inout EventHandlerRef?) -> OSStatus = { callback, eventTypes, context, handler in
+        var types = eventTypes
+        return InstallEventHandler(GetApplicationEventTarget(), callback, types.count, &types, context, &handler)
     }
     var removeHandler: (EventHandlerRef) -> OSStatus = { RemoveEventHandler($0) }
 }

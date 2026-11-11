@@ -17,6 +17,7 @@ final class CarbonHotkeyRegistrar {
     private var handler: EventHandlerRef?
     private var registrations: [HotkeyShortcut: Registration] = [:]
     var onAction: ((HotkeyAction) -> Void)?
+    var onDictation: ((DictationKeyEvent) -> Void)?
 
     init(api: CarbonHotkeyAPI = CarbonHotkeyAPI()) { self.api = api }
 
@@ -97,16 +98,24 @@ final class CarbonHotkeyRegistrar {
 
     private func installHandler() -> OSStatus {
         guard handler == nil else { return noErr }
+        let types = [kEventHotKeyPressed, kEventHotKeyReleased].map {
+            EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32($0))
+        }
         return api.installHandler({ _, event, context in
             guard let event, let context else { return OSStatus(eventNotHandledErr) }
             return MainActor.assumeIsolated {
                 let registrar = Unmanaged<CarbonHotkeyRegistrar>.fromOpaque(context).takeUnretainedValue()
                 return registrar.receive(event)
             }
-        }, Unmanaged.passUnretained(self).toOpaque(), &handler)
+        }, types, Unmanaged.passUnretained(self).toOpaque(), &handler)
     }
 
     private func receive(_ event: EventRef) -> OSStatus {
+        let kind = GetEventKind(event)
+        guard GetEventClass(event) == OSType(kEventClassKeyboard),
+              kind == UInt32(kEventHotKeyPressed) || kind == UInt32(kEventHotKeyReleased) else {
+            return OSStatus(eventNotHandledErr)
+        }
         var key = EventHotKeyID()
         let status = GetEventParameter(event, EventParamName(kEventParamDirectObject),
                                        EventParamType(typeEventHotKeyID), nil,
@@ -115,7 +124,12 @@ final class CarbonHotkeyRegistrar {
               let shortcut = registrations.first(where: { $0.value.id == key.id && $0.value.state == .active })?.key else {
             return OSStatus(eventNotHandledErr)
         }
-        onAction?(shortcut.action)
+        let pressed = kind == UInt32(kEventHotKeyPressed)
+        switch shortcut.binding {
+        case .dictationHold: onDictation?(pressed ? .pressed : .released)
+        case .dictationCancel: if pressed { onDictation?(.cancelled) }
+        case .action(let action): if pressed { onAction?(action) }
+        }
         return noErr
     }
 }

@@ -10,9 +10,9 @@ enum SettingsPane {
     case calendars
     case notifications
     case keyboardShortcuts
+    case keyboard
+    case inputMonitoring
 
-    /// Privacy panes try the modern identifier first. Keyboard setup tries
-    /// the shortcuts link, then falls back to the general Keyboard pane.
     var urls: [URL] {
         let anchor: String
         switch self {
@@ -20,6 +20,9 @@ enum SettingsPane {
         case .screenCapture: anchor = "Privacy_ScreenCapture"
         case .microphone: anchor = "Privacy_Microphone"
         case .calendars: anchor = "Privacy_Calendars"
+        case .inputMonitoring: anchor = "Privacy_ListenEvent"
+        case .keyboard:
+            return [URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension")!]
         case .notifications:
             return [URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension")!]
         case .keyboardShortcuts:
@@ -77,6 +80,7 @@ final class PermissionsManager {
     private(set) var microphone = MicrophoneAccess.notDetermined
     private(set) var calendar = CalendarAccess.notDetermined
     private(set) var notifications = NotificationAccess.notDetermined
+    private(set) var inputMonitoring = false
 
     /// Notification reads can call this after `refresh()` returns.
     var onChange: (@MainActor () -> Void)?
@@ -84,6 +88,7 @@ final class PermissionsManager {
     private let isAccessibilityTrusted: () -> Bool
     private let hasScreenCaptureAccess: () -> Bool
     private let microphoneAccess: () -> MicrophoneAccess
+    private let inputMonitoringAccess: () -> Bool
     private let requestMicrophoneAccess: @MainActor () async -> Bool
     private let calendarAccess: () -> CalendarAccess
     private let requestCalendarAccess: @MainActor () async -> Bool
@@ -99,7 +104,8 @@ final class PermissionsManager {
 
     var snapshot: PermissionSnapshot {
         PermissionSnapshot(accessibility: accessibility, screenRecording: screenRecording,
-                           microphone: microphone, calendar: calendar, notifications: notifications)
+                           microphone: microphone, calendar: calendar, notifications: notifications,
+                           inputMonitoring: inputMonitoring)
     }
 
     /// The probes, the opener and the prompt default to the real system
@@ -109,6 +115,7 @@ final class PermissionsManager {
         isAccessibilityTrusted: @escaping () -> Bool = { AXIsProcessTrusted() },
         hasScreenCaptureAccess: @escaping () -> Bool = { CGPreflightScreenCaptureAccess() },
         microphoneAccess: @escaping () -> MicrophoneAccess = { MicrophoneAccess(AVCaptureDevice.authorizationStatus(for: .audio)) },
+        inputMonitoringAccess: @escaping () -> Bool = { CGPreflightListenEventAccess() },
         requestMicrophoneAccess: @escaping @MainActor () async -> Bool = { await AVCaptureDevice.requestAccess(for: .audio) },
         calendarAccess: @escaping () -> CalendarAccess = { .notDetermined },
         requestCalendarAccess: @escaping @MainActor () async -> Bool = { false },
@@ -126,6 +133,7 @@ final class PermissionsManager {
         self.isAccessibilityTrusted = isAccessibilityTrusted
         self.hasScreenCaptureAccess = hasScreenCaptureAccess
         self.microphoneAccess = microphoneAccess
+        self.inputMonitoringAccess = inputMonitoringAccess
         self.requestMicrophoneAccess = requestMicrophoneAccess
         self.calendarAccess = calendarAccess
         self.requestCalendarAccess = requestCalendarAccess
@@ -143,6 +151,7 @@ final class PermissionsManager {
         accessibility = isAccessibilityTrusted()
         screenRecording = hasScreenCaptureAccess()
         microphone = microphoneAccess()
+        inputMonitoring = inputMonitoringAccess()
         calendar = calendarAccess()
         notificationRevision += 1
         let revision = notificationRevision

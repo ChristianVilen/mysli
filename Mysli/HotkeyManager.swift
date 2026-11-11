@@ -20,6 +20,13 @@ final class HotkeyManager {
     var screenshotsEnabled = true { didSet { refresh() } }
     var tilingEnabled = true { didSet { refresh() } }
     var clipboardHistoryEnabled = false { didSet { refresh() } }
+    var dictationEnabled = false { didSet { refresh() } }
+    var dictationCancellable = false { didSet { refresh() } }
+    var onDictationAvailabilityChange: (() -> Void)?
+    var onDictation: ((DictationKeyEvent) -> Void)? {
+        get { registrar.onDictation }
+        set { registrar.onDictation = newValue }
+    }
     var onAction: ((HotkeyAction) -> Void)? {
         get { registrar.onAction }
         set { registrar.onAction = newValue }
@@ -58,11 +65,14 @@ final class HotkeyManager {
     func refresh() {
         guard isRunning else { return }
         let desired = Set(HotkeyShortcut.allCases.filter {
+            if $0 == .dictation { return dictationEnabled }
+            if $0 == .dictationEscape { return dictationEnabled && dictationCancellable }
             if $0.isTiling { return tilingEnabled }
             if $0.isScreenshot { return screenshotsEnabled }
             return clipboardHistoryEnabled
         })
         setIssues(registrar.reconcile(desired: desired))
+        onDictationAvailabilityChange?()
     }
 
     func stop() {
@@ -72,6 +82,7 @@ final class HotkeyManager {
         for observer in observers { workspaceNotifications.removeObserver(observer) }
         observers = []
         setIssues(registrar.stop())
+        onDictationAvailabilityChange?()
     }
 
     private func renewRegistrations() {

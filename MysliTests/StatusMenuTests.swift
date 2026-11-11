@@ -3,6 +3,17 @@ import XCTest
 
 @MainActor
 final class StatusMenuTests: XCTestCase {
+    func testDictationMarkPreservesTheOtherThreeCorners() throws {
+        let existing = sut.icon(keepAwakeActive: true, recording: .recording, warning: .shortcutsUnavailable)
+        let listening = sut.icon(keepAwakeActive: true, recording: .recording,
+                                 warning: .shortcutsUnavailable, dictationListening: true)
+        for (x, y) in [(13, 4), (13, 13), (4, 13)] {
+            XCTAssertEqual(pixel(of: listening, atX: x, y: y, in: .aqua),
+                           pixel(of: existing, atX: x, y: y, in: .aqua))
+        }
+        XCTAssertNotEqual(pixel(of: listening, atX: 4, y: 4, in: .aqua),
+                          pixel(of: existing, atX: 4, y: 4, in: .aqua))
+    }
     private var meetingsRoot: URL!
     private var sut: StatusMenu!
 

@@ -29,12 +29,12 @@ Mysli is Finnish for muesli: a mix of good things.
 On first launch, the Mysli window shows three steps without a sidebar:
 
 1. **Welcome.** Click **Get Started**.
-2. **Choose your tools.** All five tools start selected. Clear the tools you do not want, then click **Continue**. Unselected tools turn off and release their shortcuts. **Calendar reminders** is a separate choice under Meetings and starts off.
+2. **Choose your tools.** Screenshots, Clipboard, Windows, Keep Awake, and Meetings start selected. Dictation starts off. Clear the tools you do not want, then click **Continue**. Unselected tools turn off and release their shortcuts. **Calendar reminders** is a separate choice under Meetings and starts off.
 3. **Allow access.** Allow the permissions for your chosen tools. Each row updates when you grant access. Click **Finish** to open the normal pages, even if some permissions are missing.
 
 Mysli saves your step and choices. If macOS asks you to quit and reopen after Screen Recording access, setup returns to the saved step. The rows show the current grants.
 
-**Skip setup** on Welcome finishes setup with all tools on. It keeps the saved reminder setting and does not apply an unsubmitted reminder choice. You can change the tools later in **Settings…**.
+**Skip setup** on Welcome turns on the five default tools and leaves Dictation off. It keeps the saved reminder setting and does not apply an unsubmitted reminder choice. You can change the tools later in **Settings…**.
 
 After setup, missing access for an enabled tool opens the **Permissions** page at launch.
 
@@ -229,6 +229,87 @@ defaults delete io.github.christianvilen.mysli meetingContextFile
 
 This leaves your file in place. It does not remove context already sent to a provider or saved in `agy` history.
 
+## Dictation
+
+Turn on **Dictation** in **Settings… → Dictation**. Dictated words go to Claude
+Haiku for polish. Allow Microphone and Accessibility when asked. Fn also needs
+Input Monitoring. Select **Control + Option + D** to use dictation without that
+extra permission. The **Permissions** page shows each permission and its
+**Grant** button. Dictation starts again by itself after a grant.
+
+For Fn, open **Keyboard Settings** and set **Press 🌐 key to** to **Do Nothing**.
+This control is on the main Keyboard page, as described in
+[Apple's Keyboard settings guide](https://support.apple.com/en-bn/guide/mac-help/-kbdm162/mac).
+Mysli never changes macOS preferences.
+
+Hold the selected key, speak in English, then release to paste. Holds under
+0.3 seconds do nothing. Escape cancels, and a hold stops after two minutes.
+A wordless pill shows the microphone level near the bottom of the focused
+window's screen. It warns with a triangle during the last ten seconds. Progress
+follows release. A triangle after processing means the text was pasted without
+Claude polish. A cross means an error. These notices last two seconds. The
+menu bar icon has a separate top-left mark while listening.
+
+Spoken formatting works locally, including when Claude is unavailable:
+
+| Say | Result |
+| --- | --- |
+| "new line" | One line break |
+| "new paragraph" | A blank line |
+| "comma" | `,` |
+| "period" or "full stop" | `.` |
+| "question mark" | `?` |
+| "exclamation mark" or "exclamation point" | `!` |
+| "colon" | `:` |
+| "semicolon" | `;` |
+
+For example, "hello comma Anna new paragraph are you free question mark" pastes:
+
+```text
+Hello, Anna
+
+Are you free?
+```
+
+A phrase inside quotation marks stays as words. Recognized shell commands, such
+as `git push`, keep their words. You can dictate a line break by itself or at the
+end of your text. A pasted line break can submit input in a terminal.
+
+**Paste last dictation again** in the menu pastes the last selected text without
+transcription or another Claude request. This text stays in memory until quit.
+Mysli restores the previous clipboard after paste, unless you copy something new
+first. Dictation does not add itself or the restored content to clipboard history.
+
+Whisper stays loaded while dictation is on, including after launch. Turning
+dictation off cancels it and releases its model session. Meetings and dictation
+share one Whisper model. You can dictate during a meeting, but the meeting
+microphone track also records those words. Neither feature pauses the other.
+
+## Dictation privacy
+
+Dictation uses Claude Code with Haiku, independently of the meeting summary tool
+in Settings. Claude receives locally cleaned text with spoken formatting already
+converted, every correct spelling from the known-words list, and the front app
+name. If nearby-text sharing is on, it also
+receives up to 500 characters before the cursor. List notes, dates, and check marks
+are not sent. Audio is never sent. Claude does not receive a dictated command, such
+as `git push`. Mysli pastes the locally cleaned command. Commands and formatting
+without words do not read app or cursor context.
+
+**Send text near the cursor** starts on and can be turned off on the Dictation
+page. Secure fields are excluded. A failed text read still allows app-only
+context and paste. Opening Settings and permission refreshes do not send text or
+write preferences. Launch never asks for dictation permissions.
+
+Mysli keeps dictation audio, text, nearby text, and Claude input and output only in
+memory. It sends text through pipes to a fresh Claude conversation with no tools
+and no session persistence. The process runs in an empty temporary folder, which
+Mysli removes after it exits. Dictated instructions remain text. Mysli uses paste
+and never sends the Return key. Claude must keep the requested line breaks and
+empty lines. Formatting without words does not go to Claude. If polish fails,
+changes the line layout, or takes more than 2.5 seconds, Mysli uses locally cleaned
+text with its formatting.
+
 ## Logs
 
 Choose **Show Log…** in the menu, immediately after **Settings…**. The window
@@ -314,6 +395,8 @@ Setup, the Permissions page, and the launch check use the same list of required 
 | Windows | Accessibility |
 | Keep Awake | None |
 | Meetings | Microphone, Screen Recording |
+| Dictation | Microphone, Accessibility |
+| Fn dictation | Input Monitoring, in addition to dictation access |
 | Calendar reminders | Calendar, Notifications |
 
 The Permissions page shows only the needed rows. A shared permission appears once. The line **Turn on more tools to see their permissions.** explains how to add rows. The optional Teams speaker names feature does not add Accessibility to this list.
@@ -323,7 +406,7 @@ Open **Settings…**, then **Permissions**, to check access again. The rows upda
 A red dot in the bottom-left corner of the menu bar icon means a needed Accessibility grant or shortcut is missing. An orange dot means needed Screen Recording access is missing, when no red warning is present.
 
 ### Accessibility (window tiling and automatic paste)
-Accessibility lets Mysli move and resize windows and paste items from clipboard history. The optional Teams speaker-name feature also uses it to read meeting UI. Registering the shortcuts does not need this permission.
+Accessibility lets Mysli move and resize windows, paste clipboard items and dictation, and read text near the cursor for dictation. The optional Teams speaker-name feature also uses it to read meeting UI. Registering the shortcuts does not need this permission.
 
 **System Settings → Privacy & Security → Accessibility** → Enable Mysli
 
@@ -340,7 +423,7 @@ Mysli retries within a few seconds. The menu warnings disappear when the shortcu
 
 To keep the macOS screenshot tool instead, turn off **Use Mysli for screenshots** in Settings. Mysli then releases both shortcuts and shows no conflict for them.
 
-All Mysli shortcuts use registered macOS hotkeys instead of a keyboard event tap. The menu lists registration failures for each shortcut; other registered shortcuts remain available. If a shortcut cannot be released, Mysli reports it and retries while running. Opening clipboard history and pasting are separate operations, so automatic paste can still fail in protected fields.
+Mysli shortcuts use registered macOS hotkeys, except for Fn dictation, which uses one passive keyboard event tap. The menu lists registration failures for each shortcut; other registered shortcuts remain available. If a shortcut cannot be released, Mysli reports it and retries while running. Opening clipboard history and pasting are separate operations, so automatic paste can still fail in protected fields.
 
 ### Screen Recording
 
@@ -350,9 +433,9 @@ Screen Recording is required while Screenshots or Meetings is on. It allows scre
 
 macOS can ask you to quit and reopen Mysli before this grant takes effect. If setup is unfinished, Mysli returns to its saved step.
 
-### Microphone (Meeting Notes)
+### Microphone (meeting notes and dictation)
 
-Microphone access is required while Meetings is on. It records your voice. **Allow** shows the first prompt; after a refusal, **Grant** opens the Microphone pane. A missing grant opens the Permissions page at launch after setup.
+Microphone access is required for Meetings and Dictation. It records your voice. **Allow** shows the first prompt; after a refusal, **Grant** opens the Microphone pane. A missing grant opens the Permissions page at launch after setup.
 
 **System Settings → Privacy & Security → Microphone** → Enable Mysli
 
@@ -413,7 +496,7 @@ The menu has one group for each enabled tool, with the tool's colored icon. A to
 Open **Settings…** in the menu to change preferences and find setup or help. The native AppKit sidebar can be resized. With the sidebar focused, use Up and Down to select a page. It has General, one page for each tool, then Permissions and Help:
 
 - **General** has Launch at login.
-- **Screenshots**, **Clipboard**, **Windows**, **Keep Awake**, and **Meetings** each hold the tool's switch and settings, its keyboard shortcuts, and a guide that you can open.
+- **Screenshots**, **Clipboard**, **Windows**, **Keep Awake**, **Meetings**, and **Dictation** each hold the tool's switch and settings, its keyboard shortcuts, and a guide that you can open.
 - **Permissions** shows access checks for enabled tools and screenshot shortcut setup while Screenshots is on. After setup, missing required access opens this page at launch.
 - **Help** opens GitHub to report a bug or send feedback. You review the message before sending it.
 
@@ -430,6 +513,9 @@ Until setup is finished, **Settings…** and Command-comma return to the saved s
 | Keep Awake | On. Off ends an active session and hides its menu group. |
 | Keep screen on | On. Keeps the display awake during a Keep Awake session. |
 | Meetings | On. Off hides its menu group and turns calendar reminders off. Active recordings and queued work continue. |
+| Dictation | Off. On prepares Whisper and asks for dictation permissions. Off cancels active dictation. |
+| Dictation key | Fn. Control + Option + D is the alternative. |
+| Send text near the cursor | On. Shares up to 500 preceding characters with Claude during dictation. |
 | Show thumbnail for | 5 seconds. Choices are 3, 5, 15 seconds, and Forever. Existing custom values stay intact until changed. |
 | Meetings folder | `~/Meetings`. Choosing another folder does not move existing meetings. |
 | Summary tool | Automatic tries Antigravity, then Claude Code. Antigravity (agy) and Claude Code (claude) each use only that tool. |
