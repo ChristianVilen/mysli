@@ -39,13 +39,18 @@ struct ClipboardHistory {
     /// text under a different set of rich flavors (say, plain the second
     /// time after rich the first) discards the stored RTF/HTML data in
     /// favor of whatever the new copy carries, and `copiedAt` updates to
-    /// the new copy's date. An item whose `byteCost` exceeds `maxItemBytes`
+    /// the new copy's date. Empty or whitespace-only text is skipped.
+    /// An item whose `byteCost` exceeds `maxItemBytes`
     /// is refused outright and the history is left unchanged. After
     /// inserting, the oldest item is evicted if the count now exceeds the
     /// item cap, and the oldest *image* items are evicted, one at a time,
     /// while the total image-byte budget is still exceeded — text items are
     /// never evicted by the byte budget, no matter how old they are.
     mutating func add(_ item: ClipboardItem) {
+        if case .text(let plain, _, _) = item.kind,
+           plain.rangeOfCharacter(from: .whitespacesAndNewlines.inverted) == nil {
+            return
+        }
         guard item.byteCost <= maxItemBytes else { return }
 
         if let existingIndex = items.firstIndex(where: { $0.contentHash == item.contentHash }) {

@@ -66,7 +66,7 @@ Press `Shift+Command+C` and a panel opens over whatever you're doing, listing wh
 
 If the item is formatted text (say, from a web page or a rich-text editor), `Enter` asks first: paste with formatting or without. Without formatting is pre-selected, so pressing `Enter` twice gives you plain text. Plain text and images paste right away, with no second step.
 
-Text and images both get recorded, including screenshots Mysli itself saves to your clipboard. Delete a screenshot from its thumbnail or the editor and its clipboard history entry goes with it.
+Text and images both get recorded, including screenshots Mysli itself saves to your clipboard. Empty copies and text made only of spaces, tabs, or line breaks are skipped. Delete a screenshot from its thumbnail or the editor and its clipboard history entry goes with it.
 
 The history lives in memory only — nothing is written to disk, so it's empty again after a restart. It holds at most 100 items; images are capped at about 100 MB in total, with the oldest images dropped first. A single item over 50 MB is not recorded. Copies that your password manager marks as sensitive are never recorded.
 

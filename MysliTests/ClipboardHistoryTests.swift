@@ -20,6 +20,28 @@ final class ClipboardHistoryTests: XCTestCase {
 
     // MARK: - Ordering
 
+    func testAddSkipsEmptyAndWhitespaceOnlyText() {
+        for plain in ["", " ", "\t", "\n", "\r\n", " \t\r\n ", "\u{00A0}\u{2003}\u{2028}\u{2029}"] {
+            var history = ClipboardHistory()
+            history.add(text("keeper"))
+
+            history.add(text(plain, rtf: Data([0x01]), html: Data([0x02]), at: 1))
+
+            XCTAssertEqual(history.items.map(\.previewLabel), ["keeper"], "Copy: \(plain.debugDescription)")
+        }
+    }
+
+    func testAddPreservesTextWithSurroundingWhitespace() {
+        for plain in [" \thello\r\n ", String(repeating: "\n", count: 3000) + "hello"] {
+            var history = ClipboardHistory()
+            let item = text(plain, rtf: Data([0x01]), html: Data([0x02]))
+
+            history.add(item)
+
+            XCTAssertEqual(history.items, [item])
+        }
+    }
+
     func testAddPutsNewestFirst() {
         var history = ClipboardHistory()
         let first = text("first", at: 0)
