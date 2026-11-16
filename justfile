@@ -34,10 +34,12 @@ clean:
 rebuild: clean build
 
 # Package the app as a zip for distribution
-package: clean release
+package signing_identity="-": clean release
     #!/bin/bash
+    set -e
     APP_PATH=$(xcodebuild -project Mysli.xcodeproj -scheme Mysli -configuration Release -showBuildSettings 2>/dev/null | grep -m1 "BUILT_PRODUCTS_DIR" | awk '{print $3}')
-    codesign --force --deep --sign - "$APP_PATH/Mysli.app"
+    codesign --force --timestamp=none --sign "{{signing_identity}}" --entitlements Mysli/Mysli.entitlements "$APP_PATH/Mysli.app"
+    codesign --verify --strict --verbose=2 "$APP_PATH/Mysli.app"
     cd "$APP_PATH" && zip -r -y "{{justfile_directory()}}/Mysli.zip" Mysli.app
     echo "Packaged: Mysli.zip"
 
@@ -48,7 +50,7 @@ publish version: package
     gh release create {{version}} Mysli.zip --title "Mysli {{version}}" --generate-notes
 
 # Build release and install to /Applications (replaces existing)
-install: package
+install: (package "Mysli Code Signing")
     #!/bin/bash
     osascript -e 'tell application "Mysli" to quit' 2>/dev/null || true
     rm -rf /Applications/Mysli.app
