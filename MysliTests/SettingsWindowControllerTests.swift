@@ -3,6 +3,39 @@ import XCTest
 
 @MainActor
 final class SettingsWindowControllerTests: XCTestCase {
+    // TEST_RUNNER_MYSLI_SETTINGS_SEARCH_SNAPSHOTS=<folder> xcodebuild -project Mysli.xcodeproj -scheme Mysli test -only-testing:MysliTests/SettingsWindowControllerTests/testWritesSearchPictures
+    func testWritesSearchPictures() throws {
+        guard let path = ProcessInfo.processInfo.environment["MYSLI_SETTINGS_SEARCH_SNAPSHOTS"] else {
+            throw XCTSkip("Set MYSLI_SETTINGS_SEARCH_SNAPSHOTS to write native renders.")
+        }
+        let folder = URL(fileURLWithPath: path)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let window = try XCTUnwrap(sut.window)
+        window.orderFront(nil)
+        for (name, query, opensResult) in [("pages", "", false), ("setting", "teams speak", true),
+                                          ("alias", "sleep", false), ("empty", "no-such-setting-xyz", false),
+                                          ("guide", "combining screenshots", true)] {
+            for size in [NSSize(width: 760, height: 700), NSSize(width: 640, height: 420)] {
+                for (theme, appearance) in [("light", NSAppearance.Name.aqua), ("dark", .darkAqua)] {
+                    window.setContentSize(size)
+                    window.appearance = NSAppearance(named: appearance)
+                    sut.show()
+                    sut.sidebar.searchField.stringValue = query
+                    fire(sut.sidebar.searchField)
+                    if opensResult { fire(sut.sidebar.tableView) }
+                    sut.applyDisplayOptions(.init(reduceTransparency: true, increaseContrast: false))
+                    let view = try XCTUnwrap(window.contentView)
+                    view.layoutSubtreeIfNeeded()
+                    window.displayIfNeeded()
+                    let bitmap = try XCTUnwrap(view.bitmapImageRepForCachingDisplay(in: view.bounds))
+                    view.cacheDisplay(in: view.bounds, to: bitmap)
+                    let data = try XCTUnwrap(bitmap.representation(using: .png, properties: [:]))
+                    try data.write(to: folder.appendingPathComponent("search-\(name)-\(Int(size.width))-\(theme).png"))
+                }
+            }
+        }
+    }
+
     // Set TEST_RUNNER_MYSLI_DICTATION_SNAPSHOTS for synthetic native Settings renders.
     func testWritesDictationSettingsPictures() throws {
         guard let path = ProcessInfo.processInfo.environment["MYSLI_DICTATION_SNAPSHOTS"] else {
@@ -273,6 +306,141 @@ final class SettingsWindowControllerTests: XCTestCase {
         XCTAssertEqual(sut.sidebar.tableView.selectedRow, SettingsPage.general.rawValue)
     }
 
+    func testSearchRevealsAndFocusesTheChosenSettingWithoutWritingPreferences() throws {
+        sut.show()
+        let before = defaults.persistentDomain(forName: "SettingsWindowControllerTests")! as NSDictionary
+        sut.sidebar.searchField.stringValue = "teams speak"
+        fire(sut.sidebar.searchField)
+        XCTAssertEqual(sut.selectedPage, .general, "typing does not navigate")
+        XCTAssertEqual(sut.sidebar.resultItems.first?.title, "Teams speaker names")
+        fire(sut.sidebar.tableView)
+        XCTAssertEqual(sut.selectedPage, .meetings)
+        XCTAssertTrue(sut.window?.firstResponder === sut.teamsSpeakerNames)
+        let scroll = try XCTUnwrap(sut.pages[.meetings])
+        scroll.layoutSubtreeIfNeeded()
+        let target = sut.teamsSpeakerNames.convert(sut.teamsSpeakerNames.bounds, to: scroll.documentView)
+        XCTAssertTrue(try XCTUnwrap(scroll.documentView).visibleRect.intersects(target))
+        XCTAssertEqual(defaults.persistentDomain(forName: "SettingsWindowControllerTests")! as NSDictionary, before)
+        sut.sidebar.searchField.stringValue = ""
+        fire(sut.sidebar.searchField)
+        XCTAssertEqual(sut.sidebar.tableView.numberOfRows, SettingsPage.allCases.count)
+        XCTAssertEqual(sut.sidebar.tableView.selectedRow, SettingsPage.meetings.rawValue)
+    }
+
+    func testSearchNoResultsAndReopeningRestoreNavigation() {
+        sut.show(.dictation)
+        sut.sidebar.searchField.stringValue = "no-such-setting-xyz"
+        fire(sut.sidebar.searchField)
+        XCTAssertEqual(sut.sidebar.tableView.numberOfRows, 0)
+        fire(sut.sidebar.tableView)
+        XCTAssertEqual(sut.selectedPage, .dictation)
+        sut.close()
+        sut.show()
+        XCTAssertEqual(sut.sidebar.searchField.stringValue, "")
+        XCTAssertEqual(sut.sidebar.tableView.numberOfRows, SettingsPage.allCases.count)
+        XCTAssertEqual(sut.selectedPage, .general)
+    }
+
+    func testSearchOpensGuideTextAndKeepsTheQueryAvailable() throws {
+        sut.show()
+        sut.sidebar.searchField.stringValue = "combining screenshots"
+        fire(sut.sidebar.searchField)
+        XCTAssertEqual(sut.sidebar.resultItems.first?.title, "Combining screenshots")
+        fire(sut.sidebar.tableView)
+        let guide = try XCTUnwrap(sut.guides[.screenshots]?.guides.last)
+        XCTAssertEqual(sut.selectedPage, .screenshots)
+        XCTAssertFalse(guide.body.isHidden)
+        XCTAssertTrue(sut.window?.firstResponder === guide.button)
+        XCTAssertEqual(sut.sidebar.searchField.stringValue, "combining screenshots")
+    }
+
+    func testSearchResultRowsKeepBothTextLinesInsideTheirBounds() throws {
+        sut.show()
+        sut.sidebar.searchField.stringValue = "teams speak"
+        fire(sut.sidebar.searchField)
+        sut.window?.contentView?.layoutSubtreeIfNeeded()
+        let table = sut.sidebar.tableView
+        let cell = try XCTUnwrap(table.view(atColumn: 0, row: 0, makeIfNecessary: true))
+        cell.layoutSubtreeIfNeeded()
+        let labels = descendants(cell).compactMap { $0 as? NSTextField }
+        XCTAssertEqual(labels.count, 2)
+        for label in labels {
+            let frame = label.convert(label.bounds, to: cell)
+            XCTAssertGreaterThanOrEqual(frame.minY, 0)
+            XCTAssertLessThanOrEqual(frame.maxY, cell.bounds.height)
+        }
+    }
+
+    func testSearchUsesCommonWordsForSettings() {
+        for (query, title) in [
+            ("startup", "Launch at login"), ("sleep", "Keep Awake"),
+            ("ai provider", "Summary tool"), ("fn key", "Hold to dictate"),
+            ("save location", "Meetings folder"), ("voice", "Dictation"),
+            ("paste", "Clipboard history"), ("bug", "Something went wrong"),
+            ("feedback", "Share an idea")
+        ] {
+            sut.sidebar.searchField.stringValue = query
+            fire(sut.sidebar.searchField)
+            XCTAssertEqual(sut.sidebar.resultItems.first?.title, title, query)
+        }
+    }
+
+    func testSearchFindsKeyboardSetupAndItsInstructionsWithoutOpeningSystemSettings() {
+        var opened = 0
+        sut.onDictationKeyboardSettings = { opened += 1 }
+        for query in ["keyboard settings", "do nothing", "keyboard settings fn"] {
+            sut.show()
+            sut.sidebar.searchField.stringValue = query
+            fire(sut.sidebar.searchField)
+            XCTAssertEqual(sut.sidebar.resultItems.first?.title, "Open Keyboard Settings…", query)
+            fire(sut.sidebar.tableView)
+            XCTAssertEqual(sut.selectedPage, .dictation, query)
+            XCTAssertTrue(sut.window?.firstResponder === sut.dictationKeyboard, query)
+        }
+        XCTAssertEqual(opened, 0, "search reveals the action without performing it")
+    }
+
+    func testSearchKeyboardSelectionReturnAndEscape() {
+        sut.show()
+        sut.sidebar.searchField.stringValue = "calendar"
+        fire(sut.sidebar.searchField)
+        let editor = NSTextView()
+        XCTAssertTrue(sut.sidebar.control(sut.sidebar.searchField, textView: editor, doCommandBy: #selector(NSResponder.moveDown(_:))))
+        XCTAssertEqual(sut.sidebar.tableView.selectedRow, 1)
+        XCTAssertTrue(sut.sidebar.control(sut.sidebar.searchField, textView: editor, doCommandBy: #selector(NSResponder.moveUp(_:))))
+        XCTAssertEqual(sut.sidebar.tableView.selectedRow, 0)
+        XCTAssertTrue(sut.sidebar.control(sut.sidebar.searchField, textView: editor, doCommandBy: #selector(NSResponder.insertNewline(_:))))
+        XCTAssertEqual(sut.selectedPage, .meetings)
+        sut.window?.firstResponder?.doCommand(by: #selector(NSResponder.cancelOperation(_:)))
+        XCTAssertEqual(sut.sidebar.searchField.stringValue, "")
+        XCTAssertEqual(sut.selectedPage, .meetings)
+        XCTAssertTrue(sut.window?.firstResponder === sut.sidebar.searchField.currentEditor())
+        for control in [sut.sidebar.searchField, sut.sidebar.tableView] as [NSView] {
+            sut.sidebar.searchField.stringValue = "teams speak"
+            fire(sut.sidebar.searchField)
+            sut.window?.makeFirstResponder(control)
+            sut.window?.firstResponder?.doCommand(by: #selector(NSResponder.cancelOperation(_:)))
+            XCTAssertEqual(sut.sidebar.searchField.stringValue, "")
+            XCTAssertEqual(sut.selectedPage, .meetings)
+        }
+    }
+
+    func testSearchOmitsHiddenPermissionRowsAndRefreshesTheirAvailability() {
+        sut.show()
+        sut.sidebar.searchField.stringValue = "calendar"
+        fire(sut.sidebar.searchField)
+        XCTAssertFalse(sut.sidebar.resultItems.contains { $0.title == "Calendar" })
+        settings.calendarRecordingRemindersEnabled = true
+        sut.refresh()
+        XCTAssertEqual(sut.sidebar.resultItems.first?.title, "Calendar")
+        sut.sidebar.searchField.stringValue = "screenshot shortcuts"
+        fire(sut.sidebar.searchField)
+        XCTAssertTrue(sut.sidebar.resultItems.contains { $0.title == "Screenshot shortcuts" })
+        settings.screenshotShortcutsEnabled = false
+        sut.refresh()
+        XCTAssertFalse(sut.sidebar.resultItems.contains { $0.title == "Screenshot shortcuts" })
+    }
+
     func testEachPageCyclesTheKeyboardThroughNavigationAndItsLabelledControls() throws {
         let guides = { [unowned self] (page: SettingsPage) in sut.guides[page]?.buttons ?? [] }
         let expected: [SettingsPage: [NSView]] = [
@@ -291,7 +459,7 @@ final class SettingsWindowControllerTests: XCTestCase {
         for page in SettingsPage.allCases {
             sut.show(page)
             let controls = try XCTUnwrap(expected[page])
-            assertKeyViewCycle([sut.sidebar.tableView] + controls)
+            assertKeyViewCycle([sut.sidebar.searchField, sut.sidebar.tableView] + controls)
             for control in controls {
                 XCTAssertFalse(control.accessibilityLabel()?.isEmpty ?? true, "\(page): \(control) has no VoiceOver label")
             }

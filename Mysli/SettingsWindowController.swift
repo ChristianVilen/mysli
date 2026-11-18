@@ -127,6 +127,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             onboardingView?.render()
         } else {
             if window?.contentViewController !== settingsContent { showSettingsContent() }
+            sidebar.clearSearch()
             selectPage(page)
         }
         guard let window else { return }
@@ -181,7 +182,11 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func refreshPermissionRequirements() {
+        let previous = permissionsPage.controls
         permissionsPage.showRequired(settings.requiredPermissions, screenshotShortcuts: settings.screenshotShortcutsEnabled)
+        if sidebar.isSearching, !previous.elementsEqual(permissionsPage.controls, by: { $0 === $1 }) {
+            sidebar.refreshSearchResults()
+        }
         if selectedPage == .permissions { updateKeyViewLoop() }
     }
 
@@ -290,8 +295,16 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             for view in views { SettingsLayout.add(view, to: column) }
             return column
         }
-        func pathRow(_ title: String, path: NSTextField, buttons: [NSView]) -> NSView {
-            column([SettingsLayout.row(title, control: NSStackView(views: buttons)), path])
+        var destinations: [SettingsSearchDestination] = []
+        func row(_ page: SettingsPage, _ title: String, detail: String? = nil,
+                 control: NSView, focus: NSView? = nil, keywords: [String] = []) -> NSView {
+            let view = SettingsLayout.row(title, detail: detail, control: control)
+            destinations.append(.init(item: .init(page: page, title: title, detail: detail ?? "", keywords: keywords),
+                                      view: view, control: focus ?? control))
+            return view
+        }
+        func pathRow(_ page: SettingsPage, _ title: String, path: NSTextField, buttons: [NSButton], keywords: [String]) -> NSView {
+            column([row(page, title, control: NSStackView(views: buttons), focus: buttons.first, keywords: keywords), path])
         }
         func note(_ text: String) -> NSView { SettingsLayout.label(text, size: 11, secondary: true) }
         loginError.textColor = .systemRed
@@ -310,7 +323,13 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             for view in views { SettingsLayout.add(view, to: content) }
             if !page.shortcuts.isEmpty {
                 SettingsLayout.add(SettingsLayout.sectionTitle("Shortcuts"), to: content)
-                SettingsLayout.add(SettingsShortcuts.group(page.shortcuts), to: content)
+                let shortcuts = page.shortcuts.map { title, keys in
+                    let view = SettingsShortcuts.row(title, shortcuts: keys)
+                    let names = keys.flatMap { $0.modifierKeycaps + [$0.keycap] }.map(\.name)
+                    destinations.append(.init(item: .init(page: page, title: title, keywords: names), view: view))
+                    return view
+                }
+                SettingsLayout.add(SettingsLayout.group(shortcuts), to: content)
             }
             if let guide = guides[page] {
                 SettingsLayout.add(SettingsLayout.sectionTitle("Guide"), to: content)
@@ -324,60 +343,84 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             SettingsLayout.add(SettingsLayout.sectionTitle("Guide"), to: permissions)
             SettingsLayout.add(guide.view, to: permissions)
         }
+        let dictationKeyboardHelp = "For Fn, set ‘Press 🌐 key to’ to ‘Do Nothing’ in Keyboard Settings. Mysli never changes this setting."
+        destinations.append(.init(item: .init(page: .dictation, title: dictationKeyboard.title,
+                                              detail: dictationKeyboardHelp),
+                                  view: dictationKeyboard, control: dictationKeyboard))
         let contents: [SettingsPage: NSView] = [
             .general: toolPage(.general, [
-                SettingsLayout.group([column([SettingsLayout.row("Launch at login", control: launchAtLogin), loginError])])
+                SettingsLayout.group([column([row(.general, "Launch at login", control: launchAtLogin,
+                                                                keywords: ["startup start automatically boot"]), loginError])])
             ]),
             .screenshots: toolPage(.screenshots, [SettingsLayout.group([
-                SettingsLayout.row("Use Mysli for screenshots", detail: "When off, Shift + Command + 3 and 4 go back to macOS.",
-                                   control: screenshotShortcuts),
-                SettingsLayout.row("Show thumbnail for", control: thumbnailDuration)
+                row(.screenshots, "Use Mysli for screenshots", detail: "When off, Shift + Command + 3 and 4 go back to macOS.",
+                                   control: screenshotShortcuts, keywords: ["screen capture hotkey"]),
+                row(.screenshots, "Show thumbnail for", control: thumbnailDuration, keywords: ["preview duration timeout seconds forever"])
             ])]),
             .clipboard: toolPage(.clipboard, [SettingsLayout.group([
-                SettingsLayout.row("Clipboard history", detail: "Keep recent copies until you quit Mysli.", control: clipboardHistory)
+                row(.clipboard, "Clipboard history", detail: "Keep recent copies until you quit Mysli.", control: clipboardHistory,
+                                   keywords: ["copy paste"])
             ])]),
             .windows: toolPage(.windows, [SettingsLayout.group([
-                SettingsLayout.row("Window tiling", detail: "Move windows with Control + Option.", control: windowTiling)
+                row(.windows, "Window tiling", detail: "Move windows with Control + Option.", control: windowTiling,
+                                   keywords: ["arrange resize snap maximize center"])
             ])]),
             .keepAwake: toolPage(.keepAwake, [
                 SettingsLayout.group([
-                    SettingsLayout.row("Keep Awake", control: keepAwakeEnabled),
-                    SettingsLayout.row("Keep screen on", detail: "The display stays awake too while a session runs.",
-                                                         control: keepScreenOn)]),
+                    row(.keepAwake, "Keep Awake", control: keepAwakeEnabled, keywords: ["sleep prevent caffeine caffeinate"]),
+                    row(.keepAwake, "Keep screen on", detail: "The display stays awake too while a session runs.",
+                                                         control: keepScreenOn, keywords: ["display sleep"])]),
                 note("Start a session from the Mysli menu.")
             ]),
             .meetings: toolPage(.meetings, [
                 SettingsLayout.group([
-                    SettingsLayout.row("Meetings", control: meetingsEnabled),
-                    pathRow("Meetings folder", path: folderPath, buttons: [chooseMeetingsFolder]),
-                    SettingsLayout.row("Summary tool", control: summaryTool)
+                    row(.meetings, "Meetings", control: meetingsEnabled, keywords: ["recording call audio transcript"]),
+                    pathRow(.meetings, "Meetings folder", path: folderPath, buttons: [chooseMeetingsFolder], keywords: ["save location path directory"]),
+                    row(.meetings, "Summary tool", control: summaryTool, keywords: ["ai provider claude antigravity automatic agy"])
                 ]),
                 note("Automatic tries Antigravity, then Claude Code. An explicit choice uses only that tool. Changes apply when the next job starts."),
-                SettingsLayout.group([pathRow("Background file", path: backgroundPath, buttons: [chooseBackground, clearBackground])]),
+                SettingsLayout.group([pathRow(.meetings, "Background file", path: backgroundPath, buttons: [chooseBackground, clearBackground],
+                                             keywords: ["context summary information"])]),
                 note("The complete background file goes with the transcript. Automatic may send it to both providers on fallback. Clear keeps the file."),
                 SettingsLayout.group([
-                    column([SettingsLayout.row("Calendar reminders", detail: "Calendar events offer recording reminders. Mysli never starts or stops recording automatically.",
-                                               control: calendarReminders), calendarStatus]),
-                    SettingsLayout.row("Remind me", control: calendarReminderTime),
-                    SettingsLayout.row("Remind for", detail: "A video meeting link is a Teams, Google Meet, or Zoom link in the event notes, location, or URL.",
-                                       control: calendarReminderEvents),
-                    SettingsLayout.row("Teams speaker names", detail: "Experimental. After Stop, names remote speakers from the Teams app. Applies from the next recording.",
-                                       control: teamsSpeakerNames)
+                    column([row(.meetings, "Calendar reminders", detail: "Calendar events offer recording reminders. Mysli never starts or stops recording automatically.",
+                                               control: calendarReminders, keywords: ["schedule notifications alerts"]), calendarStatus]),
+                    row(.meetings, "Remind me", control: calendarReminderTime, keywords: ["calendar reminder time minutes before start"]),
+                    row(.meetings, "Remind for", detail: "A video meeting link is a Teams, Google Meet, or Zoom link in the event notes, location, or URL.",
+                                       control: calendarReminderEvents, keywords: ["calendar reminders filter events teams zoom google meet video link"]),
+                    row(.meetings, "Teams speaker names", detail: "Experimental. After Stop, names remote speakers from the Teams app. Applies from the next recording.",
+                                       control: teamsSpeakerNames, keywords: ["people participants identify recognition"])
                 ])
             ]),
             .dictation: toolPage(.dictation, [
                 SettingsLayout.group([
-                    SettingsLayout.row("Dictation", detail: "Send dictated words to Claude Haiku for polish, then paste them.", control: dictationEnabled),
-                    SettingsLayout.row("Hold to dictate", control: dictationKey),
-                    SettingsLayout.row("Send text near the cursor", detail: "Share up to 500 characters before the cursor with Claude. Secure fields are excluded.", control: dictationNearbyText)
+                    row(.dictation, "Dictation", detail: "Send dictated words to Claude Haiku for polish, then paste them.",
+                                       control: dictationEnabled, keywords: ["voice speech microphone"]),
+                    row(.dictation, "Hold to dictate", control: dictationKey, keywords: ["fn globe key keyboard shortcut hotkey"]),
+                    row(.dictation, "Send text near the cursor", detail: "Share up to 500 characters before the cursor with Claude. Secure fields are excluded.",
+                                       control: dictationNearbyText, keywords: ["preceding nearby context privacy"])
                 ]),
                 note("Fn needs Input Monitoring. Both options need Microphone and Accessibility. Grant them on the Permissions page."),
-                note("For Fn, set ‘Press 🌐 key to’ to ‘Do Nothing’ in Keyboard Settings. Mysli never changes this setting."),
+                note(dictationKeyboardHelp),
                 dictationKeyboard
             ]),
             .permissions: permissions,
             .help: helpPage
         ]
+        for page in SettingsPage.allCases {
+            guard let content = contents[page] else { continue }
+            if !destinations.contains(where: { $0.item.page == page && $0.item.title == page.title }) {
+                destinations.append(.init(item: .init(page: page, title: page.title, detail: page.subtitle, kind: .page), view: content))
+            }
+            for guide in guides[page]?.guides ?? [] {
+                destinations.append(.init(item: .init(page: page, title: guide.button.title, detail: guide.body.stringValue, kind: .guide),
+                                                view: guide.button, control: guide.button, reveal: {
+                    if guide.body.isHidden { guide.button.performClick(nil) }
+                }))
+            }
+        }
+        sidebar.catalog = destinations + permissionsPage.searchDestinations + helpPage.searchDestinations
+        sidebar.onSearchChanged = { [weak self] in self?.updateKeyViewLoop() }
         let root = pageContainer
         pages = contents.mapValues(SettingsLayout.scroll)
         if let general = pages[.general] { SettingsLayout.fill(general, in: root) }
@@ -395,16 +438,21 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         settingsContent.addSplitViewItem(sidebarItem)
         settingsContent.addSplitViewItem(detailItem)
         showSettingsContent()
-        sidebar.onSelect = { [weak self] page in
-            guard let self, selectedPage != page else { return }
-            selectPage(page)
+        sidebar.onSelect = { [weak self] row in
+            guard let self else { return }
+            switch row {
+            case .page(let page):
+                if selectedPage != page { selectPage(page) }
+            case .result(let destination):
+                revealSearchResult(destination)
+            }
         }
         window?.initialFirstResponder = launchAtLogin
         selectPage(.general)
         applyDisplayOptions(.current)
     }
 
-    private func selectPage(_ page: SettingsPage) {
+    private func selectPage(_ page: SettingsPage, focusSidebar: Bool = true) {
         let changed = selectedPage != page
         selectedPage = page
         for (candidate, scroll) in pages {
@@ -415,8 +463,35 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         if changed { applyDisplayOptions(.current) }
         sidebar.select(page)
         updateKeyViewLoop()
-        window?.makeFirstResponder(sidebar.tableView)
+        if focusSidebar { window?.makeFirstResponder(sidebar.tableView) }
         refreshPermissionsVisibility()
+    }
+
+    private func revealSearchResult(_ destination: SettingsSearchDestination) {
+        selectPage(destination.item.page, focusSidebar: false)
+        destination.reveal?()
+        window?.contentView?.layoutSubtreeIfNeeded()
+        if !destination.view.isHiddenOrHasHiddenAncestor {
+            destination.view.scrollToVisible(destination.view.bounds.insetBy(dx: 0, dy: -16))
+        }
+        let focus = destination.control
+        if let focus, !focus.isHiddenOrHasHiddenAncestor, focus.acceptsFirstResponder {
+            window?.makeFirstResponder(focus)
+        } else {
+            window?.makeFirstResponder(sidebar.tableView)
+        }
+    }
+
+    @objc func focusSettingsSearch(_ sender: Any?) {
+        guard window?.contentViewController === settingsContent else { return }
+        window?.makeFirstResponder(sidebar.searchField)
+        sidebar.searchField.selectText(nil)
+    }
+
+    override func cancelOperation(_ sender: Any?) {
+        guard sidebar.isSearching else { return super.cancelOperation(sender) }
+        sidebar.clearSearch()
+        focusSettingsSearch(sender)
     }
 
     private func updateKeyViewLoop() {
@@ -431,8 +506,9 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         case .permissions: permissionsPage.controls
         case .help: helpPage.controls
         }
-        let keyViews: [NSView] = [sidebar.tableView] + controls + (guides[selectedPage]?.buttons ?? [])
-        for (control, next) in zip(keyViews, keyViews.dropFirst() + [sidebar.tableView]) { control.nextKeyView = next }
+        let navigation: [NSView] = [sidebar.searchField] + (sidebar.tableView.numberOfRows > 0 ? [sidebar.tableView] : [])
+        let keyViews = navigation + controls + (guides[selectedPage]?.buttons ?? [])
+        for (control, next) in zip(keyViews, keyViews.dropFirst() + [sidebar.searchField]) { control.nextKeyView = next }
     }
 
     func applyDisplayOptions(_ options: SettingsDisplayOptions) {

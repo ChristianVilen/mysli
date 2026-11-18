@@ -150,7 +150,7 @@ Recording needs Screen Recording access for the sound your Mac plays and Microph
 
 ### Experimental Teams speaker names
 
-This feature is off by default. Its rules come from public source code and tests with fake Accessibility trees. **It has not been verified during a real Teams call.** Teams can change its UI, hide its speaking indicator, or keep the last speaker highlighted. Names can be missing or wrong.
+This feature is off by default. Its rules come from public source code and tests with fake Accessibility trees. In one real Teams call, it found the name of a remote speaker beside a shared screen. **The video gallery view and names in a finished transcript are not verified yet.** Teams can change its UI, hide its speaking indicator, or keep the last speaker highlighted. Names can be missing or wrong.
 
 To opt in, turn on **Teams speaker names** in Settings. It applies from the next recording. You can also run this command and restart Mysli before your next recording:
 
@@ -160,7 +160,7 @@ defaults write io.github.christianvilen.mysli teamsSpeakerNamesEnabled -bool tru
 
 Mysli reads this preference once when each recording starts.
 
-While you record, Mysli reads candidate speaker indicators and participant labels from the Teams desktop app through Accessibility. It supports a narrow profile of English meeting controls and video-tile structure. Teams shows its call to Accessibility only after an app turns on the Teams flag `AXEnhancedUserInterface`. If this flag is off, Mysli turns it on while it records, and turns it off again when you pause or stop. If another app turned the flag on, Mysli does not change it. While the flag is on, moving or resizing the Teams window can be slow. Teams keeps its call visible to Accessibility until Teams quits. Mysli does not click controls, open chats, or request a new permission. If Accessibility is unavailable or the structure is unsupported, recording continues and the remote lines stay "Them".
+While you record, Mysli reads candidate speaker indicators and participant labels from the Teams desktop app through Accessibility. It supports a narrow profile of English meeting controls, video tiles, and the participant strip beside a shared screen. Teams shows its call to Accessibility only after an app turns on the Teams flag `AXEnhancedUserInterface`. If this flag is off, Mysli turns it on while it records, and turns it off again when you pause or stop. If another app turned the flag on, Mysli does not change it. While the flag is on, moving or resizing the Teams window can be slow. Teams keeps its call visible to Accessibility until Teams quits. Mysli does not click controls, open chats, or request a new permission. If Accessibility is unavailable or the structure is unsupported, recording continues and the remote lines stay "Them".
 
 After Stop, a remote segment can say `Aino (Teams)` when repeated observations support that name for at least 90% of the segment. Conflicts, uncertain observations, overlapping remote segments, and insufficient coverage keep "Them". Mysli does not guess from a roster, a muted microphone, a calendar, or a saved voice profile. The live draft and microphone Room labels stay unchanged. A Teams label alone does not establish who owns an action item.
 
@@ -499,6 +499,8 @@ Open **Settings…** in the menu to change preferences and find setup or help. T
 - **Screenshots**, **Clipboard**, **Windows**, **Keep Awake**, **Meetings**, and **Dictation** each hold the tool's switch and settings, its keyboard shortcuts, and a guide that you can open.
 - **Permissions** shows access checks for enabled tools and screenshot shortcut setup while Screenshots is on. After setup, missing required access opens this page at launch.
 - **Help** opens GitHub to report a bug or send feedback. You review the message before sending it.
+
+Use **Search Settings** above the sidebar, or press Command-F, to find a setting, shortcut, permission, or guide. Search accepts partial words and common names such as "startup" or "sleep". It also allows a single typing mistake in longer words. Use Up and Down to select a result, then Return to open it, or click the result. Mysli scrolls to the setting and focuses its control. A guide result opens the guide text. Escape or the clear button restores the page list. Search stays on this Mac and does not save your query.
 
 **Keep screen on** on the Keep Awake page and in the menu is one preference. A change in one place shows in the other.
 

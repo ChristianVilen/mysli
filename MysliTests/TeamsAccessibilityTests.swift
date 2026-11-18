@@ -205,6 +205,16 @@ final class TeamsAccessibilityTests: XCTestCase {
         XCTAssertEqual(snapshot.result.speaker?.value, "Ada Lovelace", "\(snapshot.result)")
     }
 
+    func testShareViewParticipantItemOwnsTheNameBesideItsHighlight() {
+        let tree = FakeTeamsAX.shareView()
+        let snapshot = TeamsAccessibility(reader: tree).snapshot()
+        XCTAssertEqual(snapshot.result.speaker?.value, "Lovelace, Ada", "\(snapshot.result)")
+        tree.nodes[47]!.metadata.bounds.origin.y = 900
+        tree.labelReads = []
+        XCTAssertEqual(TeamsAccessibility(reader: tree).snapshot().result, .unnamed(.unsupportedTile))
+        XCTAssertFalse(tree.labelReads.contains(47))
+    }
+
     func testSeparateCallingControlsNeedARecognisedToolbarWithTheSameParent() {
         let tree = FakeTeamsAX.callWithSeparateControls()
         tree.nodes[1]!.metadata.identifier = ""
@@ -350,7 +360,7 @@ final class TeamsAccessibilityTests: XCTestCase {
         XCTAssertEqual(TeamsAccessibility(reader: children).snapshot().result, .unnamed(.scanLimit))
         let depth = FakeTeamsAX.meeting()
         depth.nodes[0]!.children += [10]
-        for node in 10...26 { depth.nodes[node] = .init(children: node == 26 ? [] : [node + 1]) }
+        for node in 10...42 { depth.nodes[node] = .init(children: node == 42 ? [] : [node + 1]) }
         XCTAssertEqual(TeamsAccessibility(reader: depth).snapshot().result, .unnamed(.scanLimit))
         let nodes = FakeTeamsAX.meeting()
         nodes.nodes[0]!.children += Array(10..<23)
@@ -549,6 +559,37 @@ final class FakeTeamsAX: TeamsAXReading {
         tree.nodes[0]!.children.append(5)
         tree.nodes[5] = .init(children: [2], label: "Calling controls")
         tree.nodes[2]!.label = "Leave"
+        return tree
+    }
+
+    /// The participant strip beside a shared screen, measured in a real call on 2026-11-16. The item is at
+    /// depth 22, the highlight is its last child, and the name chip lies above a 3 px bar, outside it.
+    static func shareView() -> FakeTeamsAX {
+        let tree = meeting()
+        let screen = CGRect(x: 0, y: 0, width: 3000, height: 2000)
+        func box(_ x: CGFloat, _ y: CGFloat, _ width: CGFloat, _ height: CGFloat) -> CGRect {
+            CGRect(x: x, y: y, width: width, height: height)
+        }
+        tree.nodes[3] = nil
+        tree.nodes[4] = nil
+        tree.nodes[0]!.metadata.bounds = screen
+        tree.nodes[0]!.children = [1, 10]
+        for node in 10...30 {
+            tree.nodes[node] = .init(metadata: TeamsAXMetadata(bounds: screen), children: [node == 30 ? 40 : node + 1])
+        }
+        tree.nodes[40] = .init(metadata: TeamsAXMetadata(role: "AXMenuItem", bounds: box(2661, 675, 164, 123)),
+                               children: [41, 42, 43, 48])
+        tree.nodes[41] = .init(metadata: TeamsAXMetadata(bounds: box(2663, 677, 160, 119)))
+        tree.nodes[42] = .init(metadata: TeamsAXMetadata(bounds: box(2669, 798, 140, 0)))
+        tree.nodes[43] = .init(metadata: TeamsAXMetadata(bounds: box(2663, 793, 160, 3)), children: [44])
+        tree.nodes[44] = .init(metadata: TeamsAXMetadata(classes: ["vdi-occlusion"], bounds: box(2671, 764, 110, 24)),
+                               children: [45])
+        tree.nodes[45] = .init(metadata: TeamsAXMetadata(bounds: box(2671, 764, 110, 24)), children: [46])
+        tree.nodes[46] = .init(metadata: TeamsAXMetadata(bounds: box(2677, 769, 98, 14)), children: [47])
+        tree.nodes[47] = .init(metadata: TeamsAXMetadata(role: "AXStaticText", bounds: box(2677, 769, 98, 14)),
+                               label: "Lovelace, Ada")
+        tree.nodes[48] = .init(metadata: TeamsAXMetadata(classes: ["vdi-frame-occlusion", "frwhdur", "f3ve9t9"],
+                                                         bounds: box(2663, 677, 160, 119)))
         return tree
     }
 }

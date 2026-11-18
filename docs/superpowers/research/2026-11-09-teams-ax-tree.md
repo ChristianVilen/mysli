@@ -1,6 +1,6 @@
 # How tools turn on the Teams web tree
 
-Status: on 2026-11-09 the user decided that Mysli may write `AXEnhancedUserInterface` on the Teams app. `TeamsWebContentSwitch` does this with the limits in "Consequence for Mysli", item 3. It turns the flag off again at Pause and Stop. It does not retry when the tree stays empty. Nobody has checked the write in a real call yet.
+Status: on 2026-11-09 the user decided that Mysli may write `AXEnhancedUserInterface` on the Teams app. `TeamsWebContentSwitch` does this with the limits in "Consequence for Mysli", item 3. It turns the flag off again at Pause and Stop. It does not retry when the tree stays empty. On 2026-11-16 the write turned the tree on in a real call. See "Our measurement in a real call on 2026-11-16".
 
 Checked on 2026-11-09 with `gh api`, GitHub search, Microsoft Learn, and Microsoft support pages. These are observations of source code and documents. No third-party code was installed, built, or run. Nothing ran against Teams. This note builds on the [earlier open-source note](2026-10-29-teams-open-source.md) and does not repeat it.
 
@@ -18,6 +18,35 @@ Each finding has one of four labels:
 - `AXManualAccessibility = true` returns -25205 (`kAXErrorAttributeUnsupported`) on the `MSTeams` pid and on the WebView pid. Nothing changes after the write.
 - None of the 8 "Microsoft Teams WebView" processes has `--disable-renderer-accessibility`, `--disable-platform-accessibility-integration`, or `--force-renderer-accessibility` in its command line. So no start flag blocks the tree.
 - On 2026-11-04, an older Teams showed `AXScrollArea > AXWebArea` with the call controls.
+
+## Our measurement in a real call on 2026-11-16
+
+Teams was the same version as on 2026-11-09. One remote person shared a screen during the whole measurement. Read-only scripts printed roles, sizes, depths, CSS classes, and counts. They printed no names or other text.
+
+- The running Mysli was built from a branch without `TeamsWebContentSwitch`. Each of its scans gave `noMeetingWindow`.
+- A one-time script wrote `AXEnhancedUserInterface = true` on the application element of `MSTeams`. The write returned -25208, and the value then read `true`. Less than a minute later, Mysli logged `scanLimit` instead of `noMeetingWindow`.
+- The call window then had 258 to 276 nodes, with `AXScrollArea > AXWebArea` at depths 5 and 6. A second Teams window kept the 11-node shell.
+- The toolbar labelled "Meeting controls" was at depth 14 and had no identifier. Its Hang up button was at depth 15.
+- The deepest node was at depth 27, and no node had more than 28 children. Mysli's depth limit of 16 caused the `scanLimit`.
+- The shared screen was an `AXMenuItem` of 2448×1531. Beside it, 17 participants were `AXMenuItem` nodes of about 164×123 at depth 22. The title of each item held the name and state words such as "muted" and "video".
+- While a participant spoke, the last child of the item, an `AXGroup` of 160×119, had `vdi-frame-occlusion` and the border classes `frwhdur` and `f3ve9t9`. The classes went off in pauses of about 3 s. No node had "speaking" in its text.
+- The name is an `AXStaticText` at depth 26, in a 110×24 chip with the class `vdi-occlusion`. The parent of the chip is a 160×3 bar, and the chip is above the bar, outside its bounds. The name has the form "Last, First".
+
+One participant item, while that person spoke:
+
+```
+AXMenuItem 164×123
+  AXGroup 160×119
+  AXGroup 140×0
+  AXGroup 160×3
+    AXGroup 110×24 (vdi-occlusion)
+      AXGroup 110×24
+        AXGroup 98×14
+          AXStaticText 98×14 (the name)
+  AXGroup 160×119 (vdi-frame-occlusion frwhdur f3ve9t9)
+```
+
+`TeamsAccessibility` with the participant-item rules ran outside Mysli every 0.3 s for 340 scans. It gave `named` 270 times and `noHighlightedTile` 70 times. All named scans had the same remote name, which was not the user's own. A scan took 75 ms (median) and at most 133 ms. These were not checked: the video gallery view, the user's own item while the user speaks, and names in a finished transcript.
 
 ## Main findings
 

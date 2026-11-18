@@ -175,8 +175,9 @@ struct TeamsAXSnapshot: Equatable, Sendable {
     var nodes = 0
 }
 
-/// Window wrappers and call controls were observed in a real Teams call. The tile
-/// structure and highlight classes in `borders` remain unverified. Fake trees test policy only.
+/// Window wrappers and call controls were observed in a real Teams call. On 2026-11-16, beside a shared
+/// screen, a participant `AXMenuItem` had a `vdi-frame-occlusion` child with two `borders` classes while
+/// that person spoke. The gallery tile structure remains unverified. Fake trees test policy only.
 final class TeamsAccessibility<Reader: TeamsAXReading> {
     private struct Item {
         let node: Reader.Node
@@ -210,12 +211,24 @@ final class TeamsAccessibility<Reader: TeamsAXReading> {
             guard tiles.count == 1 else { throw TeamsScanReason.multipleHighlightedTiles }
             let tile = items[index]
             guard !tile.selfOwned else { throw TeamsScanReason.selfTile }
-            guard tile.metadata.role == "AXGroup", tile.rootOwned else { throw TeamsScanReason.unsupportedTile }
-            let members = items[tile.subtree]
+            guard ["AXGroup", "AXMenuItem"].contains(tile.metadata.role), tile.rootOwned else {
+                throw TeamsScanReason.unsupportedTile
+            }
+            let isMenuItem = tile.metadata.role == "AXMenuItem"
+            // A menu item becomes a tile only through a marker child, which the walk never reaches in a
+            // forbidden or hidden item, so only the item's descendants need the member check.
+            let members = isMenuItem ? items[tile.subtree].dropFirst() : items[tile.subtree]
             guard members.allSatisfy(\.tileMember) else { throw TeamsScanReason.unsupportedTile }
             let names = members.filter { $0.metadata.role == "AXStaticText" }
-            guard names.count == 1, let name = names.first,
-                  name.metadata.visible, name.bounded else { throw TeamsScanReason.unsupportedTile }
+            guard names.count == 1, let name = names.first, name.metadata.visible else {
+                throw TeamsScanReason.unsupportedTile
+            }
+            // Teams draws the name chip of a participant item above a 3 px bar that is its parent, so only
+            // the item itself can contain the name.
+            let owned = isMenuItem
+                ? TeamsAccessibility.validBounds(name.metadata.bounds) && tile.metadata.bounds.contains(name.metadata.bounds)
+                : name.bounded
+            guard owned else { throw TeamsScanReason.unsupportedTile }
             return (tile.node, name.node)
         }
     }
@@ -266,7 +279,7 @@ final class TeamsAccessibility<Reader: TeamsAXReading> {
         }
     }
 
-    private func validBounds(_ bounds: CGRect) -> Bool {
+    private static func validBounds(_ bounds: CGRect) -> Bool {
         [bounds.origin.x, bounds.origin.y, bounds.size.width, bounds.size.height].allSatisfy(\.isFinite)
             && bounds.size.width > 0 && bounds.size.height > 0
     }
@@ -279,22 +292,25 @@ final class TeamsAccessibility<Reader: TeamsAXReading> {
 
     private func walk(_ node: Reader.Node, parent: Int?, ownership: Ownership, depth: Int, tree: inout Tree, count: inout Int,
                       deadline: TimeInterval) throws {
-        guard depth <= 16, count < 512 else { throw TeamsScanReason.scanLimit }
+        // The participant strip beside a shared screen reaches depth 27.
+        guard depth <= 32, count < 512 else { throw TeamsScanReason.scanLimit }
         guard !tree.items.contains(where: { $0.node == node }) else { throw TeamsScanReason.unexpectedAXValue }
         count += 1
         let metadata = try reader.metadata(node, timeout: budget(deadline))
         let index = tree.items.count
         let excluded = forbidden(metadata)
         let selfScope = ownership.selfScope || isSelf(metadata)
-        let bounded = validBounds(metadata.bounds) && ownership.bounds.contains(metadata.bounds)
+        let bounded = Self.validBounds(metadata.bounds) && ownership.bounds.contains(metadata.bounds)
         tree.items.append(Item(node: node, parent: parent, metadata: metadata, subtree: index..<(index + 1),
                                rootOwned: ownership.rootScope && bounded, selfOwned: selfScope,
                                bounded: bounded,
                                tileMember: !excluded && !isSelf(metadata)
                                    && ["AXGroup", "AXStaticText", "AXImage", "AXButton"].contains(metadata.role)))
         if metadata.visible, metadata.classes.intersection(Self.borders).count >= 2 {
-            if metadata.classes.contains("vdi-frame-occlusion") { tree.tiles.insert(index) }
-            else if let parent, tree.items[parent].metadata.classes.contains("vdi-frame-occlusion"),
+            if metadata.classes.contains("vdi-frame-occlusion") {
+                if let parent, bounded, tree.items[parent].metadata.role == "AXMenuItem" { tree.tiles.insert(parent) }
+                else { tree.tiles.insert(index) }
+            } else if let parent, tree.items[parent].metadata.classes.contains("vdi-frame-occlusion"),
                     tree.items[parent].metadata.bounds == metadata.bounds { tree.tiles.insert(parent) }
         }
         guard !excluded, metadata.visible else { return }
@@ -306,12 +322,12 @@ final class TeamsAccessibility<Reader: TeamsAXReading> {
         } else if metadata.role == "AXGroup" {
             control = ownership.control
         }
-        if metadata.role == "AXButton", metadata.enabled, validBounds(metadata.bounds),
+        if metadata.role == "AXButton", metadata.enabled, Self.validBounds(metadata.bounds),
            let owner = ownership.control {
             tree.controls[owner].buttons.append(node)
         }
         let descendants = Ownership(
-            bounds: validBounds(metadata.bounds) ? ownership.bounds.intersection(metadata.bounds) : .null,
+            bounds: Self.validBounds(metadata.bounds) ? ownership.bounds.intersection(metadata.bounds) : .null,
             rootScope: ownership.rootScope && ["AXWindow", "AXWebArea", "AXScrollArea", "AXGroup"].contains(metadata.role),
             selfScope: selfScope,
             control: control)
