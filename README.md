@@ -500,6 +500,8 @@ Open **Settings…** in the menu to change preferences and find setup or help. T
 - **Permissions** shows access checks for enabled tools and screenshot shortcut setup while Screenshots is on. After setup, missing required access opens this page at launch.
 - **Help** opens GitHub to report a bug or send feedback. You review the message before sending it.
 
+Use **Search Settings** above the sidebar, or press Command-F, to find a setting, shortcut, permission, or guide. Search accepts partial words and common names such as "startup" or "sleep". It also allows a single typing mistake in longer words. Use Up and Down to select a result, then Return to open it, or click the result. Mysli scrolls to the setting and focuses its control. A guide result opens the guide text. Escape or the clear button restores the page list. Search stays on this Mac and does not save your query.
+
 **Keep screen on** on the Keep Awake page and in the menu is one preference. A change in one place shows in the other.
 
 Until setup is finished, **Settings…** and Command-comma return to the saved setup step. After setup, they open General. Opening a page does not change preferences.

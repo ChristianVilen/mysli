@@ -12,6 +12,16 @@ final class SettingsPermissionsView: NSStackView {
         permissionList.controls + (shortcutGroup.isHidden ? [] : [keyboardSettings])
     }
 
+    var searchDestinations: [SettingsSearchDestination] {
+        permissionList.rows.map { row in
+            SettingsSearchDestination(item: .init(page: .permissions, title: row.permission.title, detail: row.permission.explanation),
+                                      view: row.view, control: row.view.grantButton, isAvailable: { !row.view.isHidden })
+        } + [SettingsSearchDestination(item: .init(page: .permissions, title: "Screenshot shortcuts",
+                                                 keywords: ["keyboard conflict macOS"]),
+                                       view: keyboardSettings, control: keyboardSettings,
+                                       isAvailable: { [shortcutGroup] in !shortcutGroup.isHidden })]
+    }
+
     init(actions: PermissionActions) {
         permissionList = PermissionListView(actions: actions)
         keyboardAction = actions.keyboardSettings

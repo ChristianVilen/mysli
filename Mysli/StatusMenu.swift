@@ -177,7 +177,8 @@ final class StatusMenu: NSObject, NSMenuDelegate {
                       NSMenuItem(title: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x"),
                       NSMenuItem(title: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c"),
                       NSMenuItem(title: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v"),
-                      NSMenuItem(title: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")])
+                      NSMenuItem(title: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a"), .separator(),
+                      NSMenuItem(title: "Search Settings…", action: #selector(SettingsWindowController.focusSettingsSearch(_:)), keyEquivalent: "f")])
         ]
         let mainMenu = NSMenu()
         for (title, items) in menus {

@@ -214,10 +214,10 @@ final class TeamsAccessibility<Reader: TeamsAXReading> {
             guard ["AXGroup", "AXMenuItem"].contains(tile.metadata.role), tile.rootOwned else {
                 throw TeamsScanReason.unsupportedTile
             }
-            let item = tile.metadata.role == "AXMenuItem"
+            let isMenuItem = tile.metadata.role == "AXMenuItem"
             // A menu item becomes a tile only through a marker child, which the walk never reaches in a
             // forbidden or hidden item, so only the item's descendants need the member check.
-            let members = item ? items[tile.subtree].dropFirst() : items[tile.subtree]
+            let members = isMenuItem ? items[tile.subtree].dropFirst() : items[tile.subtree]
             guard members.allSatisfy(\.tileMember) else { throw TeamsScanReason.unsupportedTile }
             let names = members.filter { $0.metadata.role == "AXStaticText" }
             guard names.count == 1, let name = names.first, name.metadata.visible else {
@@ -225,7 +225,7 @@ final class TeamsAccessibility<Reader: TeamsAXReading> {
             }
             // Teams draws the name chip of a participant item above a 3 px bar that is its parent, so only
             // the item itself can contain the name.
-            let owned = item
+            let owned = isMenuItem
                 ? TeamsAccessibility.validBounds(name.metadata.bounds) && tile.metadata.bounds.contains(name.metadata.bounds)
                 : name.bounded
             guard owned else { throw TeamsScanReason.unsupportedTile }

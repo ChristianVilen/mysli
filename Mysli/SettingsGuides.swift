@@ -44,18 +44,16 @@ final class SettingsGuides: NSObject {
 /// The shortcut rows of a page, with one keycap for each key.
 @MainActor
 enum SettingsShortcuts {
-    static func group(_ rows: [(title: String, shortcuts: [HotkeyShortcut])]) -> NSView {
-        SettingsLayout.group(rows.map { title, shortcuts in
-            let key = Keycap(symbol: shortcuts.map(\.keycap.symbol).joined(separator: " / "),
-                             name: shortcuts.map(\.keycap.name).joined(separator: " or "))
-            let keycaps = shortcuts[0].modifierKeycaps + [key]
-            let keys = NSStackView(views: keycaps.map(keycapView))
-            keys.spacing = 4
-            keys.setAccessibilityElement(true)
-            keys.setAccessibilityRole(.group)
-            keys.setAccessibilityLabel(keycaps.map(\.name).joined(separator: " + "))
-            return SettingsLayout.row(title, control: keys)
-        })
+    static func row(_ title: String, shortcuts: [HotkeyShortcut]) -> NSView {
+        let key = Keycap(symbol: shortcuts.map(\.keycap.symbol).joined(separator: " / "),
+                         name: shortcuts.map(\.keycap.name).joined(separator: " or "))
+        let keycaps = shortcuts[0].modifierKeycaps + [key]
+        let keys = NSStackView(views: keycaps.map(keycapView))
+        keys.spacing = 4
+        keys.setAccessibilityElement(true)
+        keys.setAccessibilityRole(.group)
+        keys.setAccessibilityLabel(keycaps.map(\.name).joined(separator: " + "))
+        return SettingsLayout.row(title, control: keys)
     }
 
     private static func keycapView(_ keycap: Keycap) -> NSView {
