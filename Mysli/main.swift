@@ -5,10 +5,10 @@ import Cocoa
 MainActor.assumeIsolated {
     let app = NSApplication.shared
     let mode = AppLaunchMode(environment: ProcessInfo.processInfo.environment, arguments: CommandLine.arguments)
-    let delegate: (any NSApplicationDelegate)?
+    let delegate: any NSApplicationDelegate
     switch mode {
     case .production: delegate = AppDelegate()
-    case .xctest: delegate = nil
+    case .xctest: delegate = XCTestHostAppDelegate()
     case .settingsPreview: delegate = SettingsPreviewAppDelegate()
     }
     app.delegate = delegate

@@ -296,3 +296,25 @@ enum SettingsLayout {
 private final class SettingsDocument: NSView {
     override var isFlipped: Bool { true }
 }
+
+/// What Settings and onboarding say while a tool cannot work because its CLI is not installed,
+/// or nil. Each call looks at the CLI files again.
+enum MissingToolNote {
+    static func dictation() -> String? {
+        let claude = SummaryCLI.claude
+        guard claude.installedPath() == nil else { return nil }
+        return "⚠️ \(claude.productName) is not installed, so dictated text is pasted without polish. \(claude.setUpHint)"
+    }
+
+    static func summary(for tool: SummaryTool) -> String? {
+        guard !tool.isInstalled() else { return nil }
+        let consequence = "so meetings get a transcript but no summary."
+        let clis = tool.candidates
+        if clis.count == 1, let cli = clis.first {
+            return "⚠️ \(cli.productName) is not installed, \(consequence) \(cli.setUpHint)"
+        }
+        return "⚠️ No summary tool is installed, \(consequence) "
+            + "Install \(clis.map(\.installSource).joined(separator: ", or install ")). "
+            + "Then open Terminal, run \(clis.map(\.rawValue).joined(separator: " or ")) once, and log in."
+    }
+}

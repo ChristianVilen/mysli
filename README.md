@@ -102,7 +102,7 @@ While recording, open the menu to check the **Microphone** and **Mac audio** met
 
 Claude Code summaries use Sonnet with medium effort. Mysli sets both options explicitly, including when Automatic falls back to Claude Code. The Sonnet version depends on the installed Claude Code version.
 
-Mysli then transcribes the call on your Mac with Whisper (the `large-v3-v20240930_turbo` model, through WhisperKit) and asks an AI command-line tool for a summary. The default summary choice, Automatic, tries Antigravity (`agy`) first and Claude Code (`claude`) if that fails. In **Settings…**, you can select either tool to use only that provider. Install at least one of them in `/opt/homebrew/bin`, `/usr/local/bin`, or `~/.local/bin`, and log in to it once in Terminal. A notification tells you when the notes are ready; click it to open the summary, or the review window when there are words to check (see below). Mysli asks for notification permission the first time you start a recording. Each meeting gets its own folder, for example `~/Meetings/2026-10-23_14-02/`, with `transcript.md` and `summary.md`.
+Mysli then transcribes the call on your Mac with Whisper (the `large-v3-v20240930_turbo` model, through WhisperKit) and asks an AI command-line tool for a summary. The default summary choice, Automatic, tries Antigravity (`agy`) first and Claude Code (`claude`) if that fails. In **Settings…**, you can select either tool to use only that provider. Install at least one of them in `/opt/homebrew/bin`, `/usr/local/bin`, or `~/.local/bin`, and log in to it once in Terminal. If no tool is installed, **Settings…** and the setup window show a warning. A summary that fails for this reason says so in its notification, in `error.md`, and in the log. A notification tells you when the notes are ready; click it to open the summary, or the review window when there are words to check (see below). Mysli asks for notification permission the first time you start a recording. Each meeting gets its own folder, for example `~/Meetings/2026-10-23_14-02/`, with `transcript.md` and `summary.md`.
 
 By default, "Them" is everyone else on the call, from the sound your Mac plays. The optional Teams speaker-name feature below can name supported remote lines after Stop. Your Mac's microphone hears you and anyone in the same room. Mysli tells those voices apart on your Mac and labels them "Room 1", "Room 2", and so on, in the order they first speak. Mysli never guesses which voice is you. Two people with similar voices can share a label, and one person can get two. A voice with fewer than 5 words gets no label of its own: its lines take the label of the voice that spoke nearest in time. When Mysli finds only one voice, the microphone lines say "Me". If Mysli cannot tell the voices apart, the microphone lines also say "Me", and the top of the transcript says why. Mysli does not try on a microphone track longer than 3 hours. In the summary, an action item has a person's name only when the transcript or your typed notes explicitly say who will do it. Otherwise its owner is "Unclear". Headphones give the cleanest transcript. On speakers, your microphone also hears the other people. Mysli removes those repeated lines from the microphone lines when it finds them. It also removes the lines of a microphone voice that speaks almost only while the other people speak and mostly repeats their words, because that voice is their echo.
 
@@ -236,6 +236,12 @@ Haiku for polish. Allow Microphone and Accessibility when asked. Fn also needs
 Input Monitoring. Select **Control + Option + D** to use dictation without that
 extra permission. The **Permissions** page shows each permission and its
 **Grant** button. Dictation starts again by itself after a grant.
+
+Polish needs Claude Code (`claude`) in `/opt/homebrew/bin`, `/usr/local/bin`, or
+`~/.local/bin`. Log in to it once in Terminal. Without it, Mysli pastes the
+locally cleaned text. **Settings…**, the setup window, and the Dictation section
+of the menu then show a warning. The log gives the reason for each paste without
+polish.
 
 For Fn, open **Keyboard Settings** and set **Press 🌐 key to** to **Do Nothing**.
 This control is on the main Keyboard page, as described in

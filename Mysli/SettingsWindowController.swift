@@ -28,6 +28,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     let clearBackground = NSButton(title: "Clear", target: nil, action: nil)
     let loginError = NSTextField(wrappingLabelWithString: "")
     let calendarStatus = NSTextField(wrappingLabelWithString: "")
+    private let summaryToolMissing = SettingsLayout.label("", size: 11, secondary: true)
+    private let dictationToolMissing = SettingsLayout.label("", size: 11, secondary: true)
     private let folderPath = NSTextField(labelWithString: "")
     private let backgroundPath = NSTextField(labelWithString: "")
     private let settings: Settings
@@ -228,6 +230,12 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         }
         Self.select(duration, in: thumbnailDuration, customTitle: "Custom (\(duration) seconds)")
         summaryTool.select(summaryTool.itemArray.first { $0.representedObject as? SummaryTool == settings.summaryTool })
+        let summaryNote = MissingToolNote.summary(for: settings.summaryTool)
+        summaryToolMissing.stringValue = summaryNote ?? ""
+        summaryToolMissing.isHidden = summaryNote == nil
+        let dictationNote = MissingToolNote.dictation()
+        dictationToolMissing.stringValue = dictationNote ?? ""
+        dictationToolMissing.isHidden = dictationNote == nil
         folderPath.stringValue = settings.meetingsFolder.path
         backgroundPath.stringValue = settings.meetingContextFile?.path ?? "None"
         folderPath.toolTip = folderPath.stringValue
@@ -378,6 +386,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
                     pathRow(.meetings, "Meetings folder", path: folderPath, buttons: [chooseMeetingsFolder], keywords: ["save location path directory"]),
                     row(.meetings, "Summary tool", control: summaryTool, keywords: ["ai provider claude antigravity automatic agy"])
                 ]),
+                summaryToolMissing,
                 note("Automatic tries Antigravity, then Claude Code. An explicit choice uses only that tool. Changes apply when the next job starts."),
                 SettingsLayout.group([pathRow(.meetings, "Background file", path: backgroundPath, buttons: [chooseBackground, clearBackground],
                                              keywords: ["context summary information"])]),
@@ -400,6 +409,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
                     row(.dictation, "Send text near the cursor", detail: "Share up to 500 characters before the cursor with Claude. Secure fields are excluded.",
                                        control: dictationNearbyText, keywords: ["preceding nearby context privacy"])
                 ]),
+                dictationToolMissing,
                 note("Fn needs Input Monitoring. Both options need Microphone and Accessibility. Grant them on the Permissions page."),
                 note(dictationKeyboardHelp),
                 dictationKeyboard
@@ -630,6 +640,9 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     @objc private func toolChanged() {
         guard let tool = summaryTool.selectedItem?.representedObject as? SummaryTool else { return }
         settings.summaryTool = tool
+        let summaryNote = MissingToolNote.summary(for: tool)
+        summaryToolMissing.stringValue = summaryNote ?? ""
+        summaryToolMissing.isHidden = summaryNote == nil
     }
 
     @objc private func folderClicked() {

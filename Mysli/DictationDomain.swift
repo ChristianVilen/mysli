@@ -66,7 +66,23 @@ struct DictationPolishRequest: Sendable {
 
 enum DictationPolishResult: Sendable {
     case polished(PasteText)
-    case unavailable
+    case unavailable(DictationPolishFailure)
+}
+
+/// A fixed text for each reason, never dictation or Claude output, so a log can show it.
+enum DictationPolishFailure: String, Sendable, PublicLogValue {
+    case notInstalled = "claude not installed"
+    case notLoggedIn = "claude not logged in"
+    case couldNotStart = "claude could not start"
+    case notReady = "claude not ready"
+    case ended = "claude ended"
+    case unreadable = "claude reply unreadable"
+    case rejected = "claude reply rejected"
+    case tooLong = "text too long"
+    case timedOut = "timed out"
+    case cancelled = "cancelled"
+
+    var description: String { rawValue }
 }
 
 enum DictationKeyEvent: Equatable { case pressed, released, cancelled, unavailable }

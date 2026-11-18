@@ -8,8 +8,8 @@ enum SummaryTool: String, CaseIterable, Sendable {
     var title: String {
         switch self {
         case .automatic: "Automatic"
-        case .antigravity: "Antigravity (agy)"
-        case .claude: "Claude Code (claude)"
+        case .antigravity: SummaryCLI.antigravity.title
+        case .claude: SummaryCLI.claude.title
         }
     }
 
@@ -20,14 +20,54 @@ enum SummaryTool: String, CaseIterable, Sendable {
         case .claude: [.claude]
         }
     }
+
+    func isInstalled(home: URL = FileManager.default.homeDirectoryForCurrentUser,
+                     isExecutable: (String) -> Bool = SummaryCLI.isExecutable) -> Bool {
+        candidates.contains { $0.installedPath(home: home, isExecutable: isExecutable) != nil }
+    }
 }
 
 enum SummaryCLI: String {
     case antigravity = "agy"
     case claude = "claude"
 
+    var productName: String {
+        switch self {
+        case .antigravity: "Antigravity"
+        case .claude: "Claude Code"
+        }
+    }
+
+    var title: String { "\(productName) (\(rawValue))" }
+
+    private var installPage: String? {
+        switch self {
+        case .antigravity: nil
+        case .claude: "https://claude.com/claude-code"
+        }
+    }
+
+    var installSource: String { installPage.map { "\(productName) from \($0)" } ?? productName }
+
+    var setUpHint: String {
+        "Install it\(installPage.map { " from \($0)" } ?? ""), then open Terminal, run \(rawValue) once, and log in."
+    }
+
+    static func isExecutable(_ path: String) -> Bool { FileManager.default.isExecutableFile(atPath: path) }
+
     func candidatePaths(home: URL) -> [String] {
         Self.userToolDirectories(home: home).map { "\($0)/\(rawValue)" }
+    }
+
+    func installedPath(home: URL = FileManager.default.homeDirectoryForCurrentUser,
+                       isExecutable: (String) -> Bool = SummaryCLI.isExecutable) -> String? {
+        candidatePaths(home: home).first(where: isExecutable)
+    }
+
+    /// Measured with claude 2.1.327 and an empty CLAUDE_CONFIG_DIR: exit status 1, an empty
+    /// stderr, and "Not logged in · Please run /login" on stdout.
+    func isLoginFailure(stdout: String) -> Bool {
+        self == .claude && stdout.hasPrefix("Not logged in")
     }
 
     /// A GUI app does not get the user's shell PATH. The CLIs are looked for
@@ -57,6 +97,7 @@ enum SummaryCLI: String {
 struct SummaryFailure: Equatable, CustomStringConvertible {
     enum Reason: Equatable {
         case notInstalled(searched: [String])
+        case notLoggedIn
         case couldNotLaunch(String)
         case exited(status: Int32, stderrTail: String)
         case timedOut
@@ -67,7 +108,7 @@ struct SummaryFailure: Equatable, CustomStringConvertible {
 
     var logMessage: LogMessage {
         switch reason {
-        case .notInstalled, .timedOut, .emptyOutput:
+        case .notInstalled, .notLoggedIn, .timedOut, .emptyOutput:
             return "\(description, privacy: .public)"
         case .couldNotLaunch(let message):
             return "\(cli.rawValue, privacy: .public) could not start: \(message)"
@@ -83,7 +124,9 @@ struct SummaryFailure: Equatable, CustomStringConvertible {
         let name = cli.rawValue
         switch reason {
         case .notInstalled(let searched):
-            return "\(name) was not found at \(searched.joined(separator: ", "))"
+            return "\(cli.title) is not installed. \(cli.setUpHint) Mysli looked for it at \(searched.joined(separator: ", "))."
+        case .notLoggedIn:
+            return "\(cli.title) is not logged in. Open Terminal, run \(name), and log in."
         case .couldNotLaunch(let message):
             return "\(name) could not start: \(message)"
         case .exited(let status, let stderrTail):
@@ -100,6 +143,18 @@ struct SummaryFailure: Equatable, CustomStringConvertible {
     }
 }
 
+extension [SummaryFailure] {
+    var noToolInstalled: Bool {
+        !isEmpty && allSatisfy {
+            if case .notInstalled = $0.reason { return true }
+            return false
+        }
+    }
+
+    /// One sentence without its full stop, for a notification or the notes panel.
+    var shortReason: String { noToolInstalled ? "No summary tool is installed" : "The summary tool did not answer" }
+}
+
 enum SummaryResult: Equatable {
     case written(markdown: String, suspects: [SuspectWord], by: SummaryCLI, after: [SummaryFailure])
     case failed([SummaryFailure])
@@ -114,7 +169,7 @@ struct Summarizer {
 
     init(runner: CommandRunning = ProcessCommandRunner(),
          home: URL = FileManager.default.homeDirectoryForCurrentUser,
-         isExecutable: @escaping (String) -> Bool = { FileManager.default.isExecutableFile(atPath: $0) },
+         isExecutable: @escaping (String) -> Bool = SummaryCLI.isExecutable,
          timeout: Duration = .seconds(600),
          context: MeetingContextFile? = nil) {
         self.runner = runner
@@ -133,9 +188,8 @@ struct Summarizer {
         var failures: [SummaryFailure] = []
         for cli in tool.candidates {
             if Task.isCancelled { break }
-            let searched = cli.candidatePaths(home: home)
-            guard let path = searched.first(where: isExecutable) else {
-                failures.append(SummaryFailure(cli: cli, reason: .notInstalled(searched: searched)))
+            guard let path = cli.installedPath(home: home, isExecutable: isExecutable) else {
+                failures.append(SummaryFailure(cli: cli, reason: .notInstalled(searched: cli.candidatePaths(home: home))))
                 continue
             }
             let reason: SummaryFailure.Reason
@@ -151,6 +205,7 @@ struct Summarizer {
                         return .written(markdown: reply.notes, suspects: reply.suspects, by: cli, after: failures)
                     }
                     reason = .emptyOutput
+                case .exited where cli.isLoginFailure(stdout: result.stdout): reason = .notLoggedIn
                 case .exited(let status): reason = .exited(status: status, stderrTail: String(result.stderr.suffix(300)))
                 case .timedOut: reason = .timedOut
                 }

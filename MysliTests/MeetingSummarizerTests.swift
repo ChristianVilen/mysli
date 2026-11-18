@@ -62,6 +62,49 @@ final class MeetingSummarizerTests: XCTestCase {
         XCTAssertTrue(try XCTUnwrap(runner.calls.last?.input).contains("Changed background"))
     }
 
+    func testInstalledPathIsTheFirstCandidateThatRunsOrNil() {
+        let home = URL(fileURLWithPath: "/Users/test", isDirectory: true)
+
+        XCTAssertEqual(SummaryCLI.claude.installedPath(home: home, isExecutable: { $0 != "/opt/homebrew/bin/claude" }),
+                       "/usr/local/bin/claude")
+        XCTAssertNil(SummaryCLI.claude.installedPath(home: home, isExecutable: { _ in false }))
+    }
+
+    func testAToolIsInstalledWhenOneOfItsCandidatesIs() {
+        let home = URL(fileURLWithPath: "/Users/test", isDirectory: true)
+        let onlyAgy: (String) -> Bool = { $0.hasSuffix("/agy") }
+
+        XCTAssertTrue(SummaryTool.automatic.isInstalled(home: home, isExecutable: onlyAgy))
+        XCTAssertTrue(SummaryTool.antigravity.isInstalled(home: home, isExecutable: onlyAgy))
+        XCTAssertFalse(SummaryTool.claude.isInstalled(home: home, isExecutable: onlyAgy))
+        XCTAssertFalse(SummaryTool.automatic.isInstalled(home: home, isExecutable: { _ in false }))
+    }
+
+    func testNoToolIsInstalledOnlyWhenEveryFailureIsNotInstalled() {
+        let agyMissing = SummaryFailure(cli: .antigravity, reason: .notInstalled(searched: []))
+        let claudeMissing = SummaryFailure(cli: .claude, reason: .notInstalled(searched: []))
+
+        XCTAssertTrue([agyMissing, claudeMissing].noToolInstalled)
+        XCTAssertTrue([claudeMissing].noToolInstalled)
+        XCTAssertFalse([agyMissing, SummaryFailure(cli: .claude, reason: .timedOut)].noToolInstalled)
+        XCTAssertFalse([SummaryFailure]().noToolInstalled, "a cancel can leave no failure")
+    }
+
+    func testClaudeWithoutALoginFailsAsNotLoggedIn() async {
+        // Measured with claude 2.1.327, the summary arguments, and an empty CLAUDE_CONFIG_DIR.
+        let measured = CommandResult(termination: .exited(1), stdout: "Not logged in · Please run /login\n", stderr: "")
+        let runner = FakeCommandRunner()
+        runner.results["agy"] = .success(measured)
+        runner.results["claude"] = .success(measured)
+
+        let result = await summarizer(runner).summarize(transcript: transcript, knownWords: .none, tool: .automatic)
+
+        XCTAssertEqual(result, .failed([
+            SummaryFailure(cli: .antigravity, reason: .exited(status: 1, stderrTail: "")),
+            SummaryFailure(cli: .claude, reason: .notLoggedIn),
+        ]))
+    }
+
     func testEachFailureReadsAsOneLine() {
         let lines = [
             SummaryFailure(cli: .antigravity, reason: .notInstalled(searched: ["/opt/homebrew/bin/agy", "/usr/local/bin/agy"])),
@@ -73,7 +116,8 @@ final class MeetingSummarizerTests: XCTestCase {
         ].map(\.description)
 
         XCTAssertEqual(lines, [
-            "agy was not found at /opt/homebrew/bin/agy, /usr/local/bin/agy",
+            "Antigravity (agy) is not installed. Install it, then open Terminal, run agy once, and log in. "
+                + "Mysli looked for it at /opt/homebrew/bin/agy, /usr/local/bin/agy.",
             "claude could not start: The file is not executable.",
             "agy exited with status 1: error: authentication failed or timed out",
             "claude exited with status 2",

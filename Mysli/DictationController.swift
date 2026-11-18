@@ -320,7 +320,13 @@ final class DictationController {
                     guard owns(work) else { return }
                     switch result {
                     case .polished(let text): selected = text; unpolished = false
-                    case .unavailable: selected = request.localText; unpolished = true
+                    case .unavailable(let failure):
+                        if [.notReady, .cancelled].contains(failure) {
+                            Log.dictation.notice("Pasted without polish: \(failure)")
+                        } else {
+                            Log.dictation.error("Pasted without polish: \(failure)")
+                        }
+                        selected = request.localText; unpolished = true
                     }
                 }
                 lastDictation = LastDictation(heardText: heard, selectedText: selected)

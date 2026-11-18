@@ -272,7 +272,7 @@ final class DictationControllerTests: XCTestCase {
 
     func testUnavailablePolishUsesFallbackAndExpiryCannotEndNewHold() async {
         let f = DictationFixture()
-        f.polisher.result = .unavailable
+        f.polisher.result = .unavailable(.notReady)
         await f.enable()
         f.hold()
         await f.waitFor(.unpolished)
@@ -383,7 +383,7 @@ final class DictationControllerTests: XCTestCase {
         let f = DictationFixture()
         let gate = DictationTestGate<Void>()
         f.polisher.preparationGate = gate
-        f.polisher.result = .unavailable
+        f.polisher.result = .unavailable(.notReady)
         await f.enable()
         await gate.waitUntilEntered()
         f.hold()

@@ -29,6 +29,8 @@ final class Onboarding {
                             dictationKeyMode: settings.dictationKeyMode)
     }
 
+    var summaryTool: SummaryTool { settings.summaryTool }
+
     func advance() {
         guard !isFinished else { return }
         switch step {

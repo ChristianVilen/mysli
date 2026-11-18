@@ -363,6 +363,9 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
                 case .done: setSummaryResult(snapshot.map { .updated(snapshot: $0) }, for: meeting)
                 case .noSpeech: setSummaryResult(.updated(snapshot: ""), for: meeting)
                 case .failed: setSummaryResult(.failed("Processing failed. Use Retry Failed Meeting in the Mysli menu."), for: meeting)
+                case .summaryToolFailed(let failures):
+                    let retry = failures.noToolInstalled ? "Install one, then use" : "Use"
+                    setSummaryResult(.failed("\(failures.shortReason). \(retry) Retry Failed Meeting in the Mysli menu."), for: meeting)
                 case .busy, .gone: setSummaryResult(.failed("The meeting folder is unavailable or in use."), for: meeting)
                 case .cancelled: setSummaryResult(nil, for: meeting)
                 }
@@ -396,8 +399,11 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
         case .cancelled: setSummaryResult(nil, for: meeting)
         case .busy: setSummaryResult(.failed("The meeting folder is in use. Try Update summary again."), for: meeting)
         case .notReady: setSummaryResult(.failed("The meeting is not ready, or its folder was moved or deleted."), for: meeting)
-        case .failed, .summaryToolFailed:
+        case .failed:
             setSummaryResult(.failed("The summary could not be updated. The previous summary is unchanged. Try again."), for: meeting)
+        case .summaryToolFailed(let failures):
+            let tryAgain = failures.noToolInstalled ? "" : " Try again."
+            setSummaryResult(.failed("\(failures.shortReason). The previous summary is unchanged.\(tryAgain)"), for: meeting)
         }
     }
 
@@ -421,6 +427,13 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
             notifier.post(title: MeetingStep.summarize.failureHeading,
                           body: "The transcript of \(meeting.title) is ready. Choose Retry Failed Meeting in the Mysli menu to try the summary again. Click to see what went wrong.",
                           onClick: .open(meeting.url(for: .failure)))
+        case .summaryToolFailed(let failures):
+            let next = failures.noToolInstalled
+                ? "Click to see how to install one. Then choose Retry Failed Meeting in the Mysli menu."
+                : "Choose Retry Failed Meeting in the Mysli menu to try the summary again. Click to see what went wrong."
+            notifier.post(title: MeetingStep.summarize.failureHeading,
+                          body: "The transcript of \(meeting.title) is ready. \(failures.shortReason). \(next)",
+                          onClick: .open(meeting.url(for: .failure)))
         case .noSpeech:
             notifier.post(title: "No Speech Detected",
                           body: "\(meeting.title). The audio is in the meeting folder. Click to open it.",
@@ -436,11 +449,8 @@ final class MeetingNotesController: NSObject, NSMenuItemValidation, MenuSection 
         case .updated(let summary):
             notifier.post(title: "Notes Updated", body: "\(meeting.title). Click to open the summary.", onClick: .open(summary))
         case .summaryToolFailed(let failures):
-            for failure in failures {
-                Log.meeting.error("Could not update the notes of \(meeting.name, privacy: .public): \(failure.logMessage)")
-            }
             notifier.post(title: "Notes Not Updated",
-                          body: "\(meeting.title). The summary tool did not answer, so the summary did not change. The transcript has your answers.",
+                          body: "\(meeting.title). \(failures.shortReason), so the summary did not change. The transcript has your answers.",
                           onClick: .open(meeting.url(for: .summary)))
         case .failed(let message):
             Log.meeting.error("Could not update the notes of \(meeting.name, privacy: .public): \(message)")
