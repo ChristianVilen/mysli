@@ -3,9 +3,10 @@ import XCTest
 
 @MainActor
 final class AppLaunchModeTests: XCTestCase {
-    func testXCTestProcessHasPassiveHost() {
+    func testXCTestProcessHasAPassiveHostThatRefusesToQuit() {
         XCTAssertFalse(NSApp.delegate is AppDelegate, "XCTest must not construct the production AppDelegate")
-        XCTAssertNil(NSApp.delegate)
+        XCTAssertEqual(NSApp.delegate?.applicationShouldTerminate?(NSApp), .terminateCancel,
+                       "a quit meant for the installed Mysli must not end the test run")
     }
 
     func testLaunchModeChoosesProductionTestsAndPreviewWithTestsTakingPriority() {
