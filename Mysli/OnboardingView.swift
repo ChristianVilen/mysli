@@ -18,6 +18,8 @@ final class OnboardingView: NSView {
     private var dotWidths: [NSLayoutConstraint] = []
     private let progress = NSProgressIndicator()
     private let progressLabel = SettingsLayout.label("", size: 12, secondary: true)
+    private let summaryToolMissing = SettingsLayout.label("", size: 11, secondary: true)
+    private let dictationToolMissing = SettingsLayout.label("", size: 11, secondary: true)
     private let resumed = SettingsLayout.label("Welcome back. Your setup progress was saved. Continue here.", size: 12)
     private let resumedBanner = NSView()
     private var snapshot = PermissionSnapshot(accessibility: false, screenRecording: false, microphone: .notDetermined,
@@ -130,6 +132,12 @@ final class OnboardingView: NSView {
         for (tool, button) in toolButtons { button.state = model.selectedTools.contains(tool) ? .on : .off }
         remindersButton.state = model.calendarReminders ? .on : .off
         remindersButton.isEnabled = model.selectedTools.contains(.meetings)
+        let summaryNote = MissingToolNote.summary(for: model.summaryTool)
+        summaryToolMissing.stringValue = summaryNote ?? ""
+        summaryToolMissing.isHidden = summaryNote == nil
+        let dictationNote = MissingToolNote.dictation()
+        dictationToolMissing.stringValue = dictationNote ?? ""
+        dictationToolMissing.isHidden = dictationNote == nil
         let step = Onboarding.Step.allCases.firstIndex(of: model.step) ?? 0
         dots.setAccessibilityLabel("Step \(step + 1) of 3")
         for (index, dot) in dots.arrangedSubviews.enumerated() {
@@ -199,9 +207,14 @@ final class OnboardingView: NSView {
             button.setAccessibilityLabel(tool.title)
             toolButtons[tool] = button
             let needed = RequiredPermissions(tools: [tool], calendarReminders: false).permissions.map(\.title)
+            let missing: NSTextField? = switch tool {
+            case .meetings: summaryToolMissing
+            case .dictation: dictationToolMissing
+            default: nil
+            }
             rows.append(choiceRow(title: tool.title, detail: detail,
                                   needs: needed.isEmpty ? "nothing" : needed.joined(separator: ", "),
-                                  icon: tool.icon(size: 32), button: button))
+                                  icon: tool.icon(size: 32), button: button, missing: missing))
         }
         remindersButton.target = self
         remindersButton.action = #selector(remindersChanged)
@@ -214,12 +227,13 @@ final class OnboardingView: NSView {
         SettingsLayout.add(SettingsLayout.group(rows), to: tools)
     }
 
-    private func choiceRow(title: String, detail: String, needs: String, icon: NSImage, button: NSButton, indent: CGFloat = 0) -> NSView {
+    private func choiceRow(title: String, detail: String, needs: String, icon: NSImage, button: NSButton,
+                           indent: CGFloat = 0, missing: NSTextField? = nil) -> NSView {
         let heading = SettingsLayout.label(title)
         heading.font = .systemFont(ofSize: 13, weight: .semibold)
         let copy = SettingsLayout.stack(spacing: 2)
         for label in [heading, SettingsLayout.label(detail, size: 12),
-                      SettingsLayout.label("Needs: \(needs)", size: 11, secondary: true)] {
+                      SettingsLayout.label("Needs: \(needs)", size: 11, secondary: true)] + [missing].compactMap({ $0 }) {
             SettingsLayout.add(label, to: copy)
         }
         let image = NSImageView(image: icon)

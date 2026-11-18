@@ -27,12 +27,13 @@ extension Result where Success == CommandResult, Failure == any Error {
     }
 }
 
-/// The processor of the meeting tests: fake engines, a fake CLI runner that finds every CLI, a trash that
-/// deletes, and a fixed clock.
+/// The processor of the meeting tests: fake engines, a fake CLI runner that finds every CLI unless
+/// `isExecutable` says otherwise, a trash that deletes, and a fixed clock.
 @MainActor
 func makeMeetingProcessor(transcribers: [Transcribing] = [FakeTranscriber()],
                           roomLabeller: RoomLabelling = FakeRoomLabeller(),
                           runner: CommandRunning = FakeCommandRunner(),
+                          isExecutable: @escaping (String) -> Bool = { _ in true },
                           knownWords: @escaping () -> KnownWordsList = { .empty },
                           locale: Locale = Locale(identifier: "en-US"),
                           trash: @escaping (URL) throws -> Void = { try FileManager.default.removeItem(at: $0) })
@@ -40,7 +41,7 @@ func makeMeetingProcessor(transcribers: [Transcribing] = [FakeTranscriber()],
     MeetingProcessor(
         transcribers: transcribers,
         roomLabeller: roomLabeller,
-        summarizer: Summarizer(runner: runner, home: URL(fileURLWithPath: "/Users/test"), isExecutable: { _ in true }),
+        summarizer: Summarizer(runner: runner, home: URL(fileURLWithPath: "/Users/test"), isExecutable: isExecutable),
         knownWords: knownWords,
         locale: { locale },
         trash: trash,
@@ -140,6 +141,8 @@ class MeetingNotesTestCase: XCTestCase {
     var runner: FakeCommandRunner!
     /// Replaces `runner` in the next `makeController()` when set.
     var gate: CommandRunning?
+    /// Read by the next `makeController()`. When false, the summarizer finds no CLI.
+    var summaryToolInstalled = true
     var clock = localDate(2026, 10, 23, 14, 2)
     var hostTime = HostTime(seconds: 1_000)
     var meterInterval: TimeInterval = 0.1
@@ -215,6 +218,7 @@ class MeetingNotesTestCase: XCTestCase {
                 transcribers: [transcriber],
                 roomLabeller: roomLabeller,
                 runner: gate ?? runner,
+                isExecutable: { [summaryToolInstalled] _ in summaryToolInstalled },
                 knownWords: { [unowned self] in knownWords }),
             wordsToCheck: { [unowned self] in WordReview.openQuestionCount(of: $0, in: root, knownWords: knownWords) },
             summaryTool: { .automatic },

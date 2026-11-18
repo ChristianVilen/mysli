@@ -211,6 +211,23 @@ final class DictationPolisherTests: XCTestCase {
         polisher.stop()
     }
 
+    func testAMissingClaudeIsTheReasonAtEveryPolishUntilALaunchWorks() async {
+        let child = Child()
+        var installed = false
+        let polisher = DictationPolisher(launch: {
+            guard installed else { throw DictationClaudeFailure.notInstalled }
+            return child
+        }, schedule: DictationTestClock().schedule)
+        await polisher.prepare()
+        assertUnavailable(await polisher.polish(request()), because: .notInstalled)
+        assertUnavailable(await polisher.polish(request()), because: .notInstalled)
+        installed = true
+        await polisher.prepare()
+        child.reply = .success("Please send the draft before lunch.")
+        guard case .polished = await polisher.polish(request()) else { return XCTFail("Expected polished text") }
+        polisher.stop()
+    }
+
     func testFailureAndStopSettleActiveRequests() async {
         for stop in [false, true] {
             let child = Child()
@@ -278,8 +295,10 @@ final class DictationPolisherTests: XCTestCase {
         assertUnavailable(await polisher.polish(request()))
     }
 
-    private func assertUnavailable(_ result: DictationPolishResult, file: StaticString = #filePath, line: UInt = #line) {
-        guard case .unavailable = result else { return XCTFail("Expected unavailable", file: file, line: line) }
+    private func assertUnavailable(_ result: DictationPolishResult, because expected: DictationPolishFailure? = nil,
+                                   file: StaticString = #filePath, line: UInt = #line) {
+        guard case .unavailable(let failure) = result else { return XCTFail("Expected unavailable", file: file, line: line) }
+        if let expected { XCTAssertEqual(failure, expected, file: file, line: line) }
     }
 }
 
@@ -297,6 +316,26 @@ final class DictationClaudeWireTests: XCTestCase {
             var stream = DictationClaudeStream()
             XCTAssertThrowsError(try stream.append(Data((line + "\n").utf8)))
         }
+    }
+
+    func testClaudeWithoutALoginFailsAsNotLoggedIn() {
+        // Measured with claude 2.1.327, the dictation arguments, and an empty CLAUDE_CONFIG_DIR; shortened.
+        let measured = """
+            {"type":"system","subtype":"init","apiKeySource":"none"}
+            {"type":"assistant","message":{"model":"<synthetic>","content":[{"type":"text","text":"Not logged in · Please run /login"}]},"error":"authentication_failed","is_api_error_message":true}
+            {"type":"result","subtype":"success","is_error":true,"result":"Not logged in · Please run /login"}
+
+            """
+        var stream = DictationClaudeStream()
+        XCTAssertThrowsError(try stream.append(Data(measured.utf8))) { error in
+            XCTAssertEqual(error as? DictationClaudeFailure, .notLoggedIn)
+        }
+        var other = DictationClaudeStream()
+        XCTAssertEqual(try other.append(Data("""
+            {"type":"system","error":{"kind":"an object"}}
+            {"type":"result","subtype":"success","is_error":false,"result":"Hello."}
+
+            """.utf8)), "Hello.", "an error field that is not text is not the login error")
     }
 
     func testStreamAndInputHaveMemoryLimits() throws {

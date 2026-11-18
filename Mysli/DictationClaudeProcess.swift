@@ -1,6 +1,6 @@
 import Foundation
 
-enum DictationClaudeFailure: Error { case unavailable, malformed, limit, ended }
+enum DictationClaudeFailure: Error { case unavailable, notInstalled, notLoggedIn, malformed, limit, ended }
 
 enum DictationClaudeWire {
     static let instructions = """
@@ -53,6 +53,9 @@ struct DictationClaudeStream {
             let line = buffer[..<end]
             let event = try JSONDecoder().decode(Event.self, from: line)
             buffer.removeSubrange(...end)
+            // Measured with claude 2.1.327 and an empty CLAUDE_CONFIG_DIR: after the input, an assistant
+            // event with "error":"authentication_failed", then a result with is_error true.
+            if event.error == "authentication_failed" { throw DictationClaudeFailure.notLoggedIn }
             if event.type == "result" {
                 guard event.subtype == "success", event.is_error != true,
                       let result = event.result, result.utf8.count <= 65_536,
@@ -70,6 +73,19 @@ struct DictationClaudeStream {
         let subtype: String?
         let is_error: Bool?
         let result: String?
+        let error: String?
+
+        private enum CodingKeys: String, CodingKey { case type, subtype, is_error, result, error }
+
+        init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            type = try container.decode(String.self, forKey: .type)
+            subtype = try container.decodeIfPresent(String.self, forKey: .subtype)
+            is_error = try container.decodeIfPresent(Bool.self, forKey: .is_error)
+            result = try container.decodeIfPresent(String.self, forKey: .result)
+            // Only the text form is the login error; another shape must not break the stream.
+            error = try? container.decodeIfPresent(String.self, forKey: .error)
+        }
     }
 }
 
@@ -116,8 +132,8 @@ final class DictationClaudeProcess: DictationClaudeChild {
         @concurrent
         static func launch() async throws -> IO {
             let home = FileManager.default.homeDirectoryForCurrentUser
-            guard let path = SummaryCLI.claude.candidatePaths(home: home).first(where: FileManager.default.isExecutableFile) else {
-                throw DictationClaudeFailure.unavailable
+            guard let path = SummaryCLI.claude.installedPath(home: home) else {
+                throw DictationClaudeFailure.notInstalled
             }
             let folder = FileManager.default.temporaryDirectory.appendingPathComponent("mysli-dictation-\(UUID().uuidString)", isDirectory: true)
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: false)

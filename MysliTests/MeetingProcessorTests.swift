@@ -290,7 +290,10 @@ final class MeetingProcessorTests: MeetingProcessorTestCase {
 
         let outcome = await process(meeting)
 
-        XCTAssertEqual(outcome, .failed(.summarize, message: "agy exited with status 1: authentication failed\nclaude took too long and was stopped"))
+        XCTAssertEqual(outcome, .summaryToolFailed(failures: [
+            SummaryFailure(cli: .antigravity, reason: .exited(status: 1, stderrTail: "authentication failed")),
+            SummaryFailure(cli: .claude, reason: .timedOut),
+        ]))
         XCTAssertEqual(try meeting.read(.failure), """
         # Summary Failed
 
@@ -304,6 +307,39 @@ final class MeetingProcessorTests: MeetingProcessorTestCase {
         """)
         XCTAssertTrue(FileManager.default.fileExists(atPath: meeting.url(for: .transcript).path))
         XCTAssertEqual(trashed, ["audio"])
+    }
+
+    func testWithoutAnInstalledSummaryToolTheSummaryStepFailsWithEveryNotInstalledFailure() async throws {
+        let meeting = try makeMeeting()
+        let processor = makeMeetingProcessor(transcribers: [whisper], roomLabeller: labeller, runner: runner,
+                                             isExecutable: { _ in false })
+
+        let outcome = await process(meeting, with: processor)
+
+        guard case .summaryToolFailed(let failures) = outcome else { return XCTFail("\(outcome)") }
+        XCTAssertEqual(failures.map(\.cli), [.antigravity, .claude])
+        XCTAssertTrue(failures.noToolInstalled)
+        XCTAssertEqual(meeting.stage(), .failed(.summarize))
+        XCTAssertTrue(runner.calls.isEmpty)
+    }
+
+    func testAMissingToolAndAFailingToolBothReachTheOutcomeAndErrorMd() async throws {
+        let meeting = try makeMeeting()
+        runner.results["claude"] = .success(CommandResult(termination: .exited(1), stdout: "", stderr: ""))
+        let processor = makeMeetingProcessor(transcribers: [whisper], roomLabeller: labeller, runner: runner,
+                                             isExecutable: { !$0.hasSuffix("/agy") })
+
+        let outcome = await process(meeting, with: processor)
+
+        let failures = [
+            SummaryFailure(cli: .antigravity, reason: .notInstalled(searched: [
+                "/opt/homebrew/bin/agy", "/usr/local/bin/agy", "/Users/test/.local/bin/agy",
+            ])),
+            SummaryFailure(cli: .claude, reason: .exited(status: 1, stderrTail: "")),
+        ]
+        XCTAssertEqual(outcome, .summaryToolFailed(failures: failures))
+        XCTAssertTrue(try meeting.read(.failure).contains("\n\n\(failures[0].description)\n\(failures[1].description)\n\n"))
+        XCTAssertEqual(meeting.stage(), .failed(.summarize))
     }
 
     func testAFailedMeetingWaitsForRetry() async throws {

@@ -4,6 +4,8 @@ enum MeetingOutcome: Equatable {
     case done(summary: URL)
     case noSpeech
     case failed(MeetingStep, message: String)
+    /// Every summary tool failed. `error.md` lists each failure, as for `.failed(.summarize, _)`.
+    case summaryToolFailed(failures: [SummaryFailure])
     case cancelled
     /// Another recorder or processor holds the folder's lock.
     case busy
@@ -136,8 +138,13 @@ struct MeetingProcessor {
                     case .transcribe:
                         try await transcribe(meeting, speakers: speakers, progress: progress)
                     case .summarize:
-                        if try await summarize(meeting, tool: tool, summaryInput: summaryInput) == .noSpeech {
-                            return .noSpeech
+                        switch try await summarize(meeting, tool: tool, summaryInput: summaryInput) {
+                        case .written: break
+                        case .noSpeech: return .noSpeech
+                        case .failed(let failures):
+                            if Task.isCancelled { return .cancelled }
+                            _ = fail(meeting, at: step, message: failures.map(\.description).joined(separator: "\n"))
+                            return .summaryToolFailed(failures: failures)
                         }
                     }
                 } catch {
@@ -255,7 +262,7 @@ struct MeetingProcessor {
         throw MeetingStepError(failures.map(\.description).joined(separator: "\n"))
     }
 
-    private enum SummaryCompletion { case written, noSpeech }
+    private enum SummaryCompletion { case written, noSpeech, failed([SummaryFailure]) }
 
     private func summarize(_ meeting: MeetingFolder, tool: SummaryTool,
                            summaryInput: (String) -> Void) async throws -> SummaryCompletion {
@@ -281,7 +288,7 @@ struct MeetingProcessor {
             try meeting.saveQuestions(WordQuestions.select(suspects, in: content, knownWords: list))
             try meeting.write(SummaryDocument.markdown(title: meeting.title, body: notes), to: .summary)
         case .failed(let failures):
-            throw MeetingStepError(failures.map(\.description).joined(separator: "\n"))
+            return .failed(failures)
         }
         return .written
     }
@@ -305,9 +312,14 @@ struct MeetingProcessor {
         let result = await summarizer.summarize(transcript: content, knownWords: list.relevant(to: content), tool: tool,
                                                 typedNotes: MeetingNoteDocument.summaryText(MeetingNoteDocument.parse(typedNotes)))
         try Task.checkCancellation()
-        if case .written(_, _, let cli, let earlier) = result, !earlier.isEmpty {
+        switch result {
+        case .written(_, _, let cli, let earlier):
             for failure in earlier {
                 Log.meeting.notice("\(cli.rawValue, privacy: .public) wrote the notes of \(meeting.name, privacy: .public). Earlier failure: \(failure.logMessage)")
+            }
+        case .failed(let failures):
+            for failure in failures {
+                Log.meeting.error("Could not summarize \(meeting.name, privacy: .public): \(failure.logMessage)")
             }
         }
         return result

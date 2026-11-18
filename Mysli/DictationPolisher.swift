@@ -37,6 +37,7 @@ final class DictationPolisher: DictationPolishing {
     private var active: Request?
     private var retiring = 0
     private var launching = 0
+    private var launchFailure: DictationPolishFailure?
 
     init(launch: @escaping () async throws -> any DictationClaudeChild = { try await DictationClaudeProcess.launch() },
          schedule: @escaping DictationSchedule = { DictationTimer.schedule($0, $1) }) {
@@ -58,7 +59,10 @@ final class DictationPolisher: DictationPolishing {
         preparation = pending
         launching += 1
         pending.task = Task { [weak self, launch] in
-            let child = try? await launch()
+            let child: (any DictationClaudeChild)?
+            let failure: DictationPolishFailure?
+            do { child = try await launch(); failure = nil }
+            catch { child = nil; failure = DictationPolishFailure(error) }
             guard let self else { child?.retire({}); return }
             self.launching -= 1
             guard self.preparation === pending, self.enabled else {
@@ -68,15 +72,21 @@ final class DictationPolisher: DictationPolishing {
             }
             self.preparation = nil
             self.idle = child
+            self.launchFailure = failure
         }
         await pending.task?.value
     }
 
     func polish(_ request: DictationPolishRequest) async -> DictationPolishResult {
-        guard !Task.isCancelled, enabled, active == nil, let child = idle,
-              let input = try? DictationClaudeWire.input(request) else {
+        guard !Task.isCancelled, enabled, active == nil, let child = idle else {
             startSuccessor()
-            return .unavailable
+            return .unavailable(noChildReason)
+        }
+        let input: Data
+        do { input = try DictationClaudeWire.input(request) }
+        catch {
+            startSuccessor()
+            return .unavailable(DictationPolishFailure(error))
         }
         idle = nil
         let cancelled = OSAllocatedUnfairLock(initialState: false)
@@ -86,29 +96,40 @@ final class DictationPolisher: DictationPolishing {
                 active = pending
                 pending.cancelDeadline = schedule(2.5) { [weak self, weak pending] in
                     guard let pending else { return }
-                    self?.finish(pending, .unavailable)
+                    self?.finish(pending, .unavailable(.timedOut))
                 }
                 child.send(input) { [weak self, weak pending] result in
                     guard let self, let pending else { return }
-                    let accepted = (try? result.get()).flatMap { DictationText.accept($0, baseline: pending.baseline) }
-                    self.finish(pending, accepted.map(DictationPolishResult.polished) ?? .unavailable)
+                    switch result {
+                    case .success(let output):
+                        let accepted = DictationText.accept(output, baseline: pending.baseline)
+                        self.finish(pending, accepted.map(DictationPolishResult.polished) ?? .unavailable(.rejected))
+                    case .failure(let error):
+                        self.finish(pending, .unavailable(DictationPolishFailure(error)))
+                    }
                 }
-                if Task.isCancelled { finish(pending, .unavailable) }
+                if Task.isCancelled { finish(pending, .unavailable(.cancelled)) }
             }
         } onCancel: {
             cancelled.withLock { $0 = true }
             Task { @MainActor [weak self, weak child] in
                 guard let self, let child, let pending = self.active, pending.child === child else { return }
-                self.finish(pending, .unavailable)
+                self.finish(pending, .unavailable(.cancelled))
             }
         }
+    }
+
+    private var noChildReason: DictationPolishFailure {
+        if Task.isCancelled { return .cancelled }
+        guard enabled, active == nil, let launchFailure else { return .notReady }
+        return launchFailure
     }
 
     func stop() {
         enabled = false
         preparation?.task?.cancel()
         preparation = nil
-        if let pending = active { finish(pending, .unavailable) }
+        if let pending = active { finish(pending, .unavailable(.cancelled)) }
         if let child = idle { idle = nil; retire(child) }
     }
 
@@ -116,7 +137,7 @@ final class DictationPolisher: DictationPolishing {
         guard active === pending else { return }
         active = nil
         pending.cancelDeadline?()
-        pending.continuation.resume(returning: pending.cancelled.withLock { $0 } ? .unavailable : result)
+        pending.continuation.resume(returning: pending.cancelled.withLock { $0 } ? .unavailable(.cancelled) : result)
         retire(pending.child)
         startSuccessor()
     }
@@ -133,5 +154,18 @@ final class DictationPolisher: DictationPolishing {
     private func startSuccessor() {
         guard enabled else { return }
         Task { [weak self] in await self?.prepareIfEnabled() }
+    }
+}
+
+extension DictationPolishFailure {
+    init(_ error: any Error) {
+        switch error as? DictationClaudeFailure {
+        case .notInstalled?: self = .notInstalled
+        case .notLoggedIn?: self = .notLoggedIn
+        case .unavailable?, nil: self = .couldNotStart
+        case .ended?: self = .ended
+        case .malformed?: self = .unreadable
+        case .limit?: self = .tooLong
+        }
     }
 }

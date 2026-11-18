@@ -109,7 +109,7 @@ final class MeetingTypedNotesProcessorTests: MeetingProcessorTestCase {
         runner.results["agy"] = .failure(TestError(errorDescription: "Offline"))
         runner.results["claude"] = .failure(TestError(errorDescription: "Offline"))
         let outcome = await process(meeting)
-        guard case .failed(.summarize, _) = outcome else { return XCTFail("\(outcome)") }
+        guard case .summaryToolFailed = outcome else { return XCTFail("\(outcome)") }
         XCTAssertEqual(meeting.stage(), .failed(.summarize))
         XCTAssertFalse(FileManager.default.fileExists(atPath: meeting.url(for: .summary).path))
         let transcribedCount = whisper.transcribed.count
@@ -199,6 +199,20 @@ final class MeetingTypedNotesLifecycleTests: MeetingNotesTestCase {
         await sut.waitUntilIdle()
         XCTAssertEqual(notes.summaryMessage, "Summary includes these saved notes.")
         XCTAssertTrue(held.prompts[1].contains("Newer decision"))
+    }
+
+    func testUpdateSummaryWithoutAnInstalledSummaryToolSaysSoInThePanel() async throws {
+        summaryToolInstalled = false
+        sut = makeController()
+        let meeting = try MeetingFolder.create(in: root, startingAt: localDate(2026, 10, 23, 9, 0))
+        try meeting.write("**[00:00:01] Them:** Let's ship on Friday\n", to: .transcript)
+        try meeting.write("# \(meeting.title)\n\nShip Friday.\n", to: .summary)
+        let notes = try sut.typedNotes(for: meeting)
+
+        XCTAssertTrue(sut.updateSummary(meeting))
+        await sut.waitUntilIdle()
+
+        XCTAssertEqual(notes.summaryMessage, "No summary tool is installed. The previous summary is unchanged.")
     }
 
     func testCaptureFailureNeverExposesANotesDestination() async {
