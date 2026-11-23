@@ -17,15 +17,12 @@ final class PermissionRowView: NSView {
     private let statusIcon = NSImageView()
     private let name: String
     private let grant: () -> Void
-    private let reduceMotion: () -> Bool
     private var shownStatus: PermissionSnapshot.Status?
     private var pictures: [CALayer] = []
 
-    init(title: String, explanation: String, grant: @escaping () -> Void,
-         reduceMotion: @escaping () -> Bool = { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }) {
+    init(title: String, explanation: String, grant: @escaping () -> Void) {
         name = title
         self.grant = grant
-        self.reduceMotion = reduceMotion
         super.init(frame: .zero)
         let copy = SettingsLayout.stack(spacing: 4)
         let heading = SettingsLayout.label(title)
@@ -97,10 +94,10 @@ final class PermissionRowView: NSView {
         grantButton.isEnabled = status != .granted
         grantButton.isHidden = status == .granted
         guard becomesAllowed else { return }
-        let still = reduceMotion()
-        let duration = still ? 0.15 : 0.2
+        let still = Motion.isReduced
+        let duration = still ? Motion.quick : 0.2
         oldMark?.fadeAway(duration: duration)
-        oldButton?.fadeAway(duration: 0.15)
+        oldButton?.fadeAway(duration: Motion.quick)
         guard let mark = statusIcon.layer else { return }
         mark.animate("opacity", from: 0, duration: duration)
         if !still { mark.animate("transform", from: mark.scaledAboutCenter(0.9, size: mark.bounds.size), duration: duration) }
@@ -116,8 +113,7 @@ final class PermissionListView: NSView {
     private let separators: [NSBox?]
     var controls: [NSButton] { rows.filter { !$0.view.isHidden }.map { $0.view.grantButton } }
 
-    init(actions: PermissionActions, spacing: CGFloat = 6, inset: CGFloat = SettingsLayout.groupInset,
-         reduceMotion: @escaping () -> Bool = { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }) {
+    init(actions: PermissionActions, spacing: CGFloat = 6, inset: CGFloat = SettingsLayout.groupInset) {
         rows = MysliPermission.allCases.map { permission in
             let grant: () -> Void = switch permission {
             case .accessibility: actions.accessibility
@@ -127,8 +123,7 @@ final class PermissionListView: NSView {
             case .notifications: actions.notifications
             case .inputMonitoring: actions.inputMonitoring
             }
-            return (permission, PermissionRowView(title: permission.title, explanation: permission.explanation, grant: grant,
-                                                  reduceMotion: reduceMotion))
+            return (permission, PermissionRowView(title: permission.title, explanation: permission.explanation, grant: grant))
         }
         separators = rows.indices.map { index in
             guard index > 0 else { return nil }

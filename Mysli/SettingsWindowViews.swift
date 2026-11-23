@@ -209,6 +209,7 @@ enum SettingsLayout {
         child.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
     }
 
+    /// Resizes the control it is given: small size, and pop-up buttons to one width.
     static func row(_ title: String, detail: String? = nil, control: NSView) -> NSView {
         row(title, secondLine: detail.map { label($0, size: 11, secondary: true) }, control: control)
     }

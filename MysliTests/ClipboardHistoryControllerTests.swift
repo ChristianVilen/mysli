@@ -487,11 +487,8 @@ final class ClipboardHistoryControllerTests: XCTestCase {
     ///     TEST_RUNNER_MYSLI_CLIPBOARD_SNAPSHOTS="$HOME/clipboard-snapshots" xcodebuild -project Mysli.xcodeproj \
     ///         -scheme Mysli test -only-testing:MysliTests/ClipboardHistoryControllerTests/testWritesAPictureOfEachPanelState
     func testWritesAPictureOfEachPanelState() throws {
-        guard let path = ProcessInfo.processInfo.environment["MYSLI_CLIPBOARD_SNAPSHOTS"] else {
-            throw XCTSkip("Set MYSLI_CLIPBOARD_SNAPSHOTS to a folder to write pictures of the clipboard panel.")
-        }
-        let folder = URL(fileURLWithPath: path, isDirectory: true)
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let folder = try pictureFolder("MYSLI_CLIPBOARD_SNAPSHOTS",
+                                       skipMessage: "Set MYSLI_CLIPBOARD_SNAPSHOTS to a folder to write pictures of the clipboard panel.")
         let panel = ClipboardPanel(controller: controller, screens: FakeScreens())
         defer { panel.close() }
         panel.bindController()
@@ -502,12 +499,7 @@ final class ClipboardHistoryControllerTests: XCTestCase {
             field.stringValue = query
             panel.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification, object: field))
         }
-        func snap(_ name: String) throws {
-            for (suffix, appearance) in [("light", NSAppearance.Name.aqua), ("dark", .darkAqua)] {
-                try writePicture(of: content, appearance: appearance,
-                                 to: folder.appendingPathComponent("\(name)-\(suffix).png"))
-            }
-        }
+        func snap(_ name: String) throws { try writePictures(of: content, named: name, in: folder) }
         let sample = try XCTUnwrap(CapturePreview.sampleImage().cgImage(forProposedRect: nil, context: nil, hints: nil))
         let png = try XCTUnwrap(NSBitmapImageRep(cgImage: sample).representation(using: .png, properties: [:]))
 

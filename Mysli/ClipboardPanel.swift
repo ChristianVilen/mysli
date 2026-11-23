@@ -100,7 +100,7 @@ final class ClipboardPanel: FloatingPanel {
         makeFirstResponder(searchField)
 
         guard shouldFade, alphaValue < 1 else { return }
-        fadeIn(duration: Metrics.fadeDuration, timingFunction: CAMediaTimingFunction(name: .easeOut))
+        fadeIn(duration: Metrics.fadeDuration, timingFunction: Motion.easeOut)
     }
 
     /// Hides the panel at once. No fade out: a paste dismisses the panel

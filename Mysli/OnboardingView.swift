@@ -19,11 +19,11 @@ final class OnboardingView: NSView {
     let backButton = NSButton(title: "Back", target: nil, action: nil)
     let skipButton = NSButton(title: "Skip setup", target: nil, action: nil)
     private(set) var toolButtons: [MysliTool: NSButton] = [:]
+    private var toolControls: [NSButton] = []
     let remindersButton = NSButton(checkboxWithTitle: "", target: nil, action: nil)
     let permissionList: PermissionListView
     var onChange: (() -> Void)?
 
-    private let reduceMotion: () -> Bool
     private let welcome = NSView()
     private let tools = SettingsLayout.stack(spacing: 16)
     private let access = SettingsLayout.stack(spacing: 16)
@@ -46,11 +46,9 @@ final class OnboardingView: NSView {
     private var snapshot = PermissionSnapshot(accessibility: false, screenRecording: false, microphone: .notDetermined,
                                                calendar: .notDetermined, notifications: .notDetermined)
 
-    init(model: Onboarding, actions: PermissionActions,
-         reduceMotion: @escaping () -> Bool = { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }) {
+    init(model: Onboarding, actions: PermissionActions) {
         self.model = model
-        self.reduceMotion = reduceMotion
-        permissionList = PermissionListView(actions: actions, spacing: 12, inset: 14, reduceMotion: reduceMotion)
+        permissionList = PermissionListView(actions: actions, spacing: 12, inset: 14)
         super.init(frame: .zero)
         SettingsLayout.fill(SettingsBackground(), in: self)
         buildWelcome()
@@ -148,7 +146,7 @@ final class OnboardingView: NSView {
 
     func renderPermissions(_ snapshot: PermissionSnapshot) {
         self.snapshot = snapshot
-        renderAccess(animated: animates && !access.isHiddenOrHasHiddenAncestor && !reduceMotion())
+        renderAccess(animated: animates && !access.isHiddenOrHasHiddenAncestor && !Motion.isReduced)
         updateKeyViewLoop()
     }
 
@@ -374,7 +372,7 @@ final class OnboardingView: NSView {
         hasAppeared = true
         // Unlike the other motion, this does not wait for the window to be on screen: the window
         // comes on screen in the same turn of the run loop, and the entrance starts with it.
-        if model.step == .welcome, !reduceMotion() { playEntrance() }
+        if model.step == .welcome, !Motion.isReduced { playEntrance() }
     }
 
     private func playEntrance() {
@@ -423,15 +421,15 @@ final class OnboardingView: NSView {
     }
 
     private func animateStep(from: Onboarding.Step) {
-        let still = reduceMotion()
+        let still = Motion.isReduced
         let shift: CGFloat = still ? 0 : Self.index(of: model.step) > Self.index(of: from) ? -16 : 16
-        outgoing?.fadeAway(duration: still ? 0.15 : 0.16, dx: shift)
+        outgoing?.fadeAway(duration: Motion.quick, dx: shift)
         let pages = Onboarding.Step.allCases.compactMap { page(for: $0)?.layer }
         for layer in pages + entrance.compactMap(\.view.layer) { layer.removeMotion() }
         guard let entering = page(for: model.step)?.layer else { return }
-        entering.animate("opacity", from: 0, duration: still ? 0.15 : 0.24)
+        entering.animate("opacity", from: 0, duration: still ? Motion.quick : Motion.standard)
         guard !still else { return }
-        entering.animate("transform.translation.x", from: -shift, duration: 0.24)
+        entering.animate("transform.translation.x", from: -shift, duration: Motion.standard)
         animateDots(from: Self.index(of: from))
     }
 
@@ -441,9 +439,10 @@ final class OnboardingView: NSView {
         dots.layoutSubtreeIfNeeded()
         for (index, (dot, (bounds, position))) in zip(dots.arrangedSubviews, before).enumerated() {
             guard let layer = dot.layer, let bounds, let position else { continue }
-            layer.animate("bounds", from: NSValue(rect: bounds), duration: 0.24, timing: Motion.easeInOut)
-            layer.animate("position", from: NSValue(point: position), duration: 0.24, timing: Motion.easeInOut)
-            layer.animate("backgroundColor", from: Self.dotColor(active: index == old), duration: 0.24, timing: Motion.easeInOut)
+            layer.animate("bounds", from: NSValue(rect: bounds), duration: Motion.standard, timing: Motion.easeInOut)
+            layer.animate("position", from: NSValue(point: position), duration: Motion.standard, timing: Motion.easeInOut)
+            layer.animate("backgroundColor", from: Self.dotColor(active: index == old), duration: Motion.standard,
+                          timing: Motion.easeInOut)
         }
     }
 }

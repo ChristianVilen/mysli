@@ -15,7 +15,11 @@ enum AppKitPreview {
     }
 
     static func defaults() -> UserDefaults {
-        PreviewDefaults()
+        let suite = "Mysli.Preview." + UUID().uuidString
+        // No fallback to `.standard`: the Canvas host shares the real app's preferences.
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        return defaults
     }
 }
 
@@ -33,20 +37,9 @@ private final class PreviewContentController: NSViewController {
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 }
 
-private final class PreviewDefaults: UserDefaults {
-    private var values: [String: Any] = [:]
-
-    override func object(forKey key: String) -> Any? { values[key] }
-    override func string(forKey key: String) -> String? { values[key] as? String }
-    override func array(forKey key: String) -> [Any]? { values[key] as? [Any] }
-    override func stringArray(forKey key: String) -> [String]? { values[key] as? [String] }
-    override func bool(forKey key: String) -> Bool { values[key] as? Bool ?? false }
-    override func integer(forKey key: String) -> Int { values[key] as? Int ?? 0 }
-
-    override func set(_ value: Any?, forKey key: String) { values[key] = value }
-    override func set(_ value: Bool, forKey key: String) { values[key] = value }
-    override func set(_ value: Int, forKey key: String) { values[key] = value }
-    override func set(_ value: Double, forKey key: String) { values[key] = value }
-    override func removeObject(forKey key: String) { values[key] = nil }
+struct PreviewScreens: Screens {
+    var all: [ScreenGeometry] = []
+    var mainIndex: Int? { all.isEmpty ? nil : 0 }
 }
+
 #endif

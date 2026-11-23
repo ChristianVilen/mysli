@@ -83,16 +83,10 @@ final class EditorWindowTests: XCTestCase {
     ///     TEST_RUNNER_MYSLI_EDITOR_SNAPSHOTS="$HOME/editor-snapshots" xcodebuild -project Mysli.xcodeproj \
     ///         -scheme Mysli test -only-testing:MysliTests/EditorWindowTests/testWritesAPictureOfEachEditorState
     func testWritesAPictureOfEachEditorState() throws {
-        guard let path = ProcessInfo.processInfo.environment["MYSLI_EDITOR_SNAPSHOTS"] else {
-            throw XCTSkip("Set MYSLI_EDITOR_SNAPSHOTS to a folder to write pictures of the screenshot editor.")
-        }
-        let folder = URL(fileURLWithPath: path, isDirectory: true)
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let folder = try pictureFolder("MYSLI_EDITOR_SNAPSHOTS",
+                                       skipMessage: "Set MYSLI_EDITOR_SNAPSHOTS to a folder to write pictures of the screenshot editor.")
         func snap(_ window: NSWindow, _ name: String) throws {
-            let view = try XCTUnwrap(window.contentView)
-            for (suffix, appearance) in [("light", NSAppearance.Name.aqua), ("dark", .darkAqua)] {
-                try writePicture(of: view, appearance: appearance, to: folder.appendingPathComponent("\(name)-\(suffix).png"))
-            }
+            try writePictures(of: try XCTUnwrap(window.contentView), named: name, in: folder)
         }
         func descendants(_ view: NSView) -> [NSView] { view.subviews.flatMap { [$0] + descendants($0) } }
 

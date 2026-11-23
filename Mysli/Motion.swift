@@ -4,6 +4,9 @@ import Cocoa
 enum Motion {
     static let easeOut = CAMediaTimingFunction(controlPoints: 0.23, 1, 0.32, 1)
     static let easeInOut = CAMediaTimingFunction(controlPoints: 0.77, 0, 0.175, 1)
+    static let quick: CFTimeInterval = 0.15
+    static let standard: CFTimeInterval = 0.24
+    static var isReduced: Bool { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
 }
 
 extension CALayer {

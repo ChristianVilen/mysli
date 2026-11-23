@@ -42,7 +42,25 @@ func writePicture(of parts: [(view: NSView, origin: NSPoint)], size: NSSize,
     try XCTUnwrap(image.representation(using: .png, properties: [:])).write(to: url)
 }
 
+/// The folder named by `variable`, created when needed. Skips the test when the variable is not set.
+func pictureFolder(_ variable: String, skipMessage: String) throws -> URL {
+    guard let path = ProcessInfo.processInfo.environment[variable] else { throw XCTSkip(skipMessage) }
+    let folder = URL(fileURLWithPath: path, isDirectory: true)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    return folder
+}
+
+/// Writes `name-light.png` and `name-dark.png` to `folder`.
 @MainActor
-func writePicture(of view: NSView, appearance: NSAppearance.Name, to url: URL) throws {
-    try writePicture(of: [(view, .zero)], size: view.bounds.size, appearance: appearance, to: url)
+func writePictures(of parts: [(view: NSView, origin: NSPoint)], size: NSSize,
+                   backdrop: NSColor = .windowBackgroundColor, named name: String, in folder: URL) throws {
+    for (suffix, appearance) in [("light", NSAppearance.Name.aqua), ("dark", .darkAqua)] {
+        try writePicture(of: parts, size: size, backdrop: backdrop, appearance: appearance,
+                         to: folder.appendingPathComponent("\(name)-\(suffix).png"))
+    }
+}
+
+@MainActor
+func writePictures(of view: NSView, named name: String, in folder: URL) throws {
+    try writePictures(of: [(view, .zero)], size: view.bounds.size, named: name, in: folder)
 }

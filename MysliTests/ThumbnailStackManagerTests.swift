@@ -140,11 +140,8 @@ final class ThumbnailStackManagerTests: XCTestCase {
     ///         -scheme Mysli test -only-testing:MysliTests/ThumbnailStackManagerTests/testWritesAPictureOfOneThumbnailAndAStack
     @MainActor
     func testWritesAPictureOfOneThumbnailAndAStack() throws {
-        guard let path = ProcessInfo.processInfo.environment["MYSLI_THUMBNAIL_SNAPSHOTS"] else {
-            throw XCTSkip("Set MYSLI_THUMBNAIL_SNAPSHOTS to a folder to write pictures of the screenshot thumbnails.")
-        }
-        let folder = URL(fileURLWithPath: path, isDirectory: true)
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let folder = try pictureFolder("MYSLI_THUMBNAIL_SNAPSHOTS",
+                                       skipMessage: "Set MYSLI_THUMBNAIL_SNAPSHOTS to a folder to write pictures of the screenshot thumbnails.")
         // Each thumbnail and each Combine button is its own window, so the picture puts their
         // content views together at their screen positions.
         func snap(_ name: String) throws {
@@ -156,11 +153,8 @@ final class ThumbnailStackManagerTests: XCTestCase {
                 (view: try XCTUnwrap(window.contentView),
                  origin: NSPoint(x: window.frame.minX - stack.minX + margin, y: window.frame.minY - stack.minY + margin))
             }
-            for (suffix, appearance) in [("light", NSAppearance.Name.aqua), ("dark", .darkAqua)] {
-                try writePicture(of: parts, size: NSSize(width: stack.width + 2 * margin, height: stack.height + 2 * margin),
-                                 backdrop: pictureDesktop, appearance: appearance,
-                                 to: folder.appendingPathComponent("\(name)-\(suffix).png"))
-            }
+            try writePictures(of: parts, size: NSSize(width: stack.width + 2 * margin, height: stack.height + 2 * margin),
+                              backdrop: pictureDesktop, named: name, in: folder)
         }
         let image = CapturePreview.sampleImage()
         func capture(_ name: String) -> CaptureResult {

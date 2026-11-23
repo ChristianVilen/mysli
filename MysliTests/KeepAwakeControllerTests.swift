@@ -145,19 +145,10 @@ final class KeepAwakeControllerTests: XCTestCase {
     ///         -scheme Mysli test -only-testing:MysliTests/KeepAwakeControllerTests/testWritesAPictureOfIdleAndRunning
     @MainActor
     func testWritesAPictureOfIdleAndRunning() throws {
-        guard let path = ProcessInfo.processInfo.environment["MYSLI_KEEP_AWAKE_SNAPSHOTS"] else {
-            throw XCTSkip("Set MYSLI_KEEP_AWAKE_SNAPSHOTS to a folder to write pictures of the Keep Awake chips.")
-        }
-        let folder = URL(fileURLWithPath: path, isDirectory: true)
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        func snap(_ name: String) throws {
-            for (suffix, appearance) in [("light", NSAppearance.Name.aqua), ("dark", .darkAqua)] {
-                try writePicture(of: panel, appearance: appearance, to: folder.appendingPathComponent("\(name)-\(suffix).png"))
-            }
-        }
-
-        try snap("01-idle")
+        let folder = try pictureFolder("MYSLI_KEEP_AWAKE_SNAPSHOTS",
+                                       skipMessage: "Set MYSLI_KEEP_AWAKE_SNAPSHOTS to a folder to write pictures of the Keep Awake chips.")
+        try writePictures(of: panel, named: "01-idle", in: folder)
         controller.activate(.timed(60 * 60))
-        try snap("02-running")
+        try writePictures(of: panel, named: "02-running", in: folder)
     }
 }
