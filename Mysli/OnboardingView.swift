@@ -70,6 +70,10 @@ final class OnboardingView: NSView {
         }
         for view in [welcome, tools, access] {
             let scroll = SettingsLayout.scroll(view)
+            scroll.autohidesScrollers = true
+            if view === welcome, let document = scroll.documentView {
+                document.heightAnchor.constraint(greaterThanOrEqualTo: scroll.contentView.heightAnchor).isActive = true
+            }
             scroll.translatesAutoresizingMaskIntoConstraints = false
             addSubview(scroll)
             NSLayoutConstraint.activate([
@@ -149,7 +153,7 @@ final class OnboardingView: NSView {
     }
 
     private func buildWelcome() {
-        let content = SettingsLayout.stack(spacing: 18)
+        let content = SettingsLayout.stack(spacing: 16)
         content.alignment = .centerX
         let icon = NSImageView(image: NSApp.applicationIconImage)
         icon.widthAnchor.constraint(equalToConstant: 96).isActive = true
@@ -161,29 +165,32 @@ final class OnboardingView: NSView {
         let tagline = SettingsLayout.label("A daily mix of Mac tools.", secondary: true)
         content.addArrangedSubview(tagline)
         content.setCustomSpacing(6, after: title)
-        content.setCustomSpacing(28, after: tagline)
+        content.setCustomSpacing(20, after: tagline)
         let icons = NSStackView()
+        icons.alignment = .top
         icons.spacing = 12
         icons.distribution = .fillEqually
-        icons.widthAnchor.constraint(equalToConstant: 440).isActive = true
         for tool in MysliTool.allCases {
             let square = NSImageView(image: tool.icon(size: 36))
             square.widthAnchor.constraint(equalToConstant: 36).isActive = true
             square.heightAnchor.constraint(equalToConstant: 36).isActive = true
-            let column = SettingsLayout.stack([square, SettingsLayout.label(tool.title, size: 11)], spacing: 8)
+            let label = NSTextField(labelWithString: tool.title)
+            label.font = .systemFont(ofSize: 11)
+            let column = SettingsLayout.stack([square, label], spacing: 8)
             column.alignment = .centerX
             icons.addArrangedSubview(column)
         }
         content.addArrangedSubview(icons)
-        content.setCustomSpacing(24, after: icons)
+        content.setCustomSpacing(16, after: icons)
         let detail = SettingsLayout.label("Choose the tools you want. Mysli asks only for the permissions those tools need. You can change everything later in Settings.")
         detail.alignment = .center
         content.addArrangedSubview(detail)
         content.translatesAutoresizingMaskIntoConstraints = false
         welcome.addSubview(content)
         NSLayoutConstraint.activate([
-            welcome.heightAnchor.constraint(greaterThanOrEqualToConstant: 480),
             content.centerYAnchor.constraint(equalTo: welcome.centerYAnchor),
+            content.topAnchor.constraint(greaterThanOrEqualTo: welcome.topAnchor),
+            content.bottomAnchor.constraint(lessThanOrEqualTo: welcome.bottomAnchor),
             content.leadingAnchor.constraint(equalTo: welcome.leadingAnchor, constant: 16),
             content.trailingAnchor.constraint(equalTo: welcome.trailingAnchor, constant: -16),
             detail.widthAnchor.constraint(lessThanOrEqualToConstant: 460)
@@ -240,26 +247,17 @@ final class OnboardingView: NSView {
         image.imageScaling = .scaleProportionallyDown
         image.widthAnchor.constraint(equalToConstant: 32).isActive = true
         image.heightAnchor.constraint(equalToConstant: 32).isActive = true
-        let row = NSView()
-        for child in [image, copy, button] {
-            child.translatesAutoresizingMaskIntoConstraints = false
-            row.addSubview(child)
-        }
-        NSLayoutConstraint.activate([
-            image.leadingAnchor.constraint(equalTo: row.leadingAnchor, constant: indent),
-            image.topAnchor.constraint(equalTo: copy.topAnchor),
-            copy.leadingAnchor.constraint(equalTo: image.trailingAnchor, constant: 12),
-            copy.topAnchor.constraint(equalTo: row.topAnchor, constant: 8),
-            copy.bottomAnchor.constraint(equalTo: row.bottomAnchor, constant: -8),
-            copy.trailingAnchor.constraint(equalTo: button.leadingAnchor, constant: -16),
-            button.trailingAnchor.constraint(equalTo: row.trailingAnchor),
-            button.centerYAnchor.constraint(equalTo: heading.centerYAnchor)
-        ])
         copy.setHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)
         copy.setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)
         copy.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         button.setContentHuggingPriority(.required, for: .horizontal)
         button.setContentCompressionResistancePriority(.required, for: .horizontal)
+        let row = NSStackView(views: [image, copy, button])
+        row.distribution = .fill
+        row.alignment = .centerY
+        row.spacing = 12
+        row.setCustomSpacing(16, after: copy)
+        row.edgeInsets = NSEdgeInsets(top: 3, left: indent, bottom: 3, right: 0)
         return row
     }
 

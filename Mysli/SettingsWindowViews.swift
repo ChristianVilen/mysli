@@ -207,29 +207,19 @@ enum SettingsLayout {
 
     static func row(_ title: String, detail: String? = nil, control: NSView) -> NSView {
         let copy = stack(spacing: 4)
-        let heading = label(title)
-        add(heading, to: copy)
+        add(label(title), to: copy)
         if let detail { add(label(detail, size: 11, secondary: true), to: copy) }
         copy.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         copy.setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)
-        let row = NSView()
-        for child in [copy, control] {
-            child.translatesAutoresizingMaskIntoConstraints = false
-            row.addSubview(child)
-        }
-        NSLayoutConstraint.activate([
-            copy.leadingAnchor.constraint(equalTo: row.leadingAnchor),
-            copy.topAnchor.constraint(equalTo: row.topAnchor, constant: 4),
-            copy.bottomAnchor.constraint(equalTo: row.bottomAnchor, constant: -4),
-            copy.trailingAnchor.constraint(equalTo: control.leadingAnchor, constant: -12),
-            control.trailingAnchor.constraint(equalTo: row.trailingAnchor),
-            control.centerYAnchor.constraint(equalTo: heading.centerYAnchor),
-            control.topAnchor.constraint(greaterThanOrEqualTo: row.topAnchor),
-            control.bottomAnchor.constraint(lessThanOrEqualTo: row.bottomAnchor)
-        ])
+        copy.setHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)
         control.setContentHuggingPriority(.required, for: .horizontal)
         control.setContentCompressionResistancePriority(.required, for: .horizontal)
         (control as? NSStackView)?.setHuggingPriority(.required, for: .horizontal)
+        let row = NSStackView(views: [copy, control])
+        row.alignment = .centerY
+        row.distribution = .fill
+        row.spacing = 12
+        row.edgeInsets = NSEdgeInsets(top: 4, left: 0, bottom: 4, right: 0)
         return row
     }
 
