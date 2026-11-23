@@ -31,7 +31,7 @@ final class SettingsHelpView: NSStackView {
             row("Something went wrong", detail: "Tell us what happened and what you expected.", button: reportBug),
             row("Share an idea", detail: "Suggest a feature or tell us what could work better.", button: sendFeedback)
         ]), to: self)
-        SettingsLayout.add(SettingsLayout.label("These buttons open GitHub in your browser. You can review your message before you send it. A GitHub account is required.", size: 12, secondary: true), to: self)
+        SettingsLayout.add(SettingsLayout.note("These buttons open GitHub in your browser. You can review your message before you send it. A GitHub account is required."), to: self)
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }

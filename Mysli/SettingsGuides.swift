@@ -17,6 +17,7 @@ final class SettingsGuides: NSObject {
             button.image = NSImage(systemSymbolName: "chevron.right", accessibilityDescription: nil)
             button.imagePosition = .imageLeading
             button.alignment = .left
+            button.contentTintColor = .labelColor
             button.setAccessibilityLabel(title)
             button.setAccessibilityRole(.disclosureTriangle)
             button.setAccessibilityExpanded(false)
@@ -64,7 +65,7 @@ enum SettingsShortcuts {
         box.borderWidth = 0.5
         box.cornerRadius = 4
         box.borderColor = .separatorColor
-        box.fillColor = .controlBackgroundColor
+        box.fillColor = .quaternarySystemFill
         box.contentViewMargins = NSSize(width: 4, height: 3)
         box.contentView = cap
         box.widthAnchor.constraint(equalToConstant: max(26, cap.intrinsicContentSize.width + 8)).isActive = true

@@ -28,8 +28,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     let clearBackground = NSButton(title: "Clear", target: nil, action: nil)
     let loginError = NSTextField(wrappingLabelWithString: "")
     let calendarStatus = NSTextField(wrappingLabelWithString: "")
-    private let summaryToolMissing = SettingsLayout.label("", size: 11, secondary: true)
-    private let dictationToolMissing = SettingsLayout.label("", size: 11, secondary: true)
+    private let summaryToolMissing = SettingsNote()
+    private let dictationToolMissing = SettingsNote()
     private let folderPath = NSTextField(labelWithString: "")
     private let backgroundPath = NSTextField(labelWithString: "")
     private let settings: Settings
@@ -84,6 +84,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 760, height: 700),
                                     styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: true)
         window.title = "Mysli"
+        window.titleVisibility = .hidden
         window.isReleasedWhenClosed = false
         window.contentMinSize = NSSize(width: 640, height: 420)
         super.init(window: window)
@@ -315,25 +316,21 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             return column
         }
         var destinations: [SettingsSearchDestination] = []
-        func row(_ page: SettingsPage, _ title: String, detail: String? = nil,
+        func row(_ page: SettingsPage, _ title: String, detail: String? = nil, value: NSTextField? = nil,
                  control: NSView, focus: NSView? = nil, keywords: [String] = []) -> NSView {
-            let view = SettingsLayout.row(title, detail: detail, control: control)
+            let view = value.map { SettingsLayout.row(title, value: $0, control: control) }
+                ?? SettingsLayout.row(title, detail: detail, control: control)
             destinations.append(.init(item: .init(page: page, title: title, detail: detail ?? "", keywords: keywords),
                                       view: view, control: focus ?? control))
             return view
         }
         func pathRow(_ page: SettingsPage, _ title: String, path: NSTextField, buttons: [NSButton], keywords: [String]) -> NSView {
-            column([row(page, title, control: NSStackView(views: buttons), focus: buttons.first, keywords: keywords), path])
+            row(page, title, value: path, control: NSStackView(views: buttons), focus: buttons.first, keywords: keywords)
         }
-        func note(_ text: String) -> NSView { SettingsLayout.label(text, size: 11, secondary: true) }
+        let note = SettingsLayout.note
         loginError.textColor = .systemRed
         loginError.isHidden = true
         calendarStatus.isHidden = true
-        for label in [folderPath, backgroundPath] {
-            label.lineBreakMode = .byTruncatingMiddle
-            label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-            label.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        }
         for page in SettingsPage.allCases where !page.guides.isEmpty {
             guides[page] = SettingsGuides(page.guides)
         }
@@ -423,7 +420,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
                 dictationToolMissing,
                 note("Fn needs Input Monitoring. Both options need Microphone and Accessibility. Grant them on the Permissions page."),
                 note(dictationKeyboardHelp),
-                dictationKeyboard
+                SettingsLayout.trailing(dictationKeyboard)
             ]),
             .permissions: permissions,
             .help: helpPage
@@ -443,7 +440,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         sidebar.catalog = destinations + permissionsPage.searchDestinations + helpPage.searchDestinations
         sidebar.onSearchChanged = { [weak self] in self?.updateKeyViewLoop() }
         let root = pageContainer
-        pages = contents.mapValues(SettingsLayout.scroll)
+        pages = contents.mapValues { SettingsLayout.scroll($0, maxWidth: SettingsLayout.pageMaxWidth) }
         if let general = pages[.general] { SettingsLayout.fill(general, in: root) }
         let detail = NSViewController()
         detail.view = root

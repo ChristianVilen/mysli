@@ -174,6 +174,10 @@ final class SettingsGlass: NSView {
 }
 
 enum SettingsLayout {
+    static let groupInset: CGFloat = 14
+    static let popUpWidth: CGFloat = 180
+    static let pageMaxWidth: CGFloat = 640
+
     static func stack(_ views: [NSView] = [], spacing: CGFloat = 12) -> NSStackView {
         let stack = NSStackView(views: views)
         stack.orientation = .vertical
@@ -206,21 +210,51 @@ enum SettingsLayout {
     }
 
     static func row(_ title: String, detail: String? = nil, control: NSView) -> NSView {
+        row(title, secondLine: detail.map { label($0, size: 11, secondary: true) }, control: control)
+    }
+
+    /// A row with a value, such as a path, below its title. The value stays on one line and truncates in the middle.
+    static func row(_ title: String, value: NSTextField, control: NSView) -> NSView {
+        value.font = .systemFont(ofSize: 11)
+        value.textColor = .secondaryLabelColor
+        value.lineBreakMode = .byTruncatingMiddle
+        value.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        value.setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)
+        return row(title, secondLine: value, control: control)
+    }
+
+    private static func row(_ title: String, secondLine: NSTextField?, control: NSView) -> NSView {
         let copy = stack(spacing: 4)
         add(label(title), to: copy)
-        if let detail { add(label(detail, size: 11, secondary: true), to: copy) }
+        if let secondLine { add(secondLine, to: copy) }
         copy.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         copy.setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)
         copy.setHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)
         control.setContentHuggingPriority(.required, for: .horizontal)
         control.setContentCompressionResistancePriority(.required, for: .horizontal)
         (control as? NSStackView)?.setHuggingPriority(.required, for: .horizontal)
+        matchRowControls(in: control)
         let row = NSStackView(views: [copy, control])
         row.alignment = .centerY
         row.distribution = .fill
         row.spacing = 12
         row.edgeInsets = NSEdgeInsets(top: 4, left: 0, bottom: 4, right: 0)
         return row
+    }
+
+    /// Gives the switches, buttons, and pop-up buttons of a row one height, and every pop-up button one width.
+    private static func matchRowControls(in view: NSView) {
+        for case let control as NSControl in [view] + view.subviews {
+            control.controlSize = .small
+            if control is NSPopUpButton {
+                control.setContentHuggingPriority(.defaultLow, for: .horizontal)
+                control.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+                control.widthAnchor.constraint(equalToConstant: popUpWidth).isActive = true
+            } else {
+                control.setContentHuggingPriority(.required, for: .horizontal)
+                control.setContentCompressionResistancePriority(.required, for: .horizontal)
+            }
+        }
     }
 
     static func group(_ rows: [NSView]) -> SettingsGlass {
@@ -234,8 +268,24 @@ enum SettingsLayout {
             }
             add(row, to: stack)
         }
-        fill(stack, in: glass.content, inset: 14)
+        fill(stack, in: glass.content, inset: groupInset)
         return glass
+    }
+
+    static func note(_ text: String) -> SettingsNote { SettingsNote(text) }
+
+    /// Puts a view at the trailing edge of a full-width line.
+    static func trailing(_ view: NSView) -> NSView {
+        let line = NSView()
+        view.translatesAutoresizingMaskIntoConstraints = false
+        line.addSubview(view)
+        NSLayoutConstraint.activate([
+            view.leadingAnchor.constraint(greaterThanOrEqualTo: line.leadingAnchor),
+            view.trailingAnchor.constraint(equalTo: line.trailingAnchor),
+            view.topAnchor.constraint(equalTo: line.topAnchor),
+            view.bottomAnchor.constraint(equalTo: line.bottomAnchor)
+        ])
+        return line
     }
 
     static func heading(_ title: String, symbol: String, color: NSColor) -> NSView {
@@ -270,21 +320,62 @@ enum SettingsLayout {
         return stack
     }
 
-    static func scroll(_ page: NSView) -> NSScrollView {
+    /// Scrolls a page with equal margins. A page with a `maxWidth` stays centered in a wider window.
+    static func scroll(_ page: NSView, maxWidth: CGFloat? = nil) -> NSScrollView {
+        let margin: CGFloat = 20
         let scroll = NSScrollView()
         scroll.hasVerticalScroller = true
+        scroll.autohidesScrollers = true
         scroll.drawsBackground = false
         let document = SettingsDocument()
         document.translatesAutoresizingMaskIntoConstraints = false
         scroll.documentView = document
-        fill(page, in: document, inset: 20)
-        document.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor).isActive = true
+        page.translatesAutoresizingMaskIntoConstraints = false
+        document.addSubview(page)
+        let fullWidth = page.widthAnchor.constraint(equalTo: document.widthAnchor, constant: -2 * margin)
+        // Above label hugging, but below the window size priorities. Higher, and a window
+        // wider than the page's maximum width shrinks back to fit the page.
+        fullWidth.priority = NSLayoutConstraint.Priority(450)
+        NSLayoutConstraint.activate([
+            page.topAnchor.constraint(equalTo: document.topAnchor, constant: margin),
+            page.bottomAnchor.constraint(equalTo: document.bottomAnchor, constant: -margin),
+            page.centerXAnchor.constraint(equalTo: document.centerXAnchor),
+            page.widthAnchor.constraint(lessThanOrEqualTo: document.widthAnchor, constant: -2 * margin),
+            fullWidth,
+            document.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor)
+        ])
+        if let maxWidth { page.widthAnchor.constraint(lessThanOrEqualToConstant: maxWidth).isActive = true }
         return scroll
     }
 }
 
 private final class SettingsDocument: NSView {
     override var isFlipped: Bool { true }
+}
+
+/// A note below a group. Its text lines up with the text inside the group, like a footer in System Settings.
+final class SettingsNote: NSView {
+    let label = SettingsLayout.label("", size: 11, secondary: true)
+
+    var stringValue: String {
+        get { label.stringValue }
+        set { label.stringValue = newValue }
+    }
+
+    init(_ text: String = "") {
+        super.init(frame: .zero)
+        label.stringValue = text
+        label.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(label)
+        NSLayoutConstraint.activate([
+            label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: SettingsLayout.groupInset),
+            label.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -SettingsLayout.groupInset),
+            label.topAnchor.constraint(equalTo: topAnchor),
+            label.bottomAnchor.constraint(equalTo: bottomAnchor)
+        ])
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 }
 
 /// What Settings and onboarding say while a tool cannot work because its CLI is not installed,
