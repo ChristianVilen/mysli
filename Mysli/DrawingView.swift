@@ -119,3 +119,12 @@ class DrawingView: NSView {
         }
     }
 }
+
+#if DEBUG
+extension DrawingView {
+    func addPreviewStroke(_ path: NSBezierPath) {
+        strokes.append(path)
+        needsDisplay = true
+    }
+}
+#endif

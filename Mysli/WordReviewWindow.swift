@@ -319,3 +319,21 @@ private final class ReviewWindow: NSWindow {
         close()
     }
 }
+
+#if DEBUG
+extension WordReviewWindowController {
+    func previewContent(_ screen: WordReviewScreen) -> NSView {
+        let page: NSView
+        switch screen.page {
+        case .question(let question):
+            fill(question, error: screen.error)
+            page = questionPage
+        case .finished(let finished):
+            fill(finished, error: screen.error)
+            page = finishedPage
+        }
+        window?.contentView = nil
+        return page
+    }
+}
+#endif

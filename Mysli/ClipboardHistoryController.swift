@@ -324,3 +324,14 @@ final class ClipboardHistoryController {
         timer = newTimer
     }
 }
+
+#if DEBUG
+extension ClipboardHistoryController {
+    func seedPreviewItems(_ items: [ClipboardItem]) {
+        for item in items.reversed() {
+            history.add(item)
+        }
+        prepareForPresentation()
+    }
+}
+#endif

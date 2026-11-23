@@ -118,3 +118,11 @@ class EditorWindow: NSPanel, NSWindowDelegate {
         onClose?()
     }
 }
+
+#if DEBUG
+extension EditorWindow {
+    func addPreviewStroke(_ path: NSBezierPath) {
+        drawingView.addPreviewStroke(path)
+    }
+}
+#endif

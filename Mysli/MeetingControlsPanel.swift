@@ -569,3 +569,28 @@ private final class RootView: NSView {
         super.layout()
     }
 }
+
+#if DEBUG
+extension MeetingControlsPanel {
+    func previewContent(status: MeetingControls.Status, recordedTime: TimeInterval? = nil,
+                        transcript: LivePreview? = nil, notes: MeetingTypedNotesView? = nil) -> NSView {
+        if let notes {
+            notesView = notes
+            root.addSubview(notes)
+            root.notes = notes
+            presentation = .readAndWrite
+        } else if transcript != nil {
+            presentation = .transcript
+        }
+        let shape = Shape(status: status, content: content(for: status), liveStatus: transcript?.status)
+        renderTime(recordedTime)
+        render(shape)
+        relayout(shape, animated: false)
+        drawer.showBehind(transcript?.behind)
+        drawer.showRows(transcript?.rows ?? [])
+        if shape.content.showsTranscript { drawer.opened() }
+        contentView = nil
+        return root
+    }
+}
+#endif

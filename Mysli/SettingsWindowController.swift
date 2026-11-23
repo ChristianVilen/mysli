@@ -36,6 +36,9 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     let sidebar = SettingsSidebarController()
     private let onboarding: Onboarding?
     private let settingsContent = NSSplitViewController()
+    #if DEBUG
+    private weak var canvasHost: NSViewController?
+    #endif
     private let pageContainer = SettingsBackground()
     private(set) var onboardingView: OnboardingView?
     private let chooseFolder: Picker
@@ -150,6 +153,14 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func showSettingsContent() {
+        #if DEBUG
+        if let canvasHost {
+            onboardingView?.removeFromSuperview()
+            canvasHost.addChild(settingsContent)
+            SettingsLayout.fill(settingsContent.view, in: canvasHost.view)
+            return
+        }
+        #endif
         guard let window else { return }
         let size = window.contentLayoutRect.size
         settingsContent.view.setFrameSize(size)
@@ -473,18 +484,19 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         if changed { applyDisplayOptions(.current) }
         sidebar.select(page)
         updateKeyViewLoop()
-        if focusSidebar { window?.makeFirstResponder(sidebar.tableView) }
+        if focusSidebar { sidebar.tableView.window?.makeFirstResponder(sidebar.tableView) }
         refreshPermissionsVisibility()
     }
 
     private func revealSearchResult(_ destination: SettingsSearchDestination) {
         selectPage(destination.item.page, focusSidebar: false)
         destination.reveal?()
-        window?.contentView?.layoutSubtreeIfNeeded()
+        settingsContent.view.layoutSubtreeIfNeeded()
         if !destination.view.isHiddenOrHasHiddenAncestor {
             destination.view.scrollToVisible(destination.view.bounds.insetBy(dx: 0, dy: -16))
         }
         let focus = destination.control
+        let window = sidebar.tableView.window
         if let focus, !focus.isHiddenOrHasHiddenAncestor, focus.acceptsFirstResponder {
             window?.makeFirstResponder(focus)
         } else {
@@ -493,8 +505,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     }
 
     @objc func focusSettingsSearch(_ sender: Any?) {
-        guard window?.contentViewController === settingsContent else { return }
-        window?.makeFirstResponder(sidebar.searchField)
+        guard let window = sidebar.searchField.window else { return }
+        window.makeFirstResponder(sidebar.searchField)
         sidebar.searchField.selectText(nil)
     }
 
@@ -527,7 +539,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             (view as? SettingsGlass)?.apply(options)
             for child in view.subviews { apply(in: child) }
         }
-        if let root = window?.contentView { apply(in: root) }
+        apply(in: settingsContent.view)
+        if let onboardingView { apply(in: onboardingView) }
     }
 
     @objc private func loginChanged() {
@@ -689,3 +702,38 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         panel.beginSheetModal(for: window) { result in completion(result == .OK ? panel.url : nil) }
     }
 }
+
+#if DEBUG
+extension SettingsWindowController {
+    func makePreview(page: SettingsPage = .general, query: String? = nil,
+                     openFirstResult: Bool = false) -> NSViewController {
+        let size = settingsContent.view.frame.size
+        window?.contentViewController = nil
+        let host = AppKitPreview.host(NSView(), size: size, retaining: self)
+        canvasHost = host
+        if let onboardingView {
+            SettingsLayout.fill(onboardingView, in: host.view)
+            return host
+        }
+
+        showSettingsContent()
+        refresh()
+        selectPage(page, focusSidebar: false)
+        if let query {
+            sidebar.searchField.stringValue = query
+            sidebar.refreshSearchResults()
+            if openFirstResult, let action = sidebar.tableView.action {
+                NSApp.sendAction(action, to: sidebar.tableView.target, from: sidebar.tableView)
+            }
+        }
+
+        return host
+    }
+
+    func makeSidebarPreview() -> NSViewController {
+        sidebar.onSelect = nil
+        if let item = settingsContent.splitViewItem(for: sidebar) { settingsContent.removeSplitViewItem(item) }
+        return AppKitPreview.host(sidebar.view, size: NSSize(width: 230, height: 460), retaining: self)
+    }
+}
+#endif

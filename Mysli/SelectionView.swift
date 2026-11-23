@@ -27,7 +27,7 @@ class SelectionView: NSView {
     override func keyDown(with event: NSEvent) {
         if event.keyCode == 53 { // Escape
             onCancel?()
-        } else if event.keyCode == 49 { // Space
+        } else if event.keyCode == 49, onWindowSelection != nil { // Space
             toggleMode()
         }
     }
@@ -173,3 +173,12 @@ class SelectionView: NSView {
         return .crosshair
     }()
 }
+
+#if DEBUG
+extension SelectionView {
+    func showPreviewSelection(_ rect: NSRect) {
+        selectionRect = rect
+        isDragging = true
+    }
+}
+#endif

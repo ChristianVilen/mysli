@@ -325,3 +325,18 @@ final class NoteRowTextView: NSTextView, NSTextStorageDelegate {
         do { try onImage?(MeetingScreenshot.read(from: url)); return true } catch { NSSound.beep(); return false }
     }
 }
+
+#if DEBUG
+extension MeetingTypedNotesView {
+    func showSampleNotesOnly() {
+        unregisterDraggedTypes()
+        scroll.documentView?.unregisterDraggedTypes()
+        for row in rows.values {
+            row.editor.isEditable = false
+            row.editor.unregisterDraggedTypes()
+            row.editor.onImage = nil
+            row.editor.onNewRow = nil
+        }
+    }
+}
+#endif
