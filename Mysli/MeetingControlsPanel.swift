@@ -177,7 +177,6 @@ final class MeetingControlsPanel: FloatingPanel, MeetingNotesSlot {
          NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast)
     }
 
-    /// Only a new `Shape` needs layout; ticks and new text update their views directly.
     func reload() {
         if let activeSession = recorder.activeSessionID, activeSession != sessionID {
             sessionID = activeSession
@@ -191,12 +190,18 @@ final class MeetingControlsPanel: FloatingPanel, MeetingNotesSlot {
         if controls == nil, recorder.activeSessionID != nil { return disappear() }
         // After the saved notice ends, open notes keep the saved look.
         guard let status = controls?.status ?? (notesView == nil ? nil : .saved) else { return disappear() }
-        let content = content(for: status)
-        let preview = content.showsTranscript ? recorder.livePreview : nil
-        let shape = Shape(status: status, content: content, liveStatus: preview?.status)
-        let wasOpen = !drawer.isHidden
+        let preview = content(for: status).showsTranscript ? recorder.livePreview : nil
         let isAppearing = !isVisible
-        renderTime(controls?.recordedTime)
+        draw(status: status, recordedTime: controls?.recordedTime, preview: preview, isAppearing: isAppearing)
+        if isAppearing { appear() }
+    }
+
+    /// Only a new `Shape` needs layout; ticks and new text update their views directly.
+    private func draw(status: MeetingControls.Status, recordedTime: TimeInterval?, preview: LivePreview?,
+                      isAppearing: Bool) {
+        let shape = Shape(status: status, content: content(for: status), liveStatus: preview?.status)
+        let wasOpen = !drawer.isHidden
+        renderTime(recordedTime)
         drawer.showBehind(preview?.behind)
         if isAppearing || shape != drawnShape {
             drawnShape = shape
@@ -205,7 +210,6 @@ final class MeetingControlsPanel: FloatingPanel, MeetingNotesSlot {
         }
         drawer.showRows(preview?.rows ?? [])
         if !drawer.isHidden, !wasOpen { drawer.opened() }
-        if isAppearing { appear() }
     }
 
     /// The live transcript exists only while recording, and notes show only while attached.
@@ -582,13 +586,8 @@ extension MeetingControlsPanel {
         } else if transcript != nil {
             presentation = .transcript
         }
-        let shape = Shape(status: status, content: content(for: status), liveStatus: transcript?.status)
-        renderTime(recordedTime)
-        render(shape)
-        relayout(shape, animated: false)
-        drawer.showBehind(transcript?.behind)
-        drawer.showRows(transcript?.rows ?? [])
-        if shape.content.showsTranscript { drawer.opened() }
+        // The panel stays off screen like one that is about to appear: full layout, no animation.
+        draw(status: status, recordedTime: recordedTime, preview: transcript, isAppearing: true)
         contentView = nil
         return root
     }

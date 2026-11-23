@@ -36,9 +36,6 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     let sidebar = SettingsSidebarController()
     private let onboarding: Onboarding?
     private let settingsContent = NSSplitViewController()
-    #if DEBUG
-    private weak var canvasHost: NSViewController?
-    #endif
     private let pageContainer = SettingsBackground()
     private(set) var onboardingView: OnboardingView?
     private let chooseFolder: Picker
@@ -154,14 +151,6 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func showSettingsContent() {
-        #if DEBUG
-        if let canvasHost {
-            onboardingView?.removeFromSuperview()
-            canvasHost.addChild(settingsContent)
-            SettingsLayout.fill(settingsContent.view, in: canvasHost.view)
-            return
-        }
-        #endif
         guard let window else { return }
         let size = window.contentLayoutRect.size
         settingsContent.view.setFrameSize(size)
@@ -481,7 +470,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         if changed { applyDisplayOptions(.current) }
         sidebar.select(page)
         updateKeyViewLoop()
-        if focusSidebar { sidebar.tableView.window?.makeFirstResponder(sidebar.tableView) }
+        if focusSidebar { window?.makeFirstResponder(sidebar.tableView) }
         refreshPermissionsVisibility()
     }
 
@@ -502,8 +491,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     }
 
     @objc func focusSettingsSearch(_ sender: Any?) {
-        guard let window = sidebar.searchField.window else { return }
-        window.makeFirstResponder(sidebar.searchField)
+        guard window?.contentViewController === settingsContent else { return }
+        window?.makeFirstResponder(sidebar.searchField)
         sidebar.searchField.selectText(nil)
     }
 
@@ -707,13 +696,13 @@ extension SettingsWindowController {
         let size = settingsContent.view.frame.size
         window?.contentViewController = nil
         let host = AppKitPreview.host(NSView(), size: size, retaining: self)
-        canvasHost = host
         if let onboardingView {
             SettingsLayout.fill(onboardingView, in: host.view)
             return host
         }
 
-        showSettingsContent()
+        host.addChild(settingsContent)
+        SettingsLayout.fill(settingsContent.view, in: host.view)
         refresh()
         selectPage(page, focusSidebar: false)
         if let query {

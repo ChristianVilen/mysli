@@ -27,7 +27,7 @@ class SelectionView: NSView {
     override func keyDown(with event: NSEvent) {
         if event.keyCode == 53 { // Escape
             onCancel?()
-        } else if event.keyCode == 49, onWindowSelection != nil { // Space
+        } else if event.keyCode == 49 { // Space
             toggleMode()
         }
     }
