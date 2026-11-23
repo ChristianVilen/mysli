@@ -95,18 +95,22 @@ extension ClipboardItem {
         )
     }
 
-    /// Takes a bounded prefix of `text` first (cheap even for a huge
-    /// paste), then collapses whitespace/newlines to single spaces and
-    /// trims, then caps the result to `previewLabelMaxLength`. Falls back
+    /// The non-empty lines of a bounded prefix of `text` (cheap even for a
+    /// huge paste), each with its runs of whitespace collapsed to one space.
+    private static func collapsedLines(_ text: String) -> [String] {
+        String(text.prefix(previewSourceBudget))
+            .components(separatedBy: .newlines)
+            .map { $0.components(separatedBy: .whitespaces).filter { !$0.isEmpty }.joined(separator: " ") }
+            .filter { !$0.isEmpty }
+    }
+
+    /// Joins the collapsed lines of `text` with single spaces, then caps the
+    /// result to `previewLabelMaxLength`. Falls back
     /// to a placeholder when that collapses to nothing but the source text
     /// itself was non-empty (e.g. an all-whitespace prefix), so the row
     /// never shows a blank label for real content.
     private static func oneLineLabel(_ text: String) -> String {
-        let boundedPrefix = String(text.prefix(previewSourceBudget))
-        let collapsed = boundedPrefix
-            .components(separatedBy: .whitespacesAndNewlines)
-            .filter { !$0.isEmpty }
-            .joined(separator: " ")
+        let collapsed = collapsedLines(text).joined(separator: " ")
         guard !collapsed.isEmpty else {
             return text.isEmpty ? "" : whitespaceOnlyLabel
         }
@@ -118,10 +122,7 @@ extension ClipboardItem {
     /// `previewLabel`: only the few visible rows ask for it.
     var previewLines: [String] {
         guard case .text(let plain, _, _) = kind else { return [previewLabel] }
-        let lines = String(plain.prefix(Self.previewSourceBudget))
-            .components(separatedBy: .newlines)
-            .map { $0.components(separatedBy: .whitespaces).filter { !$0.isEmpty }.joined(separator: " ") }
-            .filter { !$0.isEmpty }
+        let lines = Self.collapsedLines(plain)
         guard lines.count > 1 else { return [previewLabel] }
         // A newline takes the place of one joining space, so this cap cuts
         // at the same word as the cap on `previewLabel`.

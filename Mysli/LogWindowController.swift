@@ -1,40 +1,6 @@
 import Cocoa
 import UniformTypeIdentifiers
 
-#if DEBUG
-import SwiftUI
-
-#Preview("Mysli Log", traits: .fixedLayout(width: 1000, height: 600)) {
-    LogWindowController.preview()
-}
-
-private extension LogWindowController {
-    static func preview() -> NSViewController {
-        let date = Date(timeIntervalSince1970: 1_790_000_000)
-        let controller = LogWindowController(reader: EmptyPreviewLog(), launchDate: date,
-                                             copy: { _ in }, save: { _, _ in }, deleteLogs: {})
-        let entries: [(LogLevel, String, String)] = [
-            (.notice, "app", "Mysli launched"),
-            (.info, "meeting", "Recording started"),
-            (.info, "meeting", "Recording stopped"),
-            (.error, "meeting", "Summary tool exited with status 1: <private>"),
-        ]
-        controller.display(entries.enumerated().map { index, entry in
-            let (level, category, message) = entry
-            let line = LogLine(date: date.addingTimeInterval(Double(index) * 60), processID: 123,
-                               level: level, category: category, message: message)
-            return LogRow(text: line.formatted, day: date)
-        })
-        controller.deleteAll.isEnabled = false
-        return AppKitPreview.host(contentOf: controller.window!, retaining: controller)
-    }
-}
-
-private struct EmptyPreviewLog: LogReading {
-    func rows(in interval: DateInterval?) async throws -> [LogRow] { [] }
-}
-#endif
-
 @MainActor
 final class LogWindowController: NSWindowController, NSWindowDelegate {
     let range = NSPopUpButton()
@@ -364,3 +330,37 @@ private final class LogWindow: NSWindow {
         return super.performKeyEquivalent(with: event)
     }
 }
+
+#if DEBUG
+import SwiftUI
+
+#Preview("Mysli Log", traits: .fixedLayout(width: 1000, height: 600)) {
+    LogWindowController.preview()
+}
+
+private extension LogWindowController {
+    static func preview() -> NSViewController {
+        let date = Date(timeIntervalSince1970: 1_790_000_000)
+        let controller = LogWindowController(reader: EmptyPreviewLog(), launchDate: date,
+                                             copy: { _ in }, save: { _, _ in }, deleteLogs: {})
+        let entries: [(LogLevel, String, String)] = [
+            (.notice, "app", "Mysli launched"),
+            (.info, "meeting", "Recording started"),
+            (.info, "meeting", "Recording stopped"),
+            (.error, "meeting", "Summary tool exited with status 1: <private>"),
+        ]
+        controller.display(entries.enumerated().map { index, entry in
+            let (level, category, message) = entry
+            let line = LogLine(date: date.addingTimeInterval(Double(index) * 60), processID: 123,
+                               level: level, category: category, message: message)
+            return LogRow(text: line.formatted, day: date)
+        })
+        controller.deleteAll.isEnabled = false
+        return AppKitPreview.host(contentOf: controller.window!, retaining: controller)
+    }
+}
+
+private struct EmptyPreviewLog: LogReading {
+    func rows(in interval: DateInterval?) async throws -> [LogRow] { [] }
+}
+#endif

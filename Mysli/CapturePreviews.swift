@@ -4,7 +4,7 @@ import SwiftUI
 
 #Preview("Edit screenshot · annotated") {
     let editor = EditorWindow(image: CapturePreview.sampleImage(), fileURL: PreviewImageStore.fileURL,
-                              store: PreviewImageStore(), screens: CapturePreviewScreens())
+                              store: PreviewImageStore(), screens: PreviewScreens())
     editor.addPreviewStroke(NSBezierPath(ovalIn: NSRect(x: 305, y: 79, width: 149, height: 82)))
     return AppKitPreview.host(contentOf: editor)
 }
@@ -99,11 +99,6 @@ enum CapturePreview {
             .foregroundColor: NSColor(srgbRed: 0.14, green: 0.20, blue: 0.24, alpha: 1),
         ])
     }
-}
-
-struct CapturePreviewScreens: Screens {
-    let all: [ScreenGeometry] = []
-    let mainIndex: Int? = nil
 }
 
 private struct PreviewImageStore: ImageStoring {

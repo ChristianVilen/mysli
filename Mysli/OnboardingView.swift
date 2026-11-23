@@ -91,7 +91,6 @@ final class OnboardingView: NSView {
         }
         for view in [welcome, tools, access] {
             let scroll = SettingsLayout.scroll(view)
-            scroll.autohidesScrollers = true
             scroll.wantsLayer = true
             if view === welcome, let document = scroll.documentView {
                 document.heightAnchor.constraint(greaterThanOrEqualTo: scroll.contentView.heightAnchor).isActive = true
@@ -132,9 +131,7 @@ final class OnboardingView: NSView {
         switch model.step {
         case .welcome: [skipButton, nextButton]
         case .tools:
-            MysliTool.allCases.flatMap { tool in
-                [toolButtons[tool], tool == .meetings && remindersButton.isEnabled ? remindersButton : nil].compactMap { $0 }
-            } + [backButton, nextButton]
+            toolControls.filter(\.isEnabled) + [backButton, nextButton]
         case .permissions:
             permissionList.controls.filter(\.isEnabled) + [backButton, nextButton]
         }
@@ -226,6 +223,7 @@ final class OnboardingView: NSView {
         detail.alignment = .center
         content.addArrangedSubview(detail)
         let toolDelays: [CFTimeInterval] = [0.14, 0.185, 0.225, 0.26, 0.29, 0.315]
+        assert(toolDelays.count == icons.arrangedSubviews.count)
         entrance = [Entrance(view: icon, delay: 0, duration: 0.5, scale: 0.94),
                     Entrance(view: title, delay: 0.06, duration: 0.45, rise: 10),
                     Entrance(view: tagline, delay: 0.06, duration: 0.45, rise: 10)]
@@ -264,6 +262,7 @@ final class OnboardingView: NSView {
             button.tag = index
             button.setAccessibilityLabel(tool.title)
             toolButtons[tool] = button
+            toolControls.append(button)
             let needed = RequiredPermissions(tools: [tool], calendarReminders: false).permissions.map(\.title)
             let missing: NSTextField? = switch tool {
             case .meetings: summaryToolMissing
@@ -274,6 +273,7 @@ final class OnboardingView: NSView {
                                 needs: needed.isEmpty ? "nothing" : needed.joined(separator: ", "),
                                 icon: tool.icon(size: Self.choiceIconSize), button: button, missing: missing)
             if tool == .meetings {
+                toolControls.append(remindersButton)
                 let meetings = SettingsLayout.stack(spacing: 4)
                 for child in [row, remindersRow] { SettingsLayout.add(child, to: meetings) }
                 rows.append(meetings)
@@ -413,6 +413,7 @@ final class OnboardingView: NSView {
         render()
         if model.isFinished || model.step == from {
             outgoing?.removeFromSuperlayer()
+            outgoing = nil
         } else if outgoing != nil {
             animateStep(from: from)
         }

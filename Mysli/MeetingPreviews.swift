@@ -80,6 +80,7 @@ private enum MeetingPreviews {
                          notes: (MeetingTypedNotesView, MeetingPreviewDirectory)? = nil) -> NSViewController {
         let defaults = AppKitPreview.defaults()
         let services = InertMeetingServices()
+        let screenFrame = CGRect(x: 0, y: 0, width: 1440, height: 900)
         let recorder = MeetingRecorder(
             permissions: PermissionsManager(
                 isAccessibilityTrusted: { false }, hasScreenCaptureAccess: { false },
@@ -90,8 +91,8 @@ private enum MeetingPreviews {
             teamsSpeakerObserver: services, notifier: services,
             alertStartFailure: { _, _ in false }, closeSavedNoticeLater: { _ in })
         let panel = MeetingControlsPanel(
-            recorder: recorder, settings: Settings(defaults: defaults, loginItem: services),
-            screens: MeetingPreviewScreens(), announce: { _, _ in },
+            recorder: recorder, settings: Settings(defaults: defaults, loginItem: PreviewLoginItem()),
+            screens: PreviewScreens(all: [ScreenGeometry(frame: screenFrame, visibleFrame: screenFrame)]), announce: { _, _ in },
             displayOptions: { (true, reduceTransparency) }, mouseLocation: { .zero })
         let view = panel.previewContent(status: status, recordedTime: recordedTime, transcript: transcript, notes: notes?.0)
         var owners: [AnyObject] = [panel]
@@ -208,16 +209,7 @@ private final class MeetingPreviewDirectory {
     deinit { try? FileManager.default.removeItem(at: url) }
 }
 
-private struct MeetingPreviewScreens: Screens {
-    var all: [ScreenGeometry] {
-        let frame = CGRect(x: 0, y: 0, width: 1440, height: 900)
-        return [ScreenGeometry(frame: frame, visibleFrame: frame)]
-    }
-
-    var mainIndex: Int? { 0 }
-}
-
-private struct InertMeetingServices: MeetingAudioCapturing, LiveTranscribing, TeamsSpeakerObserving, Notifying, LoginItemManaging {
+private struct InertMeetingServices: MeetingAudioCapturing, LiveTranscribing, TeamsSpeakerObserving, Notifying {
     func start(into meeting: MeetingFolder, clock: RecordingClock,
                onInterrupted: @escaping @MainActor (String) -> Void) async throws -> ActiveRecording {
         throw MeetingStepError("Recording is unavailable in previews.")
@@ -231,8 +223,6 @@ private struct InertMeetingServices: MeetingAudioCapturing, LiveTranscribing, Te
         AsyncStream { $0.finish() }
     }
 
-    var isEnabled: Bool { false }
-    func setEnabled(_ enabled: Bool) throws {}
     func requestPermission() {}
     func post(title: String, body: String, onClick: NotificationClick?) {}
 }

@@ -181,4 +181,21 @@ final class ClipboardHistoryTests: XCTestCase {
         let item = text(whitespacePrefix + "hello", at: 0)
         XCTAssertEqual(item.previewLabel, "(whitespace)")
     }
+
+    func testPreviewLinesHaveOneCollapsedEntryPerNonEmptyLine() {
+        let item = text("  one   two \n\n three\t four  \nfive", at: 0)
+        XCTAssertEqual(item.previewLines, ["one two", "three four", "five"])
+    }
+
+    func testPreviewLinesOfLongTextJoinToThePreviewLabel() {
+        let item = text(Array(repeating: "abcdefg", count: 100).joined(separator: "\n"), at: 0)
+        XCTAssertEqual(item.previewLines.joined(separator: " "), item.previewLabel)
+    }
+
+    func testPreviewLinesOfOneLineTextAndImagesAreThePreviewLabel() {
+        let oneLine = text("just  one line", at: 0)
+        let picture = image(bytes: 10, at: 1)
+        XCTAssertEqual(oneLine.previewLines, [oneLine.previewLabel])
+        XCTAssertEqual(picture.previewLines, [picture.previewLabel])
+    }
 }

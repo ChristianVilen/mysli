@@ -23,7 +23,7 @@ private enum ClipboardPreview {
         controller.seedPreviewItems(items)
         if showFormattingChooser { controller.enterPressed() }
 
-        let panel = ClipboardPanel(controller: controller, screens: CapturePreviewScreens())
+        let panel = ClipboardPanel(controller: controller, screens: PreviewScreens())
         controller.onListChanged = { [weak panel] in panel?.reload() }
         panel.reload()
         return AppKitPreview.host(contentOf: panel)
