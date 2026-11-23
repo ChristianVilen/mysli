@@ -289,11 +289,13 @@ final class NoteRowTextView: NSTextView, NSTextStorageDelegate {
     var onImage: ((MeetingScreenshot) throws -> Void)?
     var onEdit: (() -> Void)?
     private var isReplacing = false
+    private let pasteboard: () -> NSPasteboard
     var editingUndo: UndoManager?
     override var undoManager: UndoManager? { editingUndo }
 
-    init(entryID: UUID) {
+    init(entryID: UUID, pasteboard: @escaping () -> NSPasteboard = { .general }) {
         self.entryID = entryID
+        self.pasteboard = pasteboard
         let storage = NSTextStorage()
         let layout = NSLayoutManager()
         let container = NSTextContainer(containerSize: NSSize(width: 400, height: CGFloat.greatestFiniteMagnitude))
@@ -328,8 +330,18 @@ final class NoteRowTextView: NSTextView, NSTextStorageDelegate {
         if Int(event.keyCode) == kVK_Return && !event.modifierFlags.contains(.shift) { onNewRow?(); return }
         super.keyDown(with: event)
     }
+
+    override func validateUserInterfaceItem(_ item: any NSValidatedUserInterfaceItem) -> Bool {
+        // AppKit disables Paste for image-only clipboards in a plain-text view.
+        if item.action == #selector(paste(_:)), isEditable,
+           pasteboard().availableType(from: [.png, .tiff]) != nil {
+            return true
+        }
+        return super.validateUserInterfaceItem(item)
+    }
+
     override func paste(_ sender: Any?) {
-        if pasteImage(from: .general) { return }
+        if pasteImage(from: pasteboard()) { return }
         super.paste(sender)
     }
     @discardableResult
