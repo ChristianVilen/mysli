@@ -112,4 +112,20 @@ extension ClipboardItem {
         }
         return String(collapsed.prefix(previewLabelMaxLength))
     }
+
+    /// The words of `previewLabel`, cut into the lines of the copied text, so
+    /// a row can mark each line break. Worked out on each read, unlike
+    /// `previewLabel`: only the few visible rows ask for it.
+    var previewLines: [String] {
+        guard case .text(let plain, _, _) = kind else { return [previewLabel] }
+        let lines = String(plain.prefix(Self.previewSourceBudget))
+            .components(separatedBy: .newlines)
+            .map { $0.components(separatedBy: .whitespaces).filter { !$0.isEmpty }.joined(separator: " ") }
+            .filter { !$0.isEmpty }
+        guard lines.count > 1 else { return [previewLabel] }
+        // A newline takes the place of one joining space, so this cap cuts
+        // at the same word as the cap on `previewLabel`.
+        return lines.joined(separator: "\n").prefix(Self.previewLabelMaxLength)
+            .split(separator: "\n").map(String.init)
+    }
 }

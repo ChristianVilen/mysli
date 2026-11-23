@@ -133,8 +133,10 @@ class CropOverlayView: NSView {
         let text = "\(Int(pixels.width)) × \(Int(pixels.height))"
         let size = (text as NSString).size(withAttributes: SizeLabel.attributes)
         // Below the box; inside its bottom edge when there is no room below.
-        var origin = NSPoint(x: rect.midX - size.width / 2, y: rect.minY - size.height - 6)
-        if origin.y < bounds.minY { origin.y = rect.minY + 6 }
+        // Either way it keeps 8 pt clear of the bottom middle handle.
+        let offset = Self.handleSide / 2 + 8
+        var origin = NSPoint(x: rect.midX - size.width / 2, y: rect.minY - offset - size.height)
+        if origin.y < bounds.minY { origin.y = rect.minY + offset }
         origin.x = min(max(origin.x, bounds.minX), bounds.maxX - size.width)
         (text as NSString).draw(at: origin, withAttributes: SizeLabel.attributes)
     }

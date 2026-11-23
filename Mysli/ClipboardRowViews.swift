@@ -85,11 +85,14 @@ final class ClipboardHistoryRowView: NSTableRowView {
 /// thumbnail on the trailing edge. The thumbnail sits last so that every
 /// row's label starts on the same vertical line.
 final class ClipboardHistoryCellView: NSTableCellView {
+    private static let lineBreakMark = " ⏎ "
+
     private let icon = NSImageView()
     private let label = NSTextField(labelWithString: "")
     private let thumbnailView = NSImageView()
-    /// True for the "nothing copied yet" row, which stays secondary
-    /// coloured because it is never selected.
+    private var lines: [String] = []
+    /// True for an empty-state message row, which stays secondary coloured
+    /// because it is never selected.
     private var isMessage = false
 
     init(identifier: NSUserInterfaceItemIdentifier) {
@@ -147,11 +150,15 @@ final class ClipboardHistoryCellView: NSTableCellView {
         didSet { applyColors() }
     }
 
-    func configure(symbolName: String?, text: String, thumbnail: NSImage?, isMessage: Bool) {
+    /// Shows `lines` on one line, with a dim mark where each line break was.
+    func configure(symbolName: String?, lines: [String], thumbnail: NSImage?, isMessage: Bool) {
+        self.lines = lines
         self.isMessage = isMessage
         icon.image = symbolName.flatMap { NSImage(systemSymbolName: $0, accessibilityDescription: nil) }
-        label.stringValue = text
-        label.toolTip = text
+        label.toolTip = lines.joined(separator: Self.lineBreakMark)
+        // VoiceOver would read the mark out; a comma makes a pause instead. Set
+        // on the cell, because the text field ignores a value set on itself.
+        label.cell?.setAccessibilityValue(lines.joined(separator: ", "))
         thumbnailView.image = thumbnail
         thumbnailView.isHidden = thumbnail == nil
         applyColors()
@@ -160,7 +167,24 @@ final class ClipboardHistoryCellView: NSTableCellView {
     private func applyColors() {
         let isHighlighted = backgroundStyle == .emphasized
         let foreground: NSColor = isHighlighted ? .alternateSelectedControlTextColor : .labelColor
-        label.textColor = isMessage ? .secondaryLabelColor : foreground
+        let mark: NSColor = isHighlighted ? .alternateSelectedControlTextColor.withAlphaComponent(0.6) : .tertiaryLabelColor
+        label.attributedStringValue = text(color: isMessage ? .secondaryLabelColor : foreground, markColor: mark)
         icon.contentTintColor = isHighlighted ? .alternateSelectedControlTextColor : .secondaryLabelColor
+    }
+
+    private func text(color: NSColor, markColor: NSColor) -> NSAttributedString {
+        // An attributed value ignores the cell's line break mode, so the tail truncation goes in here.
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.lineBreakMode = .byTruncatingTail
+        let font = label.font ?? .systemFont(ofSize: Metrics.rowFontSize)
+        let text = NSMutableAttributedString()
+        for (index, line) in lines.enumerated() {
+            if index > 0 {
+                text.append(NSAttributedString(string: Self.lineBreakMark,
+                                               attributes: [.font: font, .foregroundColor: markColor, .paragraphStyle: paragraph]))
+            }
+            text.append(NSAttributedString(string: line, attributes: [.font: font, .foregroundColor: color, .paragraphStyle: paragraph]))
+        }
+        return text
     }
 }

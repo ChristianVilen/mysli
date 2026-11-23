@@ -77,4 +77,44 @@ final class EditorWindowTests: XCTestCase {
         XCTAssertEqual(saved?.width, 100)
         XCTAssertEqual(saved?.height, 50)
     }
+
+    /// Writes one PNG per editor state, in light and dark, when MYSLI_EDITOR_SNAPSHOTS names a folder:
+    ///
+    ///     TEST_RUNNER_MYSLI_EDITOR_SNAPSHOTS="$HOME/editor-snapshots" xcodebuild -project Mysli.xcodeproj \
+    ///         -scheme Mysli test -only-testing:MysliTests/EditorWindowTests/testWritesAPictureOfEachEditorState
+    func testWritesAPictureOfEachEditorState() throws {
+        guard let path = ProcessInfo.processInfo.environment["MYSLI_EDITOR_SNAPSHOTS"] else {
+            throw XCTSkip("Set MYSLI_EDITOR_SNAPSHOTS to a folder to write pictures of the screenshot editor.")
+        }
+        let folder = URL(fileURLWithPath: path, isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        func snap(_ window: NSWindow, _ name: String) throws {
+            let view = try XCTUnwrap(window.contentView)
+            for (suffix, appearance) in [("light", NSAppearance.Name.aqua), ("dark", .darkAqua)] {
+                try writePicture(of: view, appearance: appearance, to: folder.appendingPathComponent("\(name)-\(suffix).png"))
+            }
+        }
+        func descendants(_ view: NSView) -> [NSView] { view.subviews.flatMap { [$0] + descendants($0) } }
+
+        let sample = CapturePreview.sampleImage()
+        let annotated = EditorWindow(image: sample, fileURL: fileURL, store: store, screens: screens)
+        defer { annotated.close() }
+        annotated.addPreviewStroke(NSBezierPath(ovalIn: NSRect(x: 305, y: 79, width: 149, height: 82)))
+        try snap(annotated, "01-annotated")
+        let crop = try XCTUnwrap(descendants(try XCTUnwrap(annotated.contentView)).compactMap { $0 as? NSButton }
+            .first { $0.title == "Crop" })
+        crop.performClick(nil)
+        annotated.cropRect = CGRect(x: 88, y: 56, width: 340, height: 184)
+        try snap(annotated, "02-crop")
+        annotated.cropRect = CGRect(x: 88, y: 0, width: 340, height: 184)
+        try snap(annotated, "02b-crop-at-bottom")
+
+        let small = NSImage(size: NSSize(width: 260, height: 160), flipped: false) { rect in
+            sample.draw(in: rect)
+            return true
+        }
+        let narrow = EditorWindow(image: small, fileURL: fileURL, store: store, screens: screens)
+        defer { narrow.close() }
+        try snap(narrow, "03-narrow-image")
+    }
 }

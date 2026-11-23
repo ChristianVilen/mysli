@@ -481,6 +481,54 @@ final class ClipboardHistoryControllerTests: XCTestCase {
         XCTAssertEqual(controller.selectionIndex, 0)
         XCTAssertEqual(controller.visibleItems.map(\.previewLabel), ["banana", "apple rich", "apple"])
     }
+
+    /// Writes one PNG per panel state, in light and dark, when MYSLI_CLIPBOARD_SNAPSHOTS names a folder:
+    ///
+    ///     TEST_RUNNER_MYSLI_CLIPBOARD_SNAPSHOTS="$HOME/clipboard-snapshots" xcodebuild -project Mysli.xcodeproj \
+    ///         -scheme Mysli test -only-testing:MysliTests/ClipboardHistoryControllerTests/testWritesAPictureOfEachPanelState
+    func testWritesAPictureOfEachPanelState() throws {
+        guard let path = ProcessInfo.processInfo.environment["MYSLI_CLIPBOARD_SNAPSHOTS"] else {
+            throw XCTSkip("Set MYSLI_CLIPBOARD_SNAPSHOTS to a folder to write pictures of the clipboard panel.")
+        }
+        let folder = URL(fileURLWithPath: path, isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let panel = ClipboardPanel(controller: controller, screens: FakeScreens())
+        defer { panel.close() }
+        panel.bindController()
+        let content = try XCTUnwrap(panel.contentView)
+        func descendants(_ view: NSView) -> [NSView] { view.subviews.flatMap { [$0] + descendants($0) } }
+        let field = try XCTUnwrap(descendants(content).compactMap { $0 as? NSTextField }.first { $0.isEditable })
+        func search(_ query: String) {
+            field.stringValue = query
+            panel.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification, object: field))
+        }
+        func snap(_ name: String) throws {
+            for (suffix, appearance) in [("light", NSAppearance.Name.aqua), ("dark", .darkAqua)] {
+                try writePicture(of: content, appearance: appearance,
+                                 to: folder.appendingPathComponent("\(name)-\(suffix).png"))
+            }
+        }
+        let sample = try XCTUnwrap(CapturePreview.sampleImage().cgImage(forProposedRect: nil, context: nil, hints: nil))
+        let png = try XCTUnwrap(NSBitmapImageRep(cgImage: sample).representation(using: .png, properties: [:]))
+
+        panel.reload()
+        try snap("01-empty")
+        controller.seedPreviewItems([
+            .text(plain: "Weekly overview", html: Data("<strong>Weekly overview</strong>".utf8), copiedAt: t0),
+            .image(png: png, pixelSize: CGSize(width: sample.width, height: sample.height), copiedAt: t0),
+            text("Send the revised agenda on Thursday."),
+            text("Notes from the planning call: ship the release on Monday after QA signs off, send the checklist "
+                 + "to the pilot group, confirm the rollback steps with the on-call team, and move the retro to Friday."),
+            text("Mira Lindqvist\nRelease manager"),
+            text("https://example.com/agenda"),
+        ])
+        try snap("02-history")
+        search("invoice")
+        try snap("03-search-no-result")
+        search("")
+        controller.enterPressed()
+        try snap("04-paste-formatting")
+    }
 }
 
 /// Most chooser tests only care *that* the chooser is up, not which item it

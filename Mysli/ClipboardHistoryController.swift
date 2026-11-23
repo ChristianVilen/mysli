@@ -63,6 +63,9 @@ final class ClipboardHistoryController {
     private(set) var visibleItems: [ClipboardItem] = []
     private(set) var selectionIndex = 0
 
+    /// True when anything has been copied, whether or not the filter shows it.
+    var hasHistory: Bool { !history.items.isEmpty }
+
     /// What the panel should currently render. The only public view of
     /// `panelState` — it drops the saved list selection, which is the
     /// controller's own business, and keeps the item, which the panel

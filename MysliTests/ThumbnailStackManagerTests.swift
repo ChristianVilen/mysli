@@ -132,4 +132,53 @@ final class ThumbnailStackManagerTests: XCTestCase {
         XCTAssertEqual(edited?.fileURL, result.fileURL)
         XCTAssertTrue(sut.entries.isEmpty)
     }
+
+    /// Writes PNGs of one thumbnail and of a stack, in light and dark, when MYSLI_THUMBNAIL_SNAPSHOTS
+    /// names a folder:
+    ///
+    ///     TEST_RUNNER_MYSLI_THUMBNAIL_SNAPSHOTS="$HOME/thumbnail-snapshots" xcodebuild -project Mysli.xcodeproj \
+    ///         -scheme Mysli test -only-testing:MysliTests/ThumbnailStackManagerTests/testWritesAPictureOfOneThumbnailAndAStack
+    @MainActor
+    func testWritesAPictureOfOneThumbnailAndAStack() throws {
+        guard let path = ProcessInfo.processInfo.environment["MYSLI_THUMBNAIL_SNAPSHOTS"] else {
+            throw XCTSkip("Set MYSLI_THUMBNAIL_SNAPSHOTS to a folder to write pictures of the screenshot thumbnails.")
+        }
+        let folder = URL(fileURLWithPath: path, isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        // Each thumbnail and each Combine button is its own window, so the picture puts their
+        // content views together at their screen positions.
+        func snap(_ name: String) throws {
+            let panels: [NSWindow] = sut.entries.map(\.panel)
+            let stack = panels.dropFirst().reduce(panels[0].frame) { $0.union($1.frame) }
+            let buttons = NSApp.windows.filter { $0 is CombineButton && $0.isVisible && stack.contains($0.frame) }
+            let margin: CGFloat = 24
+            let parts = try (panels + buttons).map { window in
+                (view: try XCTUnwrap(window.contentView),
+                 origin: NSPoint(x: window.frame.minX - stack.minX + margin, y: window.frame.minY - stack.minY + margin))
+            }
+            for (suffix, appearance) in [("light", NSAppearance.Name.aqua), ("dark", .darkAqua)] {
+                try writePicture(of: parts, size: NSSize(width: stack.width + 2 * margin, height: stack.height + 2 * margin),
+                                 backdrop: pictureDesktop, appearance: appearance,
+                                 to: folder.appendingPathComponent("\(name)-\(suffix).png"))
+            }
+        }
+        let image = CapturePreview.sampleImage()
+        func capture(_ name: String) -> CaptureResult {
+            CaptureResult(image: image, fileURL: URL(fileURLWithPath: "/tmp/mysli-test/\(name)"))
+        }
+
+        add(capture("first.png"))
+        try snap("01-one")
+        add(capture("second.png"))
+        add(capture("third.png"))
+        try snap("02-stack")
+
+        let newest = try XCTUnwrap(sut.entries.first?.panel.contentView)
+        let trash = try XCTUnwrap(newest.subviews.compactMap { $0 as? NSButton }
+            .first { $0.image?.accessibilityDescription == "Delete" })
+        trash.mouseEntered(with: try XCTUnwrap(NSEvent.enterExitEvent(
+            with: .mouseEntered, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0,
+            context: nil, eventNumber: 0, trackingNumber: 0, userData: nil)))
+        try snap("03-delete-hover")
+    }
 }

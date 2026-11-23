@@ -6,7 +6,6 @@ import Cocoa
 /// the synthetic Cmd+V after a paste. Never call `NSApp.activate` here.
 final class ClipboardPanel: FloatingPanel {
 
-    private static let emptyStateText = "Nothing copied yet"
     private static let cellIdentifier = NSUserInterfaceItemIdentifier("ClipboardRowCell")
     private static let rowIdentifier = NSUserInterfaceItemIdentifier("ClipboardRowView")
 
@@ -23,6 +22,10 @@ final class ClipboardPanel: FloatingPanel {
 
     private let searchGlyph = NSImageView()
     private let searchField = NSTextField()
+    private let filterPlaceholder = NSAttributedString(
+        string: "Type to filter…",
+        attributes: [.font: NSFont.systemFont(ofSize: Metrics.searchFontSize), .foregroundColor: NSColor.secondaryLabelColor]
+    )
     private let headerLabel = NSTextField(labelWithString: "")
     private let tableView = NSTableView()
     private let scrollView = NSScrollView()
@@ -139,9 +142,12 @@ final class ClipboardPanel: FloatingPanel {
         if case .chooser(let item) = controller.mode {
             headerLabel.show(Self.headerText(for: item))
             scrollTopConstraint.constant = Metrics.chooserTopGap
+            // The chooser refuses typing, so the field must not ask for it.
+            searchField.placeholderAttributedString = nil
         } else {
             headerLabel.show(nil)
             scrollTopConstraint.constant = Metrics.listTopGap
+            searchField.placeholderAttributedString = filterPlaceholder
         }
 
         tableView.reloadData()
@@ -288,10 +294,7 @@ final class ClipboardPanel: FloatingPanel {
         // here — the field is editable, and truncating tail would fight the
         // caret once typing runs past the visible width.
         searchField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        searchField.placeholderAttributedString = NSAttributedString(
-            string: "Type to filter…",
-            attributes: [.font: font, .foregroundColor: NSColor.secondaryLabelColor]
-        )
+        searchField.placeholderAttributedString = filterPlaceholder
         searchField.delegate = self
         searchField.setAccessibilityLabel("Filter clipboard history")
         searchField.translatesAutoresizingMaskIntoConstraints = false
@@ -342,6 +345,10 @@ final class ClipboardPanel: FloatingPanel {
         // sit between the rows and the glass.
         scrollView.contentView.drawsBackground = false
         scrollView.translatesAutoresizingMaskIntoConstraints = false
+    }
+
+    private var emptyStateText: String {
+        controller.hasHistory ? "No matches" : "Nothing copied yet"
     }
 
     private func symbolName(for item: ClipboardItem) -> String {
@@ -414,19 +421,19 @@ extension ClipboardPanel: NSTableViewDelegate {
 
         if case .chooser = controller.mode {
             let option = Self.chooserRows[row]
-            cell.configure(symbolName: option.symbol, text: option.title, thumbnail: nil, isMessage: false)
+            cell.configure(symbolName: option.symbol, lines: [option.title], thumbnail: nil, isMessage: false)
         } else if row < controller.visibleItems.count {
             let item = controller.visibleItems[row]
             cell.configure(
                 symbolName: symbolName(for: item),
-                text: item.previewLabel,
+                lines: item.previewLines,
                 thumbnail: thumbnails.thumbnail(for: item),
                 isMessage: false
             )
         } else {
             // The icon slot is left empty rather than removed, so the
             // message starts on the same line as every real row's label.
-            cell.configure(symbolName: nil, text: Self.emptyStateText, thumbnail: nil, isMessage: true)
+            cell.configure(symbolName: nil, lines: [emptyStateText], thumbnail: nil, isMessage: true)
         }
         return cell
     }
