@@ -482,6 +482,7 @@ final class ClipboardHistoryControllerTests: XCTestCase {
         XCTAssertEqual(controller.visibleItems.map(\.previewLabel), ["banana", "apple rich", "apple"])
     }
 
+    #if DEBUG
     /// Writes one PNG per panel state, in light and dark, when MYSLI_CLIPBOARD_SNAPSHOTS names a folder:
     ///
     ///     TEST_RUNNER_MYSLI_CLIPBOARD_SNAPSHOTS="$HOME/clipboard-snapshots" xcodebuild -project Mysli.xcodeproj \
@@ -521,6 +522,7 @@ final class ClipboardHistoryControllerTests: XCTestCase {
         controller.enterPressed()
         try snap("04-paste-formatting")
     }
+    #endif
 }
 
 /// Most chooser tests only care *that* the chooser is up, not which item it

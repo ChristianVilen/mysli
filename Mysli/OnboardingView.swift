@@ -471,15 +471,19 @@ private final class ChoiceRow: NSStackView {
     /// The indent of an option row lies below the icon of its parent, so it is not part of the target.
     override func hitTest(_ point: NSPoint) -> NSView? {
         guard let hit = super.hitTest(point) else { return nil }
-        if hit.isDescendant(of: checkbox) { return hit }
-        return convert(point, from: superview).x >= edgeInsets.left ? self : nil
+        guard containsTarget(convert(point, from: superview)) else { return nil }
+        return hit.isDescendant(of: checkbox) ? hit : self
+    }
+
+    private func containsTarget(_ point: NSPoint) -> Bool {
+        bounds.contains(point) && point.x >= bounds.minX + edgeInsets.left
     }
 
     override func mouseDown(with event: NSEvent) { checkbox.highlight(checkbox.isEnabled) }
 
     override func mouseUp(with event: NSEvent) {
         checkbox.highlight(false)
-        guard checkbox.isEnabled, bounds.contains(convert(event.locationInWindow, from: nil)) else { return }
+        guard checkbox.isEnabled, containsTarget(convert(event.locationInWindow, from: nil)) else { return }
         checkbox.performClick(nil)
     }
 }

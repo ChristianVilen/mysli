@@ -1,6 +1,3 @@
-// The picture tests use the app's #if DEBUG preview data (CapturePreview.sampleImage,
-// seedPreviewItems, addPreviewStroke), so the test target builds only in Debug.
-
 import AppKit
 import XCTest
 

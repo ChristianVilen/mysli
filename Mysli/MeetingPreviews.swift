@@ -78,7 +78,7 @@ private enum MeetingPreviews {
     static func controls(_ status: MeetingControls.Status, recordedTime: TimeInterval? = nil,
                          transcript: LivePreview? = nil, reduceTransparency: Bool = false,
                          notes: (MeetingTypedNotesView, MeetingPreviewDirectory)? = nil) -> NSViewController {
-        let defaults = AppKitPreview.defaults()
+        let defaults = PreviewDefaults()
         let services = InertMeetingServices()
         let screenFrame = CGRect(x: 0, y: 0, width: 1440, height: 900)
         let recorder = MeetingRecorder(
@@ -86,16 +86,16 @@ private enum MeetingPreviews {
                 isAccessibilityTrusted: { false }, hasScreenCaptureAccess: { false },
                 microphoneAccess: { .denied }, inputMonitoringAccess: { false },
                 requestMicrophoneAccess: { false }, openURL: { _ in false },
-                showAccessibilityPrompt: {}, defaults: defaults),
+                showAccessibilityPrompt: {}, defaults: defaults.values),
             root: { isolatedURL() }, capture: services, liveTranscriber: services,
             teamsSpeakerObserver: services, notifier: services,
             alertStartFailure: { _, _ in false }, closeSavedNoticeLater: { _ in })
         let panel = MeetingControlsPanel(
-            recorder: recorder, settings: Settings(defaults: defaults, loginItem: PreviewLoginItem()),
+            recorder: recorder, settings: Settings(defaults: defaults.values, loginItem: PreviewLoginItem()),
             screens: PreviewScreens(all: [ScreenGeometry(frame: screenFrame, visibleFrame: screenFrame)]), announce: { _, _ in },
             displayOptions: { (true, reduceTransparency) }, mouseLocation: { .zero })
         let view = panel.previewContent(status: status, recordedTime: recordedTime, transcript: transcript, notes: notes?.0)
-        var owners: [AnyObject] = [panel]
+        var owners: [AnyObject] = [panel, defaults]
         if let notes { owners.append(notes.1) }
         return AppKitPreview.host(view, retaining: owners as NSArray)
     }

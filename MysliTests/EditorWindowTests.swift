@@ -78,6 +78,7 @@ final class EditorWindowTests: XCTestCase {
         XCTAssertEqual(saved?.height, 50)
     }
 
+    #if DEBUG
     /// Writes one PNG per editor state, in light and dark, when MYSLI_EDITOR_SNAPSHOTS names a folder:
     ///
     ///     TEST_RUNNER_MYSLI_EDITOR_SNAPSHOTS="$HOME/editor-snapshots" xcodebuild -project Mysli.xcodeproj \
@@ -111,4 +112,5 @@ final class EditorWindowTests: XCTestCase {
         defer { narrow.close() }
         try snap(narrow, "03-narrow-image")
     }
+    #endif
 }

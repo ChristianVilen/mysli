@@ -16,9 +16,9 @@ import SwiftUI
 
 @MainActor
 func onboardingPreview(startingAt step: Onboarding.Step) -> NSViewController {
-    let defaults = AppKitPreview.defaults()
-    let settings = Settings(defaults: defaults, loginItem: PreviewLoginItem())
-    let model = Onboarding(settings: settings, defaults: defaults)
+    let defaults = PreviewDefaults()
+    let settings = Settings(defaults: defaults.values, loginItem: PreviewLoginItem())
+    let model = Onboarding(settings: settings, defaults: defaults.values)
     let tools = SettingsPreviews.tools(for: settings)
     model.onApplyChoices = { tools.apply($0) }
 
@@ -31,6 +31,6 @@ func onboardingPreview(startingAt step: Onboarding.Step) -> NSViewController {
         model.advance()
     }
 
-    return SettingsPreviews.controller(settings: settings, tools: tools, onboarding: model).makePreview()
+    return SettingsPreviews.controller(settings: settings, tools: tools, onboarding: model).makePreview(retaining: defaults)
 }
 #endif

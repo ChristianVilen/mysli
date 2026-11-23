@@ -35,6 +35,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private let settings: Settings
     let sidebar = SettingsSidebarController()
     private let onboarding: Onboarding?
+    private let content = NSViewController()
     private let settingsContent = NSSplitViewController()
     private let pageContainer = SettingsBackground()
     private(set) var onboardingView: OnboardingView?
@@ -86,11 +87,15 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         window.contentMinSize = NSSize(width: 640, height: 420)
         super.init(window: window)
         window.delegate = self
+        content.view = NSView(frame: window.contentLayoutRect)
+        window.contentViewController = content
         buildForm()
         if let onboarding, !onboarding.isFinished {
             let view = OnboardingView(model: onboarding, actions: permissionActions)
             view.onChange = { [weak self] in self?.onboardingChanged() }
             onboardingView = view
+        } else {
+            installCurrentContent()
         }
         refreshPermissionRequirements()
         displayObserver = NSWorkspace.shared.notificationCenter.addObserver(
@@ -122,14 +127,10 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         loginError.stringValue = ""
         loginError.isHidden = true
         refresh()
+        installCurrentContent()
         if let onboarding, !onboarding.isFinished {
-            if window?.contentView !== onboardingView {
-                window?.contentViewController = nil
-                window?.contentView = onboardingView
-            }
             onboardingView?.render()
         } else {
-            if window?.contentViewController !== settingsContent { showSettingsContent() }
             sidebar.clearSearch()
             selectPage(page)
         }
@@ -142,7 +143,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
     private func onboardingChanged() {
         if onboarding?.isFinished == true {
-            showSettingsContent()
+            installCurrentContent()
             refresh()
             selectPage(.general)
             applyDisplayOptions(.current)
@@ -150,12 +151,15 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         refreshPermissionsVisibility()
     }
 
-    private func showSettingsContent() {
-        guard let window else { return }
-        let size = window.contentLayoutRect.size
-        settingsContent.view.setFrameSize(size)
-        window.contentViewController = settingsContent
-        window.setContentSize(size)
+    private func installCurrentContent() {
+        if let onboardingView, !onboardingView.model.isFinished {
+            if onboardingView.superview == nil { SettingsLayout.fill(onboardingView, in: content.view) }
+            return
+        }
+        guard settingsContent.parent == nil else { return }
+        onboardingView?.removeFromSuperview()
+        content.addChild(settingsContent)
+        SettingsLayout.fill(settingsContent.view, in: content.view)
     }
 
     func windowWillClose(_ notification: Notification) {
@@ -444,7 +448,6 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         settingsContent.splitView.dividerStyle = .thin
         settingsContent.addSplitViewItem(sidebarItem)
         settingsContent.addSplitViewItem(detailItem)
-        showSettingsContent()
         sidebar.onSelect = { [weak self] row in
             guard let self else { return }
             switch row {
@@ -470,7 +473,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         if changed { applyDisplayOptions(.current) }
         sidebar.select(page)
         updateKeyViewLoop()
-        if focusSidebar { window?.makeFirstResponder(sidebar.tableView) }
+        if focusSidebar { sidebar.tableView.window?.makeFirstResponder(sidebar.tableView) }
         refreshPermissionsVisibility()
     }
 
@@ -491,8 +494,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     }
 
     @objc func focusSettingsSearch(_ sender: Any?) {
-        guard window?.contentViewController === settingsContent else { return }
-        window?.makeFirstResponder(sidebar.searchField)
+        guard let window = sidebar.searchField.window else { return }
+        window.makeFirstResponder(sidebar.searchField)
         sidebar.searchField.selectText(nil)
     }
 
@@ -691,18 +694,15 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
 #if DEBUG
 extension SettingsWindowController {
-    func makePreview(page: SettingsPage = .general, query: String? = nil,
+    func makePreview(retaining defaults: PreviewDefaults, page: SettingsPage = .general, query: String? = nil,
                      openFirstResult: Bool = false) -> NSViewController {
-        let size = settingsContent.view.frame.size
+        let size = content.view.frame.size
         window?.contentViewController = nil
-        let host = AppKitPreview.host(NSView(), size: size, retaining: self)
-        if let onboardingView {
-            SettingsLayout.fill(onboardingView, in: host.view)
-            return host
-        }
-
-        host.addChild(settingsContent)
-        SettingsLayout.fill(settingsContent.view, in: host.view)
+        let host = AppKitPreview.host(NSView(), size: size, retaining: [self, defaults] as NSArray)
+        host.addChild(content)
+        SettingsLayout.fill(content.view, in: host.view)
+        installCurrentContent()
+        if onboarding?.isFinished == false { return host }
         refresh()
         selectPage(page, focusSidebar: false)
         if let query {
@@ -716,10 +716,10 @@ extension SettingsWindowController {
         return host
     }
 
-    func makeSidebarPreview() -> NSViewController {
+    func makeSidebarPreview(retaining defaults: PreviewDefaults) -> NSViewController {
         sidebar.onSelect = nil
         if let item = settingsContent.splitViewItem(for: sidebar) { settingsContent.removeSplitViewItem(item) }
-        return AppKitPreview.host(sidebar.view, size: NSSize(width: 230, height: 460), retaining: self)
+        return AppKitPreview.host(sidebar.view, size: NSSize(width: 230, height: 460), retaining: [self, defaults] as NSArray)
     }
 }
 #endif

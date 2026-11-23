@@ -133,6 +133,7 @@ final class ThumbnailStackManagerTests: XCTestCase {
         XCTAssertTrue(sut.entries.isEmpty)
     }
 
+    #if DEBUG
     /// Writes PNGs of one thumbnail and of a stack, in light and dark, when MYSLI_THUMBNAIL_SNAPSHOTS
     /// names a folder:
     ///
@@ -175,4 +176,5 @@ final class ThumbnailStackManagerTests: XCTestCase {
             context: nil, eventNumber: 0, trackingNumber: 0, userData: nil)))
         try snap("03-delete-hover")
     }
+    #endif
 }

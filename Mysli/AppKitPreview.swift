@@ -13,14 +13,17 @@ enum AppKitPreview {
         window.contentView = nil
         return host(content, retaining: owner ?? window)
     }
+}
 
-    static func defaults() -> UserDefaults {
-        let suite = "Mysli.Preview." + UUID().uuidString
-        // No fallback to `.standard`: the Canvas host shares the real app's preferences.
-        let defaults = UserDefaults(suiteName: suite)!
-        defaults.removePersistentDomain(forName: suite)
-        return defaults
+final class PreviewDefaults {
+    let suite = "Mysli.Preview." + UUID().uuidString
+    let values: UserDefaults
+
+    init() {
+        values = UserDefaults(suiteName: suite)!
     }
+
+    deinit { values.removePersistentDomain(forName: suite) }
 }
 
 private final class PreviewContentController: NSViewController {

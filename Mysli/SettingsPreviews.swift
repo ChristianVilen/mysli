@@ -65,13 +65,14 @@ enum SettingsPreviews {
                                                        notifications: .notDetermined)
 
     static func page(_ page: SettingsPage, query: String? = nil, openFirstResult: Bool = false) -> NSViewController {
-        let settings = Settings(defaults: AppKitPreview.defaults(), loginItem: PreviewLoginItem())
+        let defaults = PreviewDefaults()
+        let settings = Settings(defaults: defaults.values, loginItem: PreviewLoginItem())
         settings.meetingsFolder = URL(fileURLWithPath: "/Users/example/Meetings", isDirectory: true)
         settings.meetingContextFile = URL(fileURLWithPath: "/Users/example/Meetings/background.md")
         settings.dictationEnabled = true
         settings.calendarRecordingRemindersEnabled = true
         return controller(settings: settings, tools: tools(for: settings))
-            .makePreview(page: page, query: query, openFirstResult: openFirstResult)
+            .makePreview(retaining: defaults, page: page, query: query, openFirstResult: openFirstResult)
     }
 
     static func controller(settings: Settings, tools: ToolController,
@@ -95,8 +96,9 @@ enum SettingsPreviews {
     }
 
     static func sidebar() -> NSViewController {
-        let settings = Settings(defaults: AppKitPreview.defaults(), loginItem: PreviewLoginItem())
-        return controller(settings: settings, tools: tools(for: settings)).makeSidebarPreview()
+        let defaults = PreviewDefaults()
+        let settings = Settings(defaults: defaults.values, loginItem: PreviewLoginItem())
+        return controller(settings: settings, tools: tools(for: settings)).makeSidebarPreview(retaining: defaults)
     }
 
     static func permissionList() -> NSViewController {
