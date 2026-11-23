@@ -17,11 +17,15 @@ final class PermissionRowView: NSView {
     private let statusIcon = NSImageView()
     private let name: String
     private let grant: () -> Void
+    private let reduceMotion: () -> Bool
     private var shownStatus: PermissionSnapshot.Status?
+    private var pictures: [CALayer] = []
 
-    init(title: String, explanation: String, grant: @escaping () -> Void) {
+    init(title: String, explanation: String, grant: @escaping () -> Void,
+         reduceMotion: @escaping () -> Bool = { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }) {
         name = title
         self.grant = grant
+        self.reduceMotion = reduceMotion
         super.init(frame: .zero)
         let copy = SettingsLayout.stack(spacing: 4)
         let heading = SettingsLayout.label(title)
@@ -35,6 +39,7 @@ final class PermissionRowView: NSView {
         grantButton.target = self
         grantButton.action = #selector(grantClicked)
         grantButton.bezelStyle = .rounded
+        grantButton.controlSize = .small
         grantButton.setContentHuggingPriority(.required, for: .horizontal)
         grantButton.setContentCompressionResistancePriority(.required, for: .horizontal)
         grantButton.widthAnchor.constraint(equalToConstant: 84).isActive = true
@@ -61,6 +66,12 @@ final class PermissionRowView: NSView {
 
     func setStatus(_ status: PermissionSnapshot.Status) {
         guard status != shownStatus else { return }
+        let becomesAllowed = status == .granted && shownStatus != nil && window?.isVisible == true
+            && !isHiddenOrHasHiddenAncestor
+        for picture in pictures { picture.removeFromSuperlayer() }
+        let oldMark = becomesAllowed ? statusIcon.coveringPicture() : nil
+        let oldButton = becomesAllowed ? grantButton.coveringPicture() : nil
+        pictures = [oldMark, oldButton].compactMap { $0 }
         shownStatus = status
         let text: String
         let symbol: String
@@ -84,6 +95,15 @@ final class PermissionRowView: NSView {
         statusIcon.image = NSImage(systemSymbolName: symbol, accessibilityDescription: "\(name): \(text)")
         grantButton.setAccessibilityLabel("\(grantButton.title) \(name)")
         grantButton.isEnabled = status != .granted
+        grantButton.isHidden = status == .granted
+        guard becomesAllowed else { return }
+        let still = reduceMotion()
+        let duration = still ? 0.15 : 0.2
+        oldMark?.fadeAway(duration: duration)
+        oldButton?.fadeAway(duration: 0.15)
+        guard let mark = statusIcon.layer else { return }
+        mark.animate("opacity", from: 0, duration: duration)
+        if !still { mark.animate("transform", from: mark.scaledAboutCenter(0.9, size: mark.bounds.size), duration: duration) }
     }
 
     @objc private func grantClicked() { grant() }
@@ -92,9 +112,12 @@ final class PermissionRowView: NSView {
 @MainActor
 final class PermissionListView: NSView {
     let rows: [(permission: MysliPermission, view: PermissionRowView)]
+    /// The separator above each row. The first row has none.
+    private let separators: [NSBox?]
     var controls: [NSButton] { rows.filter { !$0.view.isHidden }.map { $0.view.grantButton } }
 
-    init(actions: PermissionActions, spacing: CGFloat = 8, inset: CGFloat = 14) {
+    init(actions: PermissionActions, spacing: CGFloat = 6, inset: CGFloat = SettingsLayout.groupInset,
+         reduceMotion: @escaping () -> Bool = { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }) {
         rows = MysliPermission.allCases.map { permission in
             let grant: () -> Void = switch permission {
             case .accessibility: actions.accessibility
@@ -104,12 +127,22 @@ final class PermissionListView: NSView {
             case .notifications: actions.notifications
             case .inputMonitoring: actions.inputMonitoring
             }
-            return (permission, PermissionRowView(title: permission.title, explanation: permission.explanation, grant: grant))
+            return (permission, PermissionRowView(title: permission.title, explanation: permission.explanation, grant: grant,
+                                                  reduceMotion: reduceMotion))
+        }
+        separators = rows.indices.map { index in
+            guard index > 0 else { return nil }
+            let separator = NSBox()
+            separator.boxType = .separator
+            return separator
         }
         super.init(frame: .zero)
         let glass = SettingsGlass()
         let stack = SettingsLayout.stack(spacing: spacing)
-        for row in rows { SettingsLayout.add(row.view, to: stack) }
+        for (row, separator) in zip(rows, separators) {
+            if let separator { SettingsLayout.add(separator, to: stack) }
+            SettingsLayout.add(row.view, to: stack)
+        }
         SettingsLayout.fill(stack, in: glass.content, inset: inset)
         SettingsLayout.fill(glass, in: self)
         render(.init(accessibility: false, screenRecording: false, microphone: .notDetermined,
@@ -119,7 +152,13 @@ final class PermissionListView: NSView {
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
     func showRequired(_ required: RequiredPermissions) {
-        for row in rows { row.view.isHidden = !required.permissions.contains(row.permission) }
+        var shownAbove = false
+        for (row, separator) in zip(rows, separators) {
+            let shown = required.permissions.contains(row.permission)
+            row.view.isHidden = !shown
+            separator?.isHidden = !(shown && shownAbove)
+            shownAbove = shownAbove || shown
+        }
         isHidden = required.permissions.isEmpty
     }
 
