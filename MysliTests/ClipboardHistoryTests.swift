@@ -182,20 +182,22 @@ final class ClipboardHistoryTests: XCTestCase {
         XCTAssertEqual(item.previewLabel, "(whitespace)")
     }
 
-    func testPreviewLinesHaveOneCollapsedEntryPerNonEmptyLine() {
-        let item = text("  one   two \n\n three\t four  \nfive", at: 0)
-        XCTAssertEqual(item.previewLines, ["one two", "three four", "five"])
+    func testPreviewLinesAreCollapsedAndLabelIsTheirJoin() {
+        let item = text("  one   two \n\n \n three\t\n")
+        XCTAssertEqual(item.previewLines, ["one two", "three"])
+        XCTAssertEqual(item.previewLabel, item.previewLines.joined(separator: " "))
     }
 
-    func testPreviewLinesOfLongTextJoinToThePreviewLabel() {
-        let item = text(Array(repeating: "abcdefg", count: 100).joined(separator: "\n"), at: 0)
-        XCTAssertEqual(item.previewLines.joined(separator: " "), item.previewLabel)
+    func testPreviewLabelCapCutsLinesAndLabelAtTheSameCharacter() {
+        let line = String(repeating: "abcdefghi ", count: 6)
+        let item = text(Array(repeating: line, count: 12).joined(separator: "\n"))
+        XCTAssertEqual(item.previewLabel.count, 500)
+        XCTAssertEqual(item.previewLabel, item.previewLines.joined(separator: " "))
     }
 
-    func testPreviewLinesOfOneLineTextAndImagesAreThePreviewLabel() {
-        let oneLine = text("just  one line", at: 0)
-        let picture = image(bytes: 10, at: 1)
-        XCTAssertEqual(oneLine.previewLines, [oneLine.previewLabel])
-        XCTAssertEqual(picture.previewLines, [picture.previewLabel])
+    func testWhitespaceOnlyTextHasOnePlaceholderLine() {
+        let item = text("\n \n")
+        XCTAssertEqual(item.previewLabel, "(whitespace)")
+        XCTAssertEqual(item.previewLines, ["(whitespace)"])
     }
 }

@@ -103,9 +103,7 @@ final class ClipboardHistoryCellView: NSTableCellView {
         icon.contentTintColor = .secondaryLabelColor
 
         label.font = .systemFont(ofSize: Metrics.rowFontSize)
-        label.textColor = .labelColor
         label.maximumNumberOfLines = 1
-        label.cell?.lineBreakMode = .byTruncatingTail
         label.cell?.usesSingleLineMode = true
         label.setContentHuggingPriority(.defaultLow, for: .horizontal)
         // A preview label can be 500 characters. Low compression resistance

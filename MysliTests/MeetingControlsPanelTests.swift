@@ -519,16 +519,15 @@ final class MeetingControlsPanelTests: XCTestCase {
     ///     TEST_RUNNER_MYSLI_PANEL_SNAPSHOTS="$HOME/panel-snapshots" xcodebuild -project Mysli.xcodeproj \
     ///         -scheme Mysli test -only-testing:MysliTests/MeetingControlsPanelTests/testWritesAPictureOfEachState
     func testWritesAPictureOfEachState() async throws {
-        guard let path = ProcessInfo.processInfo.environment["MYSLI_PANEL_SNAPSHOTS"] else {
-            throw XCTSkip("Set MYSLI_PANEL_SNAPSHOTS to a folder to write pictures of the panel.")
-        }
-        let folder = URL(fileURLWithPath: path, isDirectory: true)
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let folder = try pictureFolder("MYSLI_PANEL_SNAPSHOTS",
+                                       skipMessage: "Set MYSLI_PANEL_SNAPSHOTS to a folder to write pictures of the panel.")
+        // The margin of desktop around the panel keeps text on a transparent background readable.
         func snap(_ name: String) throws {
-            for (suffix, appearance) in [("light", NSAppearance.Name.aqua), ("dark", .darkAqua)] {
-                try writePicture(of: sut, appearance: NSAppearance(named: appearance)!,
-                                 to: folder.appendingPathComponent("\(name)-\(suffix).png"))
-            }
+            let view = try XCTUnwrap(sut.contentView)
+            let margin: CGFloat = 24
+            try writePictures(of: [(view, NSPoint(x: margin, y: margin))],
+                              size: NSSize(width: view.bounds.width + 2 * margin, height: view.bounds.height + 2 * margin),
+                              backdrop: pictureDesktop, named: name, in: folder)
         }
 
         microphone = .notDetermined
@@ -596,29 +595,5 @@ final class MeetingControlsPanelTests: XCTestCase {
 
         capture.interrupt(reason: "The microphone was disconnected.")
         try snap("11-interrupted")
-    }
-
-    private func writePicture(of panel: NSPanel, appearance: NSAppearance, to url: URL) throws {
-        panel.appearance = appearance
-        let view = try XCTUnwrap(panel.contentView)
-        view.layoutSubtreeIfNeeded()
-        view.needsDisplay = true
-        view.displayIfNeeded()
-        let rep = try XCTUnwrap(view.bitmapImageRepForCachingDisplay(in: view.bounds))
-        view.cacheDisplay(in: view.bounds, to: rep)
-
-        // A desktop-like backdrop, so text on a transparent background stays readable.
-        let margin: CGFloat = 24
-        let size = NSSize(width: view.bounds.width + 2 * margin, height: view.bounds.height + 2 * margin)
-        let image = NSImage(size: size, flipped: false) { rect in
-            (appearance.name == .darkAqua ? NSColor(red: 0.11, green: 0.16, blue: 0.16, alpha: 1)
-                : NSColor(red: 0.79, green: 0.83, blue: 0.77, alpha: 1)).setFill()
-            rect.fill()
-            rep.draw(in: NSRect(x: margin, y: margin, width: view.bounds.width, height: view.bounds.height))
-            return true
-        }
-        let tiff = try XCTUnwrap(image.tiffRepresentation)
-        let png = try XCTUnwrap(NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]))
-        try png.write(to: url)
     }
 }

@@ -55,24 +55,24 @@ final class MeetingTypedNotesView: NSView {
         title.stringValue = session.meeting.title
         title.toolTip = session.meeting.title
         let footer = makeFooter()
-        for view in [title, scroll, footer] as [NSView] {
-            view.translatesAutoresizingMaskIntoConstraints = false
-            addSubview(view)
-        }
+        let outer = NSStackView(views: [title, scroll, footer])
+        outer.orientation = .vertical
+        outer.alignment = .leading
+        outer.spacing = 6
+        outer.setCustomSpacing(8, after: scroll)
+        outer.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(outer)
         NSLayoutConstraint.activate([
-            title.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
-            title.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -8),
-            title.topAnchor.constraint(equalTo: topAnchor, constant: 8),
-            scroll.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
-            scroll.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
-            scroll.topAnchor.constraint(equalTo: title.bottomAnchor, constant: 6),
+            outer.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
+            outer.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
+            outer.topAnchor.constraint(equalTo: topAnchor, constant: 8),
+            outer.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -8),
+            title.widthAnchor.constraint(lessThanOrEqualTo: outer.widthAnchor),
+            scroll.widthAnchor.constraint(equalTo: outer.widthAnchor),
+            footer.widthAnchor.constraint(equalTo: outer.widthAnchor),
             scroll.heightAnchor.constraint(greaterThanOrEqualToConstant: 40),
             document.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor),
-            document.heightAnchor.constraint(greaterThanOrEqualTo: scroll.contentView.heightAnchor),
-            footer.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
-            footer.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
-            footer.topAnchor.constraint(equalTo: scroll.bottomAnchor, constant: 8),
-            footer.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -8)
+            document.heightAnchor.constraint(greaterThanOrEqualTo: scroll.contentView.heightAnchor)
         ])
         // `onChange` has one subscriber, so a second view of a session would take it from this
         // one. `MeetingNotesHosting` keeps one view per meeting and moves it.
@@ -90,7 +90,6 @@ final class MeetingTypedNotesView: NSView {
         status.distribution = .fill
         status.spacing = 2
         status.setCustomSpacing(6, after: summaryLabel)
-        status.detachesHiddenViews = true
         for label in [saveLabel, summaryLabel] {
             label.maximumNumberOfLines = 3
             label.cell?.truncatesLastVisibleLine = true
@@ -101,25 +100,16 @@ final class MeetingTypedNotesView: NSView {
         }
         update.setContentHuggingPriority(.defaultHigh, for: .horizontal)
         update.setContentCompressionResistancePriority(.defaultHigh, for: .horizontal)
-        let footer = NSView()
-        for view in [status, update] as [NSView] {
-            view.translatesAutoresizingMaskIntoConstraints = false
-            footer.addSubview(view)
-        }
-        let hugContent = footer.heightAnchor.constraint(equalToConstant: 0)
-        hugContent.priority = .defaultLow
+        status.setContentHuggingPriority(.defaultLow, for: .horizontal)
         NSLayoutConstraint.activate([
             saveLabel.widthAnchor.constraint(equalTo: status.widthAnchor),
-            summaryLabel.widthAnchor.constraint(equalTo: status.widthAnchor),
-            status.leadingAnchor.constraint(equalTo: footer.leadingAnchor),
-            status.trailingAnchor.constraint(equalTo: update.leadingAnchor, constant: -12),
-            status.topAnchor.constraint(greaterThanOrEqualTo: footer.topAnchor),
-            status.centerYAnchor.constraint(equalTo: footer.centerYAnchor),
-            update.trailingAnchor.constraint(equalTo: footer.trailingAnchor),
-            update.topAnchor.constraint(greaterThanOrEqualTo: footer.topAnchor),
-            update.centerYAnchor.constraint(equalTo: footer.centerYAnchor),
-            hugContent
+            summaryLabel.widthAnchor.constraint(equalTo: status.widthAnchor)
         ])
+        let footer = NSStackView(views: [status, update])
+        footer.orientation = .horizontal
+        footer.alignment = .centerY
+        footer.spacing = 12
+        footer.distribution = .fill
         return footer
     }
 

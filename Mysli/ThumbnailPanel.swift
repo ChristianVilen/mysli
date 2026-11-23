@@ -77,10 +77,11 @@ class ThumbnailPanel: FloatingPanel {
         container.addSubview(closeButton)
 
         let trash = NSImage(systemSymbolName: "trash.circle.fill", accessibilityDescription: "Delete")
-        let deleteButton = HoverButton(frame: NSRect(x: size.width - closeSize - 4, y: size.height - closeSize - 4, width: closeSize, height: closeSize))
+        let deleteButton = HoverButton(
+            frame: NSRect(x: size.width - closeSize - 4, y: size.height - closeSize - 4, width: closeSize, height: closeSize),
+            resting: trash?.withSymbolConfiguration(symbolConfig),
+            hover: trash?.withSymbolConfiguration(symbolConfig.applying(.init(paletteColors: [.white, .systemRed]))))
         deleteButton.bezelStyle = .circular
-        deleteButton.restingImage = trash?.withSymbolConfiguration(symbolConfig)
-        deleteButton.hoverImage = trash?.withSymbolConfiguration(symbolConfig.applying(.init(paletteColors: [.white, .systemRed])))
         deleteButton.isBordered = false
         deleteButton.target = self
         deleteButton.action = #selector(deleteThumbnail)
@@ -113,13 +114,14 @@ class ThumbnailPanel: FloatingPanel {
 
 /// Shows `hoverImage` while the pointer is over the button, and `restingImage` otherwise.
 private final class HoverButton: NSButton {
-    var restingImage: NSImage? {
-        didSet { image = restingImage }
-    }
-    var hoverImage: NSImage?
+    private let restingImage: NSImage?
+    private let hoverImage: NSImage?
 
-    override init(frame: NSRect) {
+    init(frame: NSRect, resting: NSImage?, hover: NSImage?) {
+        restingImage = resting
+        hoverImage = hover
         super.init(frame: frame)
+        image = resting
         // Always active: the thumbnail is a non-activating panel, and Mysli is
         // usually not the active app while the pointer is over it.
         addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
@@ -129,7 +131,7 @@ private final class HoverButton: NSButton {
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
     override func mouseEntered(with event: NSEvent) {
-        image = hoverImage ?? restingImage
+        image = hoverImage
     }
 
     override func mouseExited(with event: NSEvent) {
