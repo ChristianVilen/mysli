@@ -91,7 +91,7 @@ final class MeetingTypedNotesWindowTests: XCTestCase {
         let buttons = descendants(content).compactMap { $0 as? NSButton }
         let retry = try XCTUnwrap(buttons.first { $0.title == "Retry save" })
         let reload = try XCTUnwrap(buttons.first { $0.title == "Reload saved notes" })
-        XCTAssertFalse(retry.isHidden)
+        XCTAssertFalse(retry.isHiddenOrHasHiddenAncestor)
         retry.performClick(nil)
         XCTAssertTrue(session.hasUnsavedChanges)
         XCTAssertEqual(try meeting.read(.notes), "External notes")
@@ -104,7 +104,7 @@ final class MeetingTypedNotesWindowTests: XCTestCase {
         XCTAssertFalse(session.hasUnsavedChanges)
         let reloaded = descendants(content).compactMap { $0 as? NSTextView }
         XCTAssertEqual(reloaded.map(\.string), ["External notes"])
-        XCTAssertTrue(retry.isHidden)
+        XCTAssertTrue(retry.isHiddenOrHasHiddenAncestor)
     }
 
     func testDetachingSharedViewReleasesActivationWithoutClosingItsSession() throws {
