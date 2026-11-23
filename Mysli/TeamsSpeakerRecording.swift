@@ -10,6 +10,7 @@ final class TeamsSpeakerRecording {
     private let observer: any TeamsSpeakerObserving
     private let log: (LogMessage) -> Void
     private var history: TeamsSpeakerHistory
+    private var liveRows: LiveTranscript.FinalRows?
     private var tally = TeamsScanTally()
     private var task: Task<Void, Never>?
     private var runID: UUID?
@@ -55,6 +56,32 @@ final class TeamsSpeakerRecording {
         runID = nil
         task?.cancel()
         task = nil
+    }
+
+    func preview(_ transcript: LiveTranscript, on clock: RecordingClock) -> LivePreview {
+        let newRows = transcript.finalRows.revision != liveRows?.revision
+        if newRows { liveRows = transcript.finalRows }
+        _ = refreshEvidence(clock: clock, resolveAll: newRows)
+        return transcript.preview(on: clock, resolvedRows: liveRows?.rows)
+    }
+
+    func evidenceSoFar(clock: RecordingClock) -> TeamsSpeakerEvidence {
+        refreshEvidence(clock: clock, resolveAll: false)
+    }
+
+    private func refreshEvidence(clock: RecordingClock, resolveAll: Bool) -> TeamsSpeakerEvidence {
+        var changed = IndexSet()
+        func invalidate(_ span: ClosedRange<Double>) {
+            if let indices = liveRows?.candidates(changedIn: span) {
+                changed.insert(integersIn: indices)
+            }
+        }
+        if resolveAll { invalidate(-.infinity ... .infinity) }
+        let evidence = history.evidenceSoFar(clock: clock) { span in
+            if !resolveAll { invalidate(span) }
+        }
+        liveRows?.resolve(changed, using: evidence)
+        return evidence
     }
 
     func finish(clock: RecordingClock, endingAt: HostTime) -> TeamsSpeakerEvidence {

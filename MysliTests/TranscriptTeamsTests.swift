@@ -77,8 +77,8 @@ final class TranscriptTeamsTests: XCTestCase {
     func testOverlappingSystemSegmentsKeepThem() {
         let overlapping = [TranscriptSegment(start: 0.02, end: 0.59, text: "One"),
                            TranscriptSegment(start: 0.3, end: 0.89, text: "Two")]
-        let lines = Transcript.merge([.system: overlapping], rooms: .notDiarized, joinGap: nil, speakers: evidence())
-        XCTAssertEqual(lines.map(\.speaker), [.them, .them])
+        let lines = Transcript.merge([.system: overlapping], rooms: .notDiarized, speakers: evidence())
+        XCTAssertEqual(lines, [TranscriptLine(speaker: .them, start: 0.02, text: "One Two")])
     }
 
     func testRoomLabelsAndMicrophoneEchoFilteringArePreserved() {

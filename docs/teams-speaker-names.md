@@ -1,10 +1,10 @@
 # Teams speaker names (experimental)
 
-**Teams speaker names** on the Meetings page of Settings starts off. When it is on, Mysli reads speaker indicators and participant labels from the Teams desktop app through Accessibility while you record. After Stop, a remote line in the transcript can say `Aino (Teams)` instead of "Them".
+**Teams speaker names** on the Meetings page of Settings starts off. When it is on, Mysli reads speaker indicators and participant labels from the Teams desktop app through Accessibility while you record. A final remote line can show `Aino (Teams)` in the live transcript and in the transcript after Stop.
 
 ## What is verified
 
-Treat the names as best effort. The rules come from public source code and tests with fake Accessibility trees. In one real call, a standalone scanner identified a remote speaker beside a shared screen. A separate script enabled access to the Teams call. The gallery view, the local speaker's tile, and the names in a finished transcript still need a live check.
+Treat the names as best effort. The rules come from public source code and tests with fake Accessibility trees. In one real call, a standalone scanner identified a remote speaker beside a shared screen. A separate script enabled access to the Teams call. The gallery view, the local speaker's tile, and the names in either transcript still need a real-call check.
 
 Teams can change its interface, hide its speaking indicator, or keep the last speaker highlighted. Names can be missing or wrong.
 
@@ -33,7 +33,7 @@ Reopen Mysli after you run the command.
 Mysli checks each segment of speech from the Mac audio track before it joins segments into transcript lines. A segment can get a name when intervals between matching scans in the same Teams window and recording run cover at least 90% of the segment. Conflicts, overlapping speech segments, or too little coverage keep the label "Them".
 
 - Mysli does not guess from a roster, a muted microphone, a calendar, or a voice profile.
-- The live draft and the "Room" labels of the microphone do not change.
+- A final live row can gain a name when later scans cover it. Draft remote rows show "Them". The transcript after Stop can use different speech segments, so the labels can differ.
 - The Mac audio track can include other apps. A Teams indicator can therefore lead to a name on speech from outside Teams.
 - The summary prompt asks for an action owner only when the transcript or typed notes say who will do the task.
 - Pause stops observation. Resume starts a new run and adds the same 3-second gap to the observation timeline as to the audio.

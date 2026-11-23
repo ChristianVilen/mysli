@@ -320,7 +320,6 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         func pathRow(_ page: SettingsPage, _ title: String, path: NSTextField, buttons: [NSButton], keywords: [String]) -> NSView {
             row(page, title, value: path, control: NSStackView(views: buttons), focus: buttons.first, keywords: keywords)
         }
-        let note = SettingsLayout.note
         loginError.textColor = .systemRed
         loginError.isHidden = true
         calendarStatus.isHidden = true
@@ -379,7 +378,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
                     row(.keepAwake, "Keep Awake", control: keepAwakeEnabled, keywords: ["sleep prevent caffeine caffeinate"]),
                     row(.keepAwake, "Keep screen on", detail: "The display stays awake too while a session runs.",
                                                          control: keepScreenOn, keywords: ["display sleep"])]),
-                note("Start a session from the Mysli menu.")
+                SettingsNote("Start a session from the Mysli menu.")
             ]),
             .meetings: toolPage(.meetings, [
                 SettingsLayout.group([
@@ -388,17 +387,17 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
                     row(.meetings, "Summary tool", control: summaryTool, keywords: ["ai provider claude antigravity automatic agy"])
                 ]),
                 summaryToolMissing,
-                note("Automatic tries Antigravity, then Claude Code. An explicit choice uses only that tool. Changes apply when the next job starts."),
+                SettingsNote("Automatic tries Antigravity, then Claude Code. An explicit choice uses only that tool. Changes apply when the next job starts."),
                 SettingsLayout.group([pathRow(.meetings, "Background file", path: backgroundPath, buttons: [chooseBackground, clearBackground],
                                              keywords: ["context summary information"])]),
-                note("The complete background file goes with the transcript. Automatic may send it to both providers on fallback. Clear keeps the file."),
+                SettingsNote("The complete background file goes with the transcript. Automatic may send it to both providers on fallback. Clear keeps the file."),
                 SettingsLayout.group([
                     column([row(.meetings, "Calendar reminders", detail: "Calendar events offer recording reminders. Mysli never starts or stops recording automatically.",
                                                control: calendarReminders, keywords: ["schedule notifications alerts"]), calendarStatus]),
                     row(.meetings, "Remind me", control: calendarReminderTime, keywords: ["calendar reminder time minutes before start"]),
                     row(.meetings, "Remind for", detail: "A video meeting link is a Teams, Google Meet, or Zoom link in the event notes, location, or URL.",
                                        control: calendarReminderEvents, keywords: ["calendar reminders filter events teams zoom google meet video link"]),
-                    row(.meetings, "Teams speaker names", detail: "Experimental. After Stop, names remote speakers from the Teams app. Applies from the next recording.",
+                    row(.meetings, "Teams speaker names", detail: "Experimental. Final remote lines can show Teams names during recording and in the saved transcript. Applies from the next recording.",
                                        control: teamsSpeakerNames, keywords: ["people participants identify recognition"])
                 ])
             ]),
@@ -411,8 +410,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
                                        control: dictationNearbyText, keywords: ["preceding nearby context privacy"])
                 ]),
                 dictationToolMissing,
-                note("Fn needs Input Monitoring. Both options need Microphone and Accessibility. Grant them on the Permissions page."),
-                note(dictationKeyboardHelp),
+                SettingsNote("Fn needs Input Monitoring. Both options need Microphone and Accessibility. Grant them on the Permissions page."),
+                SettingsNote(dictationKeyboardHelp),
                 SettingsLayout.trailing(dictationKeyboard)
             ]),
             .permissions: permissions,

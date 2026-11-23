@@ -25,6 +25,7 @@ struct TeamsSpeakerObservation: Equatable, Sendable {
     let nodes: Int
 
     var speaker: TeamsSpeakerName? { result.speaker }
+    fileprivate var hasFiniteTimes: Bool { began.seconds.isFinite && ended.seconds.isFinite }
 }
 
 struct TeamsSpeakerHistory {
@@ -34,6 +35,9 @@ struct TeamsSpeakerHistory {
     }
 
     private var entries: [Entry] = []
+    private var projectedClock: RecordingClock?
+    private var projectedCount = 0
+    private var liveProjection = Projection()
     let capacity: Int
 
     init(capacity: Int = 36_000) {
@@ -46,25 +50,56 @@ struct TeamsSpeakerHistory {
         return entries.count < capacity
     }
 
+    mutating func evidenceSoFar(clock: RecordingClock, changed: (ClosedRange<Double>) -> Void) -> TeamsSpeakerEvidence {
+        // A pause or resume can change the mapping of a scan that straddles its boundary.
+        let reset = projectedClock != clock
+        if reset {
+            projectedClock = clock
+            projectedCount = 0
+            liveProjection = Projection()
+            changed(-.infinity ... .infinity)
+        }
+        guard clock.origin.seconds.isFinite else { return .empty }
+        for entry in entries.dropFirst(projectedCount) {
+            liveProjection.add(entry, clock: clock) { span in
+                if !reset { changed(span) }
+            }
+        }
+        projectedCount = entries.count
+        return liveProjection.evidence(scans: .empty)
+    }
+
     func finish(clock: RecordingClock, endingAt stop: HostTime) -> TeamsSpeakerEvidence {
         guard stop.seconds.isFinite, clock.origin.seconds.isFinite else { return .empty }
-        var positive: [SpeakerSpan] = []
-        var uncertain: [SpeakerSpan] = []
-        var observed: [SpeakerSpan] = []
-        var previous: Entry?
-        var latestEnd = -Double.infinity
+        var projection = Projection()
         var scans: [TeamsSpeakerObservation] = []
         for entry in entries {
             let sample = entry.sample
-            guard sample.began.seconds.isFinite, sample.ended.seconds.isFinite else {
-                previous = nil
-                continue
+            if sample.hasFiniteTimes {
+                guard sample.began <= stop, sample.ended <= stop else { continue }
+                scans.append(sample)
             }
-            guard sample.began <= stop, sample.ended <= stop else { continue }
-            scans.append(sample)
+            projection.add(entry, clock: clock)
+        }
+        return projection.evidence(scans: TeamsScanSummary(scans))
+    }
+
+    private struct Projection {
+        private var positive: [SpeakerSpan] = []
+        private var uncertain: [SpeakerSpan] = []
+        private var observed: [SpeakerSpan] = []
+        private var previous: Entry?
+        private var latestEnd = -Double.infinity
+
+        mutating func add(_ entry: Entry, clock: RecordingClock, changed: (ClosedRange<Double>) -> Void = { _ in }) {
+            let sample = entry.sample
+            guard sample.hasFiniteTimes else {
+                previous = nil
+                return
+            }
             let ordered = sample.began.seconds >= latestEnd
             latestEnd = max(latestEnd, sample.began.seconds, sample.ended.seconds)
-            let mappedScan = clock.fileIntervalInOneRun(from:sample.began, to: sample.ended)
+            let mappedScan = clock.fileIntervalInOneRun(from: sample.began, to: sample.ended)
             let valid = ordered && sample.ended >= sample.began
                 && sample.sequence >= 0
                 && sample.ended <= sample.began + 0.150
@@ -72,15 +107,19 @@ struct TeamsSpeakerHistory {
                 && mappedScan != nil
 
             if !valid || sample.speaker == nil {
-                uncertain += clock.keptFileIntervals(from:min(sample.began, sample.ended), to: max(sample.began, sample.ended))
-                    .map { SpeakerSpan(start: $0.start, end: $0.end, name: nil) }
+                for span in clock.keptFileIntervals(from: min(sample.began, sample.ended),
+                                                    to: max(sample.began, sample.ended)) {
+                    addUncertainty(SpeakerSpan(start: span.start, end: span.end, name: nil))
+                    changed(span.start...span.end)
+                }
             }
             guard valid else {
                 previous = nil
-                continue
+                return
             }
             if let name = sample.speaker, let span = mappedScan {
                 observed.append(SpeakerSpan(start: span.start, end: span.end, name: name))
+                changed(span.start...span.end)
             }
             if let earlier = previous, let name = sample.speaker,
                earlier.sample.speaker == name,
@@ -89,25 +128,30 @@ struct TeamsSpeakerHistory {
                earlier.sample.sequence < Int.max,
                sample.sequence == earlier.sample.sequence + 1,
                sample.began <= earlier.sample.ended + 0.750,
-               let span = clock.fileIntervalInOneRun(from:earlier.sample.ended, to: sample.began), span.end > span.start {
+               let span = clock.fileIntervalInOneRun(from: earlier.sample.ended, to: sample.began), span.end > span.start {
                 positive.append(SpeakerSpan(start: span.start, end: span.end, name: name))
+                changed(span.start...span.end)
             }
             previous = entry
         }
-        return TeamsSpeakerEvidence(positive: positive, uncertain: mergedUncertainty(uncertain), observed: observed,
-                                    scans: TeamsScanSummary(scans))
-    }
 
-    private func mergedUncertainty(_ spans: [SpeakerSpan]) -> [SpeakerSpan] {
-        var merged: [SpeakerSpan] = []
-        for span in spans.sorted(by: { $0.start < $1.start }) {
-            if let last = merged.last, span.start <= last.end {
-                merged[merged.count - 1] = SpeakerSpan(start: last.start, end: max(last.end, span.end), name: nil)
-            } else {
-                merged.append(span)
-            }
+        func evidence(scans: TeamsScanSummary) -> TeamsSpeakerEvidence {
+            TeamsSpeakerEvidence(positive: positive, uncertain: uncertain, observed: observed, scans: scans)
         }
-        return merged
+
+        private mutating func addUncertainty(_ span: SpeakerSpan) {
+            // Scans normally arrive in order. Out-of-order scans can still veto earlier evidence.
+            let first = uncertain.lastIndex { $0.end < span.start }.map { $0 + 1 } ?? 0
+            var end = first
+            while end < uncertain.count, uncertain[end].start <= span.end { end += 1 }
+            guard first < end else {
+                uncertain.insert(span, at: first)
+                return
+            }
+            let merged = SpeakerSpan(start: min(span.start, uncertain[first].start),
+                                     end: max(span.end, uncertain[end - 1].end), name: nil)
+            uncertain.replaceSubrange(first..<end, with: CollectionOfOne(merged))
+        }
     }
 }
 
@@ -119,7 +163,7 @@ struct TeamsSpeakerEvidence: Equatable, Sendable {
     let scans: TeamsScanSummary
 
     func name(for segment: TranscriptSegment) -> TeamsSpeakerName? {
-        guard segment.start.isFinite, segment.end.isFinite, segment.start >= 0,
+        guard !positive.isEmpty, segment.start.isFinite, segment.end.isFinite, segment.start >= 0,
               segment.end > segment.start else { return nil }
         let unknown = firstEnding(atOrAfter: segment.start, in: uncertain)
         if unknown < uncertain.count, uncertain[unknown].start < segment.end { return nil }

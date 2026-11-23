@@ -10,21 +10,24 @@ final class TeamsSpeakerLifecycleTests: XCTestCase {
     private var alerts: [String] = []
     private var source: RecordingSpeakerSource!
     private var capture: FakeMeetingAudioCapture!
+    private var liveTranscriber: FakeLiveTranscriber!
     private var recorder: MeetingRecorder!
 
     override func setUpWithError() throws {
         root = try makeTemporaryDirectory()
         source = RecordingSpeakerSource()
         capture = FakeMeetingAudioCapture()
+        liveTranscriber = FakeLiveTranscriber()
         recorder = makeRecorder(capture: capture)
     }
 
     override func tearDown() { recorder?.shutDown() }
 
-    private func makeRecorder(capture: MeetingAudioCapturing) -> MeetingRecorder {
-        MeetingRecorder(permissions: PermissionsManager(isAccessibilityTrusted: { false }, hasScreenCaptureAccess: { true },
+    private func makeRecorder(capture: MeetingAudioCapturing, accessibilityGranted: Bool = false) -> MeetingRecorder {
+        MeetingRecorder(permissions: PermissionsManager(isAccessibilityTrusted: { accessibilityGranted },
+                                                        hasScreenCaptureAccess: { true },
                                                         microphoneAccess: { .granted }, requestMicrophoneAccess: { true }),
-                        root: { [unowned self] in root }, capture: capture, liveTranscriber: FakeLiveTranscriber(),
+                        root: { [unowned self] in root }, capture: capture, liveTranscriber: liveTranscriber,
                         teamsSpeakerNamesEnabled: { [unowned self] in reads += 1; return enabled },
                         teamsSpeakerObserver: source, notifier: FakeNotifier(), alertStartFailure: { [unowned self] reason, _ in
                             alerts.append(reason)
@@ -39,6 +42,24 @@ final class TeamsSpeakerLifecycleTests: XCTestCase {
         guard source.starts > run else { return }
         for index in 0...6 { source.yield(start + Double(index) * 0.5, sequence: index, name: name, run: run) }
         for _ in 0..<20 { await Task.yield() }
+    }
+
+    func testLateTeamsScansNameAnExistingFinalRowInTheLivePreview() async throws {
+        recorder = makeRecorder(capture: capture, accessibilityGranted: true)
+        await recorder.toggleRecording()
+        time = HostTime(seconds: 102)
+        liveTranscriber.send(.result(LiveResult(track: .system, start: 1, end: 2, text: "Hello",
+                                                isFinal: true, finalizedThrough: 2)))
+        await waitUntil { self.recorder.livePreview?.rows.isEmpty == false }
+        XCTAssertEqual(recorder.livePreview?.rows, [LiveRow(at: 1, content: .speech(.them, text: "Hello", isFinal: true))])
+
+        time = HostTime(seconds: 103)
+        await samples()
+
+        let alice = try XCTUnwrap(TeamsSpeakerName("Alice"))
+        let expected = [LiveRow(at: 1, content: .speech(.teams(alice), text: "Hello", isFinal: true))]
+        await waitUntil { self.recorder.livePreview?.rows == expected }
+        XCTAssertEqual(recorder.livePreview?.rows, expected)
     }
 
     func testStopFreezesNamesBeforeCallbackAndReadsOptInOnce() async {

@@ -32,6 +32,11 @@ struct LiveRow: Equatable {
     /// Audio-file position, the same timeline as the saved transcript and note rows.
     let at: TimeInterval
     let content: Content
+
+    fileprivate static func final(_ speech: Transcript.Speech, using evidence: TeamsSpeakerEvidence) -> LiveRow {
+        LiveRow(at: speech.segment.start, content: .speech(speech.speaker(using: evidence),
+                                                          text: speech.segment.text, isFinal: true))
+    }
 }
 
 struct LivePreview: Equatable {
@@ -44,10 +49,9 @@ struct LivePreview: Equatable {
 
 /// In memory only, never on disk.
 ///
-/// Per track: the final phrases and at most one volatile tail, in file positions. The final
-/// rows come from `Transcript.merge`, so their order and echo rule are the ones in
-/// `transcript.md`. Unlike `transcript.md`, rows never join: one microphone track can carry
-/// several people in one room, and a short gap can be a new speaker. Volatile tails are not
+/// Per track: the final phrases and at most one volatile tail, in file positions. Final rows use
+/// the same ordering, echo rule, and Teams evidence rule as `transcript.md`. Live rows never join
+/// because a short gap on the microphone track can be a new speaker. Volatile tails are not
 /// echo-checked: they change, and the final decides.
 struct LiveTranscript: Equatable {
     enum Status: Equatable {
@@ -63,9 +67,7 @@ struct LiveTranscript: Equatable {
     private(set) var status: Status = .preparing
     private var finals: [MeetingTrack: [TranscriptSegment]] = [:]
     private var tails: [MeetingTrack: Tail] = [:]
-    /// `Transcript.merge` of the finals and the settled tails, in file positions. Each change to
-    /// those merges again, so the preview on every update and every tick does not.
-    private var finalLines: [TranscriptLine] = []
+    private(set) var finalRows = FinalRows([], revision: 0)
     /// Recorded seconds between the newest result's end and the moment it arrived.
     private var lag: TimeInterval = 0
 
@@ -76,6 +78,50 @@ struct LiveTranscript: Equatable {
         let phrases: [TranscriptSegment]
         /// Shows as final. A later result for the same audio still replaces it.
         var isSettled = false
+    }
+
+    struct FinalRows: Equatable {
+        private struct Candidate: Equatable {
+            let row: Int
+            let speech: Transcript.Speech
+        }
+
+        let revision: Int
+        private var candidates: [Candidate] = []
+        private(set) var rows: [LiveRow] = []
+
+        fileprivate init(_ speech: [Transcript.Speech], revision: Int) {
+            self.revision = revision
+            for item in speech {
+                let segment = item.segment
+                if item.attribution == .teamsCandidate, segment.start.isFinite, segment.end.isFinite,
+                   segment.start >= 0, segment.end > segment.start {
+                    candidates.append(Candidate(row: rows.count, speech: item))
+                }
+                rows.append(.final(item, using: .empty))
+            }
+        }
+
+        /// Remote candidates are ordered and never overlap. A point scan at the row start can veto its name.
+        func candidates(changedIn span: ClosedRange<Double>) -> Range<Int> {
+            var low = 0
+            var high = candidates.count
+            while low < high {
+                let middle = low + (high - low) / 2
+                if candidates[middle].speech.segment.end <= span.lowerBound { low = middle + 1 } else { high = middle }
+            }
+            let first = low
+            while low < candidates.count, candidates[low].speech.segment.start <= span.upperBound { low += 1 }
+            return first..<low
+        }
+
+        mutating func resolve(_ indices: IndexSet, using evidence: TeamsSpeakerEvidence) {
+            for index in indices {
+                let candidate = candidates[index]
+                let row = LiveRow.final(candidate.speech, using: evidence)
+                if rows[candidate.row] != row { rows[candidate.row] = row }
+            }
+        }
     }
 
     /// Measures lag on arrival, so silence does not grow it.
@@ -118,7 +164,7 @@ struct LiveTranscript: Equatable {
                 return
             }
         }
-        mergeFinalLines()
+        orderFinalSpeech()
     }
 
     /// At Pause: a tail gets no more audio until Resume, so it shows as final. It stays the
@@ -126,19 +172,18 @@ struct LiveTranscript: Equatable {
     /// a newer result for the same words.
     mutating func settleTails() {
         for track in tails.keys { tails[track]?.isSettled = true }
-        mergeFinalLines()
+        orderFinalSpeech()
     }
 
-    private mutating func mergeFinalLines() {
+    private mutating func orderFinalSpeech() {
         var spoken = finals
         for (track, tail) in tails where tail.isSettled { spoken[track, default: []].append(contentsOf: tail.phrases) }
-        finalLines = Transcript.merge(spoken, rooms: .notDiarized, joinGap: nil)
+        finalRows = FinalRows(Transcript.orderedSpeech(spoken, rooms: .notDiarized), revision: finalRows.revision + 1)
     }
 
     /// Unsettled text stays below committed speech and pause markers until it becomes final.
-    func preview(on clock: RecordingClock) -> LivePreview {
-        var rows = finalLines.map { LiveRow(at: $0.start,
-                                            content: .speech($0.speaker, text: $0.text, isFinal: true)) }
+    func preview(on clock: RecordingClock, resolvedRows: [LiveRow]? = nil) -> LivePreview {
+        var rows = resolvedRows ?? finalRows.rows
         for pause in clock.pauses {
             rows.insert(LiveRow(at: pause.filePosition, content: .pause(duration: pause.duration)),
                         at: rows.firstIndex { $0.at >= pause.filePosition } ?? rows.endIndex)
@@ -152,7 +197,7 @@ struct LiveTranscript: Equatable {
                 drafts.append(row)
             }
         }
-        rows.append(contentsOf: drafts.sorted { $0.at < $1.at })
+        if !drafts.isEmpty { rows.append(contentsOf: drafts.sorted { $0.at < $1.at }) }
         return LivePreview(status: status, rows: rows, behind: lag >= Self.behindThreshold ? lag : nil)
     }
 }

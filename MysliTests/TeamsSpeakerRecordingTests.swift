@@ -83,6 +83,38 @@ final class TeamsSpeakerRecordingTests: XCTestCase {
         XCTAssertEqual(source.terminations, 1)
     }
 
+    func testEvidenceSoFarKeepsCollectingAndMatchesTheClockAfterResume() async {
+        let source = RecordingSpeakerSource()
+        let recording = makeRecording(source)
+        var clock = RecordingClock(origin: HostTime(seconds: 100))
+        let first = TranscriptSegment(start: 0, end: 0.5, text: "Hello")
+        let next = TranscriptSegment(start: 0.5, end: 1, text: "Still here")
+        recording.resume(at: clock.origin)
+        source.yield(100, sequence: 0)
+        source.yield(100.5, sequence: 1)
+        await waitUntil { recording.evidenceSoFar(clock: clock).name(for: first) != nil }
+
+        let initial = recording.evidenceSoFar(clock: clock)
+        XCTAssertEqual(initial.name(for: first)?.value, "Alice")
+        XCTAssertNil(initial.name(for: next))
+        source.yield(101, sequence: 2)
+        await waitUntil { recording.evidenceSoFar(clock: clock).name(for: next) != nil }
+        XCTAssertEqual(recording.evidenceSoFar(clock: clock).name(for: next)?.value, "Alice")
+        XCTAssertNil(initial.name(for: next))
+
+        let pause = HostTime(seconds: 102)
+        let resume = HostTime(seconds: 110)
+        clock.pause(at: pause)
+        recording.pause()
+        clock.resume(at: resume)
+        recording.resume(at: resume)
+        source.yield(110, sequence: 0, name: "Bob", run: 1)
+        source.yield(110.5, sequence: 1, name: "Bob", run: 1)
+        let afterPause = TranscriptSegment(start: 5, end: 5.5, text: "Welcome back")
+        await waitUntil { recording.evidenceSoFar(clock: clock).name(for: afterPause) != nil }
+        XCTAssertEqual(recording.evidenceSoFar(clock: clock).name(for: afterPause)?.value, "Bob")
+    }
+
     func testResumeRejectsBufferedSamplesBeforeItsLowerBoundAndLeavesThePauseGapEmpty() async {
         let source = RecordingSpeakerSource()
         let recording = TeamsSpeakerRecording(observer: source)

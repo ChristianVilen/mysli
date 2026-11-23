@@ -241,9 +241,9 @@ The first use asks for Calendar and notification access. See the [integration co
 
 ### Name Teams speakers (experimental)
 
-**Teams speaker names** in Settings starts off. When it is on, Mysli reads speaker indicators and participant labels from the Teams desktop app through Accessibility while you record. After Stop, a remote line can say `Aino (Teams)` instead of "Them".
+**Teams speaker names** in Settings starts off. When it is on, Mysli reads speaker indicators and participant labels from the Teams desktop app through Accessibility while you record. A final remote line can show `Aino (Teams)` in the live transcript and in the transcript after Stop. Draft remote rows show "Them".
 
-Treat the names as best effort. Nobody has verified the video gallery view or the names in a finished transcript, and names can be missing or wrong. See [Teams speaker names](docs/teams-speaker-names.md) for what Mysli reads, when a line gets a name, and how to find out why no name appeared.
+Treat the names as best effort. Names can be missing or wrong. The video gallery view and names in either transcript still need a real-call check. See [Teams speaker names](docs/teams-speaker-names.md) for what Mysli reads, when a line gets a name, and how to find out why no name appeared.
 
 ### When a meeting fails
 

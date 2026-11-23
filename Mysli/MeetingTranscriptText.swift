@@ -11,6 +11,7 @@ struct TranscriptText {
         let location: Int
         /// Replaces the old text from `location` to its end.
         let text: NSAttributedString
+        let selection: NSRange
     }
 
     private(set) var rows: [LiveRow] = []
@@ -19,7 +20,7 @@ struct TranscriptText {
 
     /// Moves to `newRows`. `shown` is the text that the view shows now, the text of `rows`.
     /// Renders only the rows after the unchanged ones.
-    mutating func update(to newRows: [LiveRow], shown: String) -> Replacement {
+    mutating func update(to newRows: [LiveRow], shown: String, selection: NSRange = NSRange()) -> Replacement {
         let keptRows = zip(rows, newRows).prefix { $0 == $1 }.count
         let keptLength = rowLengths.prefix(keptRows).reduce(0, +)
         let rendered = Self.render(Array(newRows.dropFirst(keptRows)))
@@ -27,12 +28,60 @@ struct TranscriptText {
         var location = keptLength + zip(old.substring(from: keptLength).utf16, rendered.text.string.utf16)
             .prefix { $0 == $1 }.count
         if location > 0, UTF16.isLeadSurrogate(old.character(at: location - 1)) { location -= 1 }
+        var nextSelection = Self.selection(selection, keptBefore: location)
+        if selection.length > 0, nextSelection != selection, selection.location >= keptLength {
+            nextSelection = remappedSelection(selection, old: old, newRows: newRows, firstRow: keptRows,
+                                              keptLength: keptLength, rendered: rendered) ?? nextSelection
+        }
         rows = newRows
         rowLengths = Array(rowLengths.prefix(keptRows)) + rendered.lengths
         let start = location - keptLength
         return Replacement(location: location,
                            text: rendered.text.attributedSubstring(from: NSRange(location: start,
-                                                                                  length: rendered.text.length - start)))
+                                                                                  length: rendered.text.length - start)),
+                           selection: nextSelection)
+    }
+
+    /// A speaker edit can shift both the end of its own heading and every later row.
+    private func remappedSelection(_ selection: NSRange, old: NSString, newRows: [LiveRow], firstRow: Int,
+                                   keptLength: Int, rendered: (text: NSAttributedString, lengths: [Int])) -> NSRange? {
+        let new = rendered.text.string as NSString
+        let selectionEnd = NSMaxRange(selection)
+        func matchingRange(from oldAnchor: Int, to newAnchor: Int, through end: Int) -> NSRange? {
+            let length = end - oldAnchor
+            guard newAnchor + length <= new.length,
+                  (0..<length).allSatisfy({ old.character(at: oldAnchor + $0) == new.character(at: newAnchor + $0) })
+            else { return nil }
+            return NSRange(location: keptLength + newAnchor + selection.location - oldAnchor, length: selection.length)
+        }
+
+        var oldStart = keptLength
+        var newStart = 0
+        for index in firstRow..<min(rows.count, newRows.count) {
+            let oldEnd = oldStart + rowLengths[index]
+            let newEnd = newStart + rendered.lengths[index - firstRow]
+            if selection.location < oldEnd {
+                let before = rows[index]
+                let after = newRows[index]
+                guard before.at == after.at else { return nil }
+                if let prefix = matchingRange(from: oldStart, to: newStart, through: selectionEnd) {
+                    return prefix
+                }
+                guard case .speech(let oldSpeaker, _, _) = before.content,
+                      case .speech(let newSpeaker, _, _) = after.content,
+                      oldSpeaker.track == newSpeaker.track else { return nil }
+                let oldBody = NSMaxRange(old.range(of: "\n", range: NSRange(oldStart..<oldEnd)))
+                let newBody = NSMaxRange(new.range(of: "\n", range: NSRange(newStart..<newEnd)))
+                // The unchanged span can start in the heading suffix and continue into the words.
+                let oldAnchor = min(selection.location, oldBody)
+                let newAnchor = newBody - (oldBody - oldAnchor)
+                guard newAnchor >= newStart else { return nil }
+                return matchingRange(from: oldAnchor, to: newAnchor, through: max(selectionEnd, oldBody))
+            }
+            oldStart = oldEnd
+            newStart = newEnd
+        }
+        return nil
     }
 
     /// A selection that ends in the kept text stays. Any other collapses to where the change starts.
