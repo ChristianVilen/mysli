@@ -2,6 +2,8 @@ import Cocoa
 
 @MainActor
 final class OnboardingView: NSView {
+    private static let choiceIconSize: CGFloat = 32
+
     let model: Onboarding
     let nextButton = NSButton(title: "", target: nil, action: nil)
     let backButton = NSButton(title: "Back", target: nil, action: nil)
@@ -221,21 +223,21 @@ final class OnboardingView: NSView {
             }
             rows.append(choiceRow(title: tool.title, detail: detail,
                                   needs: needed.isEmpty ? "nothing" : needed.joined(separator: ", "),
-                                  icon: tool.icon(size: 32), button: button, missing: missing))
+                                  icon: tool.icon(size: Self.choiceIconSize), button: button, missing: missing))
         }
         remindersButton.target = self
         remindersButton.action = #selector(remindersChanged)
         remindersButton.setAccessibilityLabel("Calendar reminders")
         let reminders = choiceRow(title: "Calendar reminders", detail: "Offers to record when a calendar event starts. Mysli never records by itself.",
                                   needs: "Calendar, Notifications",
-                                  icon: MysliTool.neutralIcon(symbolName: "calendar", size: 28, description: "Calendar reminders"),
-                                  button: remindersButton, indent: 24)
+                                  icon: MysliTool.neutralIcon(symbolName: "calendar", size: Self.choiceIconSize, description: "Calendar reminders"),
+                                  button: remindersButton)
         rows.append(reminders)
         SettingsLayout.add(SettingsLayout.group(rows), to: tools)
     }
 
     private func choiceRow(title: String, detail: String, needs: String, icon: NSImage, button: NSButton,
-                           indent: CGFloat = 0, missing: NSTextField? = nil) -> NSView {
+                           missing: NSTextField? = nil) -> NSView {
         let heading = SettingsLayout.label(title)
         heading.font = .systemFont(ofSize: 13, weight: .semibold)
         let copy = SettingsLayout.stack(spacing: 2)
@@ -245,8 +247,8 @@ final class OnboardingView: NSView {
         }
         let image = NSImageView(image: icon)
         image.imageScaling = .scaleProportionallyDown
-        image.widthAnchor.constraint(equalToConstant: 32).isActive = true
-        image.heightAnchor.constraint(equalToConstant: 32).isActive = true
+        image.widthAnchor.constraint(equalToConstant: Self.choiceIconSize).isActive = true
+        image.heightAnchor.constraint(equalToConstant: Self.choiceIconSize).isActive = true
         copy.setHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)
         copy.setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)
         copy.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
@@ -257,7 +259,7 @@ final class OnboardingView: NSView {
         row.alignment = .centerY
         row.spacing = 12
         row.setCustomSpacing(16, after: copy)
-        row.edgeInsets = NSEdgeInsets(top: 3, left: indent, bottom: 3, right: 0)
+        row.edgeInsets = NSEdgeInsets(top: 3, left: 0, bottom: 3, right: 0)
         return row
     }
 
