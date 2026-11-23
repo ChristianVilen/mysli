@@ -246,7 +246,8 @@ enum SettingsLayout {
     /// Gives the switches, buttons, and pop-up buttons of a row one height, and every pop-up button one width.
     private static func matchRowControls(in view: NSView) {
         for case let control as NSControl in [view] + view.subviews {
-            control.controlSize = .small
+            // System Settings rows use the mini switch beside small buttons and pop-up buttons.
+            control.controlSize = control is NSSwitch ? .mini : .small
             if control is NSPopUpButton {
                 control.setContentHuggingPriority(.defaultLow, for: .horizontal)
                 control.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
