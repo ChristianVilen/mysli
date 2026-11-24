@@ -136,4 +136,19 @@ final class KeepAwakeControllerTests: XCTestCase {
         XCTAssertEqual(KeepAwakeController.formatRemaining(61 * 60), "1h 1m left")
         XCTAssertEqual(KeepAwakeController.formatRemaining(2 * 60 * 60), "2h left")
     }
+
+    /// Writes PNGs of the duration chips, idle and running, in light and dark, when
+    /// MYSLI_KEEP_AWAKE_SNAPSHOTS names a folder. The other rows of the section are native menu
+    /// items, which only the open menu draws:
+    ///
+    ///     TEST_RUNNER_MYSLI_KEEP_AWAKE_SNAPSHOTS="$HOME/keep-awake-snapshots" xcodebuild -project Mysli.xcodeproj \
+    ///         -scheme Mysli test -only-testing:MysliTests/KeepAwakeControllerTests/testWritesAPictureOfIdleAndRunning
+    @MainActor
+    func testWritesAPictureOfIdleAndRunning() throws {
+        let folder = try pictureFolder("MYSLI_KEEP_AWAKE_SNAPSHOTS",
+                                       skipMessage: "Set MYSLI_KEEP_AWAKE_SNAPSHOTS to a folder to write pictures of the Keep Awake chips.")
+        try writePictures(of: panel, named: "01-idle", in: folder)
+        controller.activate(.timed(60 * 60))
+        try writePictures(of: panel, named: "02-running", in: folder)
+    }
 }

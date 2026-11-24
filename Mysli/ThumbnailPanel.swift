@@ -67,7 +67,7 @@ class ThumbnailPanel: FloatingPanel {
         let symbolConfig = NSImage.SymbolConfiguration(pointSize: closeSize - 4, weight: .regular)
             .applying(.init(paletteColors: [.white, NSColor.black.withAlphaComponent(0.55)]))
 
-        let closeButton = NSButton(frame: NSRect(x: size.width - closeSize - 4, y: size.height - closeSize - 4, width: closeSize, height: closeSize))
+        let closeButton = NSButton(frame: NSRect(x: 4, y: size.height - closeSize - 4, width: closeSize, height: closeSize))
         closeButton.bezelStyle = .circular
         closeButton.image = NSImage(systemSymbolName: "xmark.circle.fill", accessibilityDescription: "Close")?
             .withSymbolConfiguration(symbolConfig)
@@ -76,10 +76,12 @@ class ThumbnailPanel: FloatingPanel {
         closeButton.action = #selector(dismissThumbnail)
         container.addSubview(closeButton)
 
-        let deleteButton = NSButton(frame: NSRect(x: 4, y: size.height - closeSize - 4, width: closeSize, height: closeSize))
+        let trash = NSImage(systemSymbolName: "trash.circle.fill", accessibilityDescription: "Delete")
+        let deleteButton = HoverButton(
+            frame: NSRect(x: size.width - closeSize - 4, y: size.height - closeSize - 4, width: closeSize, height: closeSize),
+            resting: trash?.withSymbolConfiguration(symbolConfig),
+            hover: trash?.withSymbolConfiguration(symbolConfig.applying(.init(paletteColors: [.white, .systemRed]))))
         deleteButton.bezelStyle = .circular
-        deleteButton.image = NSImage(systemSymbolName: "trash.circle.fill", accessibilityDescription: "Delete")?
-            .withSymbolConfiguration(symbolConfig)
         deleteButton.isBordered = false
         deleteButton.target = self
         deleteButton.action = #selector(deleteThumbnail)
@@ -108,4 +110,31 @@ class ThumbnailPanel: FloatingPanel {
     @objc private func thumbnailClicked() { onEdit?() }
     @objc private func dismissThumbnail() { onDismiss?() }
     @objc private func deleteThumbnail() { onDelete?() }
+}
+
+/// Shows `hoverImage` while the pointer is over the button, and `restingImage` otherwise.
+private final class HoverButton: NSButton {
+    private let restingImage: NSImage?
+    private let hoverImage: NSImage?
+
+    init(frame: NSRect, resting: NSImage?, hover: NSImage?) {
+        restingImage = resting
+        hoverImage = hover
+        super.init(frame: frame)
+        image = resting
+        // Always active: the thumbnail is a non-activating panel, and Mysli is
+        // usually not the active app while the pointer is over it.
+        addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+                                       owner: self, userInfo: nil))
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    override func mouseEntered(with event: NSEvent) {
+        image = hoverImage
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        image = restingImage
+    }
 }

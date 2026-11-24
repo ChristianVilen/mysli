@@ -181,4 +181,23 @@ final class ClipboardHistoryTests: XCTestCase {
         let item = text(whitespacePrefix + "hello", at: 0)
         XCTAssertEqual(item.previewLabel, "(whitespace)")
     }
+
+    func testPreviewLinesAreCollapsedAndLabelIsTheirJoin() {
+        let item = text("  one   two \n\n \n three\t\n")
+        XCTAssertEqual(item.previewLines, ["one two", "three"])
+        XCTAssertEqual(item.previewLabel, item.previewLines.joined(separator: " "))
+    }
+
+    func testPreviewLabelCapCutsLinesAndLabelAtTheSameCharacter() {
+        let line = String(repeating: "abcdefghi ", count: 6)
+        let item = text(Array(repeating: line, count: 12).joined(separator: "\n"))
+        XCTAssertEqual(item.previewLabel.count, 500)
+        XCTAssertEqual(item.previewLabel, item.previewLines.joined(separator: " "))
+    }
+
+    func testWhitespaceOnlyTextHasOnePlaceholderLine() {
+        let item = text("\n \n")
+        XCTAssertEqual(item.previewLabel, "(whitespace)")
+        XCTAssertEqual(item.previewLines, ["(whitespace)"])
+    }
 }

@@ -8,10 +8,11 @@ final class MeetingTypedNotesView: NSView {
     private let confirmReload: @MainActor (NSWindow) -> Bool
     private let stack = NSStackView()
     private let scroll = NSScrollView()
-    private let saveLabel = NSTextField.makeWrappingLabel(size: 12, color: .secondaryLabelColor)
-    private let summaryLabel = NSTextField.makeWrappingLabel(size: 12, color: .secondaryLabelColor)
+    private let saveLabel = NSTextField.makeWrappingLabel(size: 11, color: .secondaryLabelColor)
+    private let summaryLabel = NSTextField.makeWrappingLabel(size: 11, color: .secondaryLabelColor)
     private lazy var retry = NSButton(title: "Retry save", target: self, action: #selector(retrySave))
     private lazy var reload = NSButton(title: "Reload saved notes", target: self, action: #selector(reloadSaved))
+    private lazy var saveFixes = NSStackView(views: [retry, reload])
     private lazy var update = NSButton(title: "Update summary", target: self, action: #selector(updateSummary))
     /// Keeps a row that leaves the session: text undo actions point at its editor, so undo can
     /// bring it back. Only a reload, which clears undo, removes rows.
@@ -50,17 +51,15 @@ final class MeetingTypedNotesView: NSView {
         scroll.contentView.drawsBackground = false
         scroll.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
         scroll.setContentHuggingPriority(.defaultLow, for: .vertical)
-        scroll.translatesAutoresizingMaskIntoConstraints = false
-        let buttons = NSStackView(views: [retry, reload, update])
-        buttons.spacing = 8
-        buttons.detachesHiddenViews = true
         let title = NSTextField.makeLabel(size: 13, weight: .semibold)
         title.stringValue = session.meeting.title
         title.toolTip = session.meeting.title
-        let outer = NSStackView(views: [title, scroll, saveLabel, summaryLabel, buttons])
+        let footer = makeFooter()
+        let outer = NSStackView(views: [title, scroll, footer])
         outer.orientation = .vertical
         outer.alignment = .leading
         outer.spacing = 6
+        outer.setCustomSpacing(8, after: scroll)
         outer.translatesAutoresizingMaskIntoConstraints = false
         addSubview(outer)
         NSLayoutConstraint.activate([
@@ -68,12 +67,12 @@ final class MeetingTypedNotesView: NSView {
             outer.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
             outer.topAnchor.constraint(equalTo: topAnchor, constant: 8),
             outer.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -8),
+            title.widthAnchor.constraint(lessThanOrEqualTo: outer.widthAnchor),
             scroll.widthAnchor.constraint(equalTo: outer.widthAnchor),
+            footer.widthAnchor.constraint(equalTo: outer.widthAnchor),
             scroll.heightAnchor.constraint(greaterThanOrEqualToConstant: 40),
             document.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor),
-            document.heightAnchor.constraint(greaterThanOrEqualTo: scroll.contentView.heightAnchor),
-            saveLabel.widthAnchor.constraint(equalTo: outer.widthAnchor),
-            summaryLabel.widthAnchor.constraint(equalTo: outer.widthAnchor)
+            document.heightAnchor.constraint(greaterThanOrEqualTo: scroll.contentView.heightAnchor)
         ])
         // `onChange` has one subscriber, so a second view of a session would take it from this
         // one. `MeetingNotesHosting` keeps one view per meeting and moves it.
@@ -82,6 +81,37 @@ final class MeetingTypedNotesView: NSView {
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    private func makeFooter() -> NSView {
+        saveFixes.spacing = 8
+        let status = NSStackView(views: [saveLabel, summaryLabel, saveFixes])
+        status.orientation = .vertical
+        status.alignment = .leading
+        status.distribution = .fill
+        status.spacing = 2
+        status.setCustomSpacing(6, after: summaryLabel)
+        for label in [saveLabel, summaryLabel] {
+            label.maximumNumberOfLines = 3
+            label.cell?.truncatesLastVisibleLine = true
+            label.allowsExpansionToolTips = true
+            // Below the window's own size priority, so a long message wraps instead of
+            // widening the window.
+            label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        }
+        update.setContentHuggingPriority(.defaultHigh, for: .horizontal)
+        update.setContentCompressionResistancePriority(.defaultHigh, for: .horizontal)
+        status.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        NSLayoutConstraint.activate([
+            saveLabel.widthAnchor.constraint(equalTo: status.widthAnchor),
+            summaryLabel.widthAnchor.constraint(equalTo: status.widthAnchor)
+        ])
+        let footer = NSStackView(views: [status, update])
+        footer.orientation = .horizontal
+        footer.alignment = .centerY
+        footer.spacing = 12
+        footer.distribution = .fill
+        return footer
+    }
 
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
         NoteRowTextView.acceptsImage(from: sender.draggingPasteboard) ? .copy : []
@@ -137,8 +167,7 @@ final class MeetingTypedNotesView: NSView {
         }
         saveLabel.stringValue = session.saveError.map { "Not saved. " + $0 } ?? "Saved to notes.md"
         summaryLabel.stringValue = session.summaryMessage
-        retry.isHidden = session.saveError == nil
-        reload.isHidden = session.saveError == nil
+        saveFixes.isHidden = session.saveError == nil
         update.isEnabled = session.canUpdateSummary
     }
 
@@ -260,11 +289,13 @@ final class NoteRowTextView: NSTextView, NSTextStorageDelegate {
     var onImage: ((MeetingScreenshot) throws -> Void)?
     var onEdit: (() -> Void)?
     private var isReplacing = false
+    private let pasteboard: () -> NSPasteboard
     var editingUndo: UndoManager?
     override var undoManager: UndoManager? { editingUndo }
 
-    init(entryID: UUID) {
+    init(entryID: UUID, pasteboard: @escaping () -> NSPasteboard = { .general }) {
         self.entryID = entryID
+        self.pasteboard = pasteboard
         let storage = NSTextStorage()
         let layout = NSLayoutManager()
         let container = NSTextContainer(containerSize: NSSize(width: 400, height: CGFloat.greatestFiniteMagnitude))
@@ -299,8 +330,18 @@ final class NoteRowTextView: NSTextView, NSTextStorageDelegate {
         if Int(event.keyCode) == kVK_Return && !event.modifierFlags.contains(.shift) { onNewRow?(); return }
         super.keyDown(with: event)
     }
+
+    override func validateUserInterfaceItem(_ item: any NSValidatedUserInterfaceItem) -> Bool {
+        // AppKit disables Paste for image-only clipboards in a plain-text view.
+        if item.action == #selector(paste(_:)), isEditable,
+           pasteboard().availableType(from: [.png, .tiff]) != nil {
+            return true
+        }
+        return super.validateUserInterfaceItem(item)
+    }
+
     override func paste(_ sender: Any?) {
-        if pasteImage(from: .general) { return }
+        if pasteImage(from: pasteboard()) { return }
         super.paste(sender)
     }
     @discardableResult
@@ -325,3 +366,18 @@ final class NoteRowTextView: NSTextView, NSTextStorageDelegate {
         do { try onImage?(MeetingScreenshot.read(from: url)); return true } catch { NSSound.beep(); return false }
     }
 }
+
+#if DEBUG
+extension MeetingTypedNotesView {
+    func showSampleNotesOnly() {
+        unregisterDraggedTypes()
+        scroll.documentView?.unregisterDraggedTypes()
+        for row in rows.values {
+            row.editor.isEditable = false
+            row.editor.unregisterDraggedTypes()
+            row.editor.onImage = nil
+            row.editor.onNewRow = nil
+        }
+    }
+}
+#endif

@@ -28,13 +28,14 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     let clearBackground = NSButton(title: "Clear", target: nil, action: nil)
     let loginError = NSTextField(wrappingLabelWithString: "")
     let calendarStatus = NSTextField(wrappingLabelWithString: "")
-    private let summaryToolMissing = SettingsLayout.label("", size: 11, secondary: true)
-    private let dictationToolMissing = SettingsLayout.label("", size: 11, secondary: true)
+    private let summaryToolMissing = SettingsNote()
+    private let dictationToolMissing = SettingsNote()
     private let folderPath = NSTextField(labelWithString: "")
     private let backgroundPath = NSTextField(labelWithString: "")
     private let settings: Settings
     let sidebar = SettingsSidebarController()
     private let onboarding: Onboarding?
+    private let content = NSViewController()
     private let settingsContent = NSSplitViewController()
     private let pageContainer = SettingsBackground()
     private(set) var onboardingView: OnboardingView?
@@ -81,15 +82,20 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 760, height: 700),
                                     styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: true)
         window.title = "Mysli"
+        window.titleVisibility = .hidden
         window.isReleasedWhenClosed = false
         window.contentMinSize = NSSize(width: 640, height: 420)
         super.init(window: window)
         window.delegate = self
+        content.view = NSView(frame: window.contentLayoutRect)
+        window.contentViewController = content
         buildForm()
         if let onboarding, !onboarding.isFinished {
             let view = OnboardingView(model: onboarding, actions: permissionActions)
             view.onChange = { [weak self] in self?.onboardingChanged() }
             onboardingView = view
+        } else {
+            installCurrentContent()
         }
         refreshPermissionRequirements()
         displayObserver = NSWorkspace.shared.notificationCenter.addObserver(
@@ -121,14 +127,10 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         loginError.stringValue = ""
         loginError.isHidden = true
         refresh()
+        installCurrentContent()
         if let onboarding, !onboarding.isFinished {
-            if window?.contentView !== onboardingView {
-                window?.contentViewController = nil
-                window?.contentView = onboardingView
-            }
             onboardingView?.render()
         } else {
-            if window?.contentViewController !== settingsContent { showSettingsContent() }
             sidebar.clearSearch()
             selectPage(page)
         }
@@ -141,7 +143,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
     private func onboardingChanged() {
         if onboarding?.isFinished == true {
-            showSettingsContent()
+            installCurrentContent()
             refresh()
             selectPage(.general)
             applyDisplayOptions(.current)
@@ -149,12 +151,15 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         refreshPermissionsVisibility()
     }
 
-    private func showSettingsContent() {
-        guard let window else { return }
-        let size = window.contentLayoutRect.size
-        settingsContent.view.setFrameSize(size)
-        window.contentViewController = settingsContent
-        window.setContentSize(size)
+    private func installCurrentContent() {
+        if let onboardingView, !onboardingView.model.isFinished {
+            if onboardingView.superview == nil { SettingsLayout.fill(onboardingView, in: content.view) }
+            return
+        }
+        guard settingsContent.parent == nil else { return }
+        onboardingView?.removeFromSuperview()
+        content.addChild(settingsContent)
+        SettingsLayout.fill(settingsContent.view, in: content.view)
     }
 
     func windowWillClose(_ notification: Notification) {
@@ -304,25 +309,21 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             return column
         }
         var destinations: [SettingsSearchDestination] = []
-        func row(_ page: SettingsPage, _ title: String, detail: String? = nil,
+        func row(_ page: SettingsPage, _ title: String, detail: String? = nil, value: NSTextField? = nil,
                  control: NSView, focus: NSView? = nil, keywords: [String] = []) -> NSView {
-            let view = SettingsLayout.row(title, detail: detail, control: control)
+            let view = value.map { SettingsLayout.row(title, value: $0, control: control) }
+                ?? SettingsLayout.row(title, detail: detail, control: control)
             destinations.append(.init(item: .init(page: page, title: title, detail: detail ?? "", keywords: keywords),
                                       view: view, control: focus ?? control))
             return view
         }
         func pathRow(_ page: SettingsPage, _ title: String, path: NSTextField, buttons: [NSButton], keywords: [String]) -> NSView {
-            column([row(page, title, control: NSStackView(views: buttons), focus: buttons.first, keywords: keywords), path])
+            row(page, title, value: path, control: NSStackView(views: buttons), focus: buttons.first, keywords: keywords)
         }
-        func note(_ text: String) -> NSView { SettingsLayout.label(text, size: 11, secondary: true) }
+        let note = SettingsLayout.note
         loginError.textColor = .systemRed
         loginError.isHidden = true
         calendarStatus.isHidden = true
-        for label in [folderPath, backgroundPath] {
-            label.lineBreakMode = .byTruncatingMiddle
-            label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-            label.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        }
         for page in SettingsPage.allCases where !page.guides.isEmpty {
             guides[page] = SettingsGuides(page.guides)
         }
@@ -412,7 +413,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
                 dictationToolMissing,
                 note("Fn needs Input Monitoring. Both options need Microphone and Accessibility. Grant them on the Permissions page."),
                 note(dictationKeyboardHelp),
-                dictationKeyboard
+                SettingsLayout.trailing(dictationKeyboard)
             ]),
             .permissions: permissions,
             .help: helpPage
@@ -432,7 +433,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         sidebar.catalog = destinations + permissionsPage.searchDestinations + helpPage.searchDestinations
         sidebar.onSearchChanged = { [weak self] in self?.updateKeyViewLoop() }
         let root = pageContainer
-        pages = contents.mapValues(SettingsLayout.scroll)
+        pages = contents.mapValues { SettingsLayout.scroll($0, maxWidth: SettingsLayout.pageMaxWidth) }
         if let general = pages[.general] { SettingsLayout.fill(general, in: root) }
         let detail = NSViewController()
         detail.view = root
@@ -447,7 +448,6 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         settingsContent.splitView.dividerStyle = .thin
         settingsContent.addSplitViewItem(sidebarItem)
         settingsContent.addSplitViewItem(detailItem)
-        showSettingsContent()
         sidebar.onSelect = { [weak self] row in
             guard let self else { return }
             switch row {
@@ -473,18 +473,19 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         if changed { applyDisplayOptions(.current) }
         sidebar.select(page)
         updateKeyViewLoop()
-        if focusSidebar { window?.makeFirstResponder(sidebar.tableView) }
+        if focusSidebar { sidebar.tableView.window?.makeFirstResponder(sidebar.tableView) }
         refreshPermissionsVisibility()
     }
 
     private func revealSearchResult(_ destination: SettingsSearchDestination) {
         selectPage(destination.item.page, focusSidebar: false)
         destination.reveal?()
-        window?.contentView?.layoutSubtreeIfNeeded()
+        settingsContent.view.layoutSubtreeIfNeeded()
         if !destination.view.isHiddenOrHasHiddenAncestor {
             destination.view.scrollToVisible(destination.view.bounds.insetBy(dx: 0, dy: -16))
         }
         let focus = destination.control
+        let window = sidebar.tableView.window
         if let focus, !focus.isHiddenOrHasHiddenAncestor, focus.acceptsFirstResponder {
             window?.makeFirstResponder(focus)
         } else {
@@ -493,8 +494,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     }
 
     @objc func focusSettingsSearch(_ sender: Any?) {
-        guard window?.contentViewController === settingsContent else { return }
-        window?.makeFirstResponder(sidebar.searchField)
+        guard let window = sidebar.searchField.window else { return }
+        window.makeFirstResponder(sidebar.searchField)
         sidebar.searchField.selectText(nil)
     }
 
@@ -527,7 +528,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             (view as? SettingsGlass)?.apply(options)
             for child in view.subviews { apply(in: child) }
         }
-        if let root = window?.contentView { apply(in: root) }
+        apply(in: settingsContent.view)
+        if let onboardingView { apply(in: onboardingView) }
     }
 
     @objc private func loginChanged() {
@@ -689,3 +691,35 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         panel.beginSheetModal(for: window) { result in completion(result == .OK ? panel.url : nil) }
     }
 }
+
+#if DEBUG
+extension SettingsWindowController {
+    func makePreview(retaining defaults: PreviewDefaults, page: SettingsPage = .general, query: String? = nil,
+                     openFirstResult: Bool = false) -> NSViewController {
+        let size = content.view.frame.size
+        window?.contentViewController = nil
+        let host = AppKitPreview.host(NSView(), size: size, retaining: [self, defaults] as NSArray)
+        host.addChild(content)
+        SettingsLayout.fill(content.view, in: host.view)
+        installCurrentContent()
+        if onboarding?.isFinished == false { return host }
+        refresh()
+        selectPage(page, focusSidebar: false)
+        if let query {
+            sidebar.searchField.stringValue = query
+            sidebar.refreshSearchResults()
+            if openFirstResult, let action = sidebar.tableView.action {
+                NSApp.sendAction(action, to: sidebar.tableView.target, from: sidebar.tableView)
+            }
+        }
+
+        return host
+    }
+
+    func makeSidebarPreview(retaining defaults: PreviewDefaults) -> NSViewController {
+        sidebar.onSelect = nil
+        if let item = settingsContent.splitViewItem(for: sidebar) { settingsContent.removeSplitViewItem(item) }
+        return AppKitPreview.host(sidebar.view, size: NSSize(width: 230, height: 460), retaining: [self, defaults] as NSArray)
+    }
+}
+#endif

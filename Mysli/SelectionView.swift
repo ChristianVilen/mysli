@@ -173,3 +173,12 @@ class SelectionView: NSView {
         return .crosshair
     }()
 }
+
+#if DEBUG
+extension SelectionView {
+    func showPreviewSelection(_ rect: NSRect) {
+        selectionRect = rect
+        isDragging = true
+    }
+}
+#endif

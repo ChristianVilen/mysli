@@ -8,8 +8,11 @@ MainActor.assumeIsolated {
     let delegate: any NSApplicationDelegate
     switch mode {
     case .production: delegate = AppDelegate()
-    case .xctest: delegate = XCTestHostAppDelegate()
+    case .xctest: delegate = PassiveAppDelegate()
     case .settingsPreview: delegate = SettingsPreviewAppDelegate()
+    #if DEBUG
+    case .xcodePreview: delegate = PassiveAppDelegate()
+    #endif
     }
     app.delegate = delegate
     // NSApplication holds its delegate weakly; without this, Swift can release it before run() returns.

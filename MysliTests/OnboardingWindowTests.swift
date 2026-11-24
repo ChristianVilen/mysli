@@ -36,7 +36,7 @@ final class OnboardingWindowTests: XCTestCase {
         let window = try XCTUnwrap(controller.window)
         controller.show(.meetings)
         let view = try XCTUnwrap(controller.onboardingView)
-        XCTAssertTrue(window.contentView === view)
+        XCTAssertTrue(view.window === window)
         view.nextButton.performClick(nil)
         try XCTUnwrap(view.toolButtons[.clipboard]).performClick(nil)
         view.nextButton.performClick(nil)
@@ -48,7 +48,8 @@ final class OnboardingWindowTests: XCTestCase {
         view.nextButton.performClick(nil)
         XCTAssertTrue(model.isFinished)
         XCTAssertTrue(controller.window === window)
-        XCTAssertFalse(window.contentView === view)
+        XCTAssertNil(view.window)
+        XCTAssertTrue(controller.launchAtLogin.window === window)
         XCTAssertEqual(controller.selectedPage, .general)
         XCTAssertEqual(polling, [true, false])
     }
@@ -60,7 +61,7 @@ final class OnboardingWindowTests: XCTestCase {
         controller = makeController(resumed)
         let before = defaults.persistentDomain(forName: suite)! as NSDictionary
         controller.show(.permissions)
-        XCTAssertTrue(controller.window?.contentView === controller.onboardingView)
+        XCTAssertTrue(try XCTUnwrap(controller.onboardingView?.window) === controller.window)
         XCTAssertEqual(resumed.step, .permissions)
         XCTAssertTrue(resumed.wasResumed)
         XCTAssertEqual(defaults.persistentDomain(forName: suite)! as NSDictionary, before)

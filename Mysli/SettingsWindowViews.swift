@@ -74,7 +74,7 @@ enum SettingsPage: Int, CaseIterable {
             ("Keep Awake", "Open the Mysli menu and choose 30m, 1h, 2h, or 4h. Choose ∞ to keep the session on until you turn it off. Choose Turn Off to end the session. Keep screen on, here or in the menu, prevents the display from sleeping while the session runs. Closing the lid still sleeps your Mac.")
         ]
         case .meetings: [
-            ("Meeting notes", "Choose Start Recording Meeting in the menu. Allow Microphone and Screen Recording access when asked. The microphone records Me; Mac audio records Them. Use Pause, Resume, and Stop on the floating controls. The live draft stays in memory. The pencil button opens a separate notes window. Typed notes save to notes.md and remain editable while paused and after Stop. Recent Meeting Notes reopens them. Update summary includes later edits without changing the transcript or word review. Save errors keep your draft; Retry save tries again. After Stop, Mysli transcribes on this Mac and sends the transcript and saved typed notes to the summary tool. The complete optional background file goes too; Automatic may use both providers. Find transcript.md and summary.md in the dated meeting folder. Audio goes to the Trash after transcription. Check Words lets you correct suspect words; Update Notes rebuilds the transcript and summary from the heard copy and replaces transcript edits. With Calendar reminders on, a calendar event offers to start and stop recording; Mysli never records on its own. Teams speaker names is experimental and can name remote speakers after Stop.")
+            ("Meeting notes", "Choose Start Recording Meeting in the menu. Allow Microphone and Screen Recording access when asked. The microphone records Me. Mac audio records Them. Use Pause, Resume, and Stop on the floating controls. The live draft stays in memory. While recording or paused, the pencil button opens the notes below the live transcript. People who can see your shared screen can see both. Typed notes save to notes.md and remain editable after Stop. Recent Meeting Notes reopens them. Update summary includes later edits without changing the transcript or word review. If a save fails, use Retry save. Processing waits for a successful save. After Stop, Mysli transcribes on this Mac and sends the transcript and saved typed notes to the summary tool. The complete optional background file also goes to the tool. Automatic may use both providers. Choose one provider in Summary tool to use it for each job. Find transcript.md and summary.md in the dated meeting folder. Before the summary, Mysli moves the audio to the Trash if it found speech or you wrote notes. Check Words lets you correct suspect words. Update Notes rebuilds the transcript and summary from the heard copy and replaces transcript edits. With Calendar reminders on, a calendar event offers to start and stop recording. Teams speaker names is experimental and can name remote speakers after Stop.")
         ]
         case .permissions: [
             ("Permissions and shortcut setup", "Accessibility allows window tiling and paste; Screen Recording allows screenshots and Mac audio. Microphone is needed for meetings and dictation. Fn dictation also needs Input Monitoring. Grant access in System Settings. If macOS already uses the screenshot shortcuts, follow Mysli's shortcut setup instructions to turn those system shortcuts off. Registration warnings appear in the Mysli menu. You can use this window without these permissions.")
@@ -174,6 +174,10 @@ final class SettingsGlass: NSView {
 }
 
 enum SettingsLayout {
+    static let groupInset: CGFloat = 14
+    static let popUpWidth: CGFloat = 180
+    static let pageMaxWidth: CGFloat = 640
+
     static func stack(_ views: [NSView] = [], spacing: CGFloat = 12) -> NSStackView {
         let stack = NSStackView(views: views)
         stack.orientation = .vertical
@@ -205,32 +209,53 @@ enum SettingsLayout {
         child.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
     }
 
+    /// Resizes the control it is given: small size, and pop-up buttons to one width.
     static func row(_ title: String, detail: String? = nil, control: NSView) -> NSView {
+        row(title, secondLine: detail.map { label($0, size: 11, secondary: true) }, control: control)
+    }
+
+    /// A row with a value, such as a path, below its title. The value stays on one line and truncates in the middle.
+    static func row(_ title: String, value: NSTextField, control: NSView) -> NSView {
+        value.font = .systemFont(ofSize: 11)
+        value.textColor = .secondaryLabelColor
+        value.lineBreakMode = .byTruncatingMiddle
+        value.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        value.setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)
+        return row(title, secondLine: value, control: control)
+    }
+
+    private static func row(_ title: String, secondLine: NSTextField?, control: NSView) -> NSView {
         let copy = stack(spacing: 4)
-        let heading = label(title)
-        add(heading, to: copy)
-        if let detail { add(label(detail, size: 11, secondary: true), to: copy) }
+        add(label(title), to: copy)
+        if let secondLine { add(secondLine, to: copy) }
         copy.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         copy.setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)
-        let row = NSView()
-        for child in [copy, control] {
-            child.translatesAutoresizingMaskIntoConstraints = false
-            row.addSubview(child)
-        }
-        NSLayoutConstraint.activate([
-            copy.leadingAnchor.constraint(equalTo: row.leadingAnchor),
-            copy.topAnchor.constraint(equalTo: row.topAnchor, constant: 4),
-            copy.bottomAnchor.constraint(equalTo: row.bottomAnchor, constant: -4),
-            copy.trailingAnchor.constraint(equalTo: control.leadingAnchor, constant: -12),
-            control.trailingAnchor.constraint(equalTo: row.trailingAnchor),
-            control.centerYAnchor.constraint(equalTo: heading.centerYAnchor),
-            control.topAnchor.constraint(greaterThanOrEqualTo: row.topAnchor),
-            control.bottomAnchor.constraint(lessThanOrEqualTo: row.bottomAnchor)
-        ])
+        copy.setHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)
         control.setContentHuggingPriority(.required, for: .horizontal)
         control.setContentCompressionResistancePriority(.required, for: .horizontal)
         (control as? NSStackView)?.setHuggingPriority(.required, for: .horizontal)
+        matchRowControls(in: control)
+        let row = NSStackView(views: [copy, control])
+        row.alignment = .centerY
+        row.distribution = .fill
+        row.spacing = 12
+        row.edgeInsets = NSEdgeInsets(top: 4, left: 0, bottom: 4, right: 0)
         return row
+    }
+
+    /// Gives the switches, buttons, and pop-up buttons of a row one height, and every pop-up button one width.
+    private static func matchRowControls(in view: NSView) {
+        for case let control as NSControl in [view] + view.subviews {
+            control.controlSize = .small
+            if control is NSPopUpButton {
+                control.setContentHuggingPriority(.defaultLow, for: .horizontal)
+                control.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+                control.widthAnchor.constraint(equalToConstant: popUpWidth).isActive = true
+            } else {
+                control.setContentHuggingPriority(.required, for: .horizontal)
+                control.setContentCompressionResistancePriority(.required, for: .horizontal)
+            }
+        }
     }
 
     static func group(_ rows: [NSView]) -> SettingsGlass {
@@ -244,8 +269,24 @@ enum SettingsLayout {
             }
             add(row, to: stack)
         }
-        fill(stack, in: glass.content, inset: 14)
+        fill(stack, in: glass.content, inset: groupInset)
         return glass
+    }
+
+    static func note(_ text: String) -> SettingsNote { SettingsNote(text) }
+
+    /// Puts a view at the trailing edge of a full-width line.
+    static func trailing(_ view: NSView) -> NSView {
+        let line = NSView()
+        view.translatesAutoresizingMaskIntoConstraints = false
+        line.addSubview(view)
+        NSLayoutConstraint.activate([
+            view.leadingAnchor.constraint(greaterThanOrEqualTo: line.leadingAnchor),
+            view.trailingAnchor.constraint(equalTo: line.trailingAnchor),
+            view.topAnchor.constraint(equalTo: line.topAnchor),
+            view.bottomAnchor.constraint(equalTo: line.bottomAnchor)
+        ])
+        return line
     }
 
     static func heading(_ title: String, symbol: String, color: NSColor) -> NSView {
@@ -280,21 +321,62 @@ enum SettingsLayout {
         return stack
     }
 
-    static func scroll(_ page: NSView) -> NSScrollView {
+    /// Scrolls a page with equal margins. A page with a `maxWidth` stays centered in a wider window.
+    static func scroll(_ page: NSView, maxWidth: CGFloat? = nil) -> NSScrollView {
+        let margin: CGFloat = 20
         let scroll = NSScrollView()
         scroll.hasVerticalScroller = true
+        scroll.autohidesScrollers = true
         scroll.drawsBackground = false
         let document = SettingsDocument()
         document.translatesAutoresizingMaskIntoConstraints = false
         scroll.documentView = document
-        fill(page, in: document, inset: 20)
-        document.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor).isActive = true
+        page.translatesAutoresizingMaskIntoConstraints = false
+        document.addSubview(page)
+        let fullWidth = page.widthAnchor.constraint(equalTo: document.widthAnchor, constant: -2 * margin)
+        // Above label hugging, but below the window size priorities. Higher, and a window
+        // wider than the page's maximum width shrinks back to fit the page.
+        fullWidth.priority = NSLayoutConstraint.Priority(450)
+        NSLayoutConstraint.activate([
+            page.topAnchor.constraint(equalTo: document.topAnchor, constant: margin),
+            page.bottomAnchor.constraint(equalTo: document.bottomAnchor, constant: -margin),
+            page.centerXAnchor.constraint(equalTo: document.centerXAnchor),
+            page.widthAnchor.constraint(lessThanOrEqualTo: document.widthAnchor, constant: -2 * margin),
+            fullWidth,
+            document.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor)
+        ])
+        if let maxWidth { page.widthAnchor.constraint(lessThanOrEqualToConstant: maxWidth).isActive = true }
         return scroll
     }
 }
 
 private final class SettingsDocument: NSView {
     override var isFlipped: Bool { true }
+}
+
+/// A note below a group. Its text lines up with the text inside the group, like a footer in System Settings.
+final class SettingsNote: NSView {
+    let label = SettingsLayout.label("", size: 11, secondary: true)
+
+    var stringValue: String {
+        get { label.stringValue }
+        set { label.stringValue = newValue }
+    }
+
+    init(_ text: String = "") {
+        super.init(frame: .zero)
+        label.stringValue = text
+        label.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(label)
+        NSLayoutConstraint.activate([
+            label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: SettingsLayout.groupInset),
+            label.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -SettingsLayout.groupInset),
+            label.topAnchor.constraint(equalTo: topAnchor),
+            label.bottomAnchor.constraint(equalTo: bottomAnchor)
+        ])
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 }
 
 /// What Settings and onboarding say while a tool cannot work because its CLI is not installed,

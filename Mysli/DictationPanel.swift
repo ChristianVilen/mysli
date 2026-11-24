@@ -65,14 +65,24 @@ final class DictationPanel: FloatingPanel {
             else { startsListening = true }
         } else { startsListening = false }
         presentation = state
+        guard render(state) else {
+            orderOut(nil)
+            return
+        }
+        if (!isVisible || startsListening), let screen = screenFrame() {
+            setFrameOrigin(NSPoint(x: screen.midX - frame.width / 2, y: screen.minY + 24))
+        }
+        orderFrontRegardless()
+    }
+
+    private func render(_ state: DictationPresentation) -> Bool {
         let label: String
         var spinning = false
         meter.isHidden = true
         switch state {
         case .disabled, .idle:
             progress.stopAnimation(nil)
-            orderOut(nil)
-            return
+            return false
         case .loading: stateSymbol = "arrow.down.circle"; label = "Preparing dictation"; spinning = true
         case .listening(let level, let warning):
             stateSymbol = warning ? "exclamationmark.triangle" : "mic.fill"
@@ -95,10 +105,7 @@ final class DictationPanel: FloatingPanel {
         else { progress.stopAnimation(nil) }
         pill.setAccessibilityLabel(label)
         applyMaterial()
-        if (!isVisible || startsListening), let screen = screenFrame() {
-            setFrameOrigin(NSPoint(x: screen.midX - frame.width / 2, y: screen.minY + 24))
-        }
-        orderFrontRegardless()
+        return true
     }
 
     private func applyMaterial() {
@@ -133,3 +140,13 @@ final class DictationPanel: FloatingPanel {
         return screens[index].visibleFrame
     }
 }
+
+#if DEBUG
+extension DictationPanel {
+    static func preview(_ state: DictationPresentation) -> NSViewController {
+        let panel = DictationPanel(screenFrame: { nil }, reduceTransparency: { true }, reduceMotion: { false })
+        _ = panel.render(state)
+        return AppKitPreview.host(contentOf: panel)
+    }
+}
+#endif

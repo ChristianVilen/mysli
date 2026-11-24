@@ -15,6 +15,11 @@ final class AppLaunchModeTests: XCTestCase {
         XCTAssertEqual(AppLaunchMode(environment: ["XCTestConfigurationFilePath": "tests"], arguments: ["Mysli"]), .xctest)
         XCTAssertEqual(AppLaunchMode(environment: ["XCTestConfigurationFilePath": "tests"],
                                      arguments: ["Mysli", "--uitesting"]), .xctest)
+        #if DEBUG
+        XCTAssertEqual(AppLaunchMode(environment: ["XCODE_RUNNING_FOR_PREVIEWS": "1"], arguments: ["Mysli"]), .xcodePreview)
+        #endif
+        XCTAssertEqual(AppLaunchMode(environment: ["XCTestConfigurationFilePath": "tests", "XCODE_RUNNING_FOR_PREVIEWS": "1"],
+                                     arguments: ["Mysli"]), .xctest)
     }
 
     func testPreviewOpensItsSettingsWindowAndWritesOnlyIsolatedPreferencesWithInertLogin() throws {

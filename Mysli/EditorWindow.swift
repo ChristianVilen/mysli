@@ -1,9 +1,9 @@
 import Cocoa
 
 class EditorWindow: NSPanel, NSWindowDelegate {
-    /// Narrower content can't fit the four toolbar buttons with 8 pt gaps
-    /// (Undo 12–92, Crop 100–180, trash centred at 190–270, Done 368–448);
-    /// smaller images are centered in a window of this width.
+    /// Smaller images are centered in a window of this width, so the toolbar
+    /// (Undo 12–92, Crop 100–180, trash 196–276, Done 368–448) keeps a wide
+    /// space before Done.
     static let minimumContentWidth: CGFloat = 460
 
     var onClose: (() -> Void)?
@@ -65,7 +65,8 @@ class EditorWindow: NSPanel, NSWindowDelegate {
         cropButton.frame = NSRect(x: 100, y: 8, width: 80, height: 28)
         toolbar.addSubview(cropButton)
 
-        let deleteButton = NSButton(frame: NSRect(x: (contentWidth - 80) / 2, y: 8, width: 80, height: 28))
+        // A wider gap than between Undo and Crop sets Delete apart as its own group.
+        let deleteButton = NSButton(frame: NSRect(x: 196, y: 8, width: 80, height: 28))
         deleteButton.bezelStyle = .rounded
         deleteButton.image = NSImage(systemSymbolName: "trash", accessibilityDescription: "Delete")
         deleteButton.target = self
@@ -118,3 +119,11 @@ class EditorWindow: NSPanel, NSWindowDelegate {
         onClose?()
     }
 }
+
+#if DEBUG
+extension EditorWindow {
+    func addPreviewStroke(_ path: NSBezierPath) {
+        drawingView.addPreviewStroke(path)
+    }
+}
+#endif

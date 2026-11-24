@@ -20,19 +20,23 @@ struct ClipboardItem: Equatable {
     /// Private: the `text`/`image` factories below are the only way to
     /// build an item, so hash and `previewLabel` can never drift out of
     /// sync with `kind`.
-    private init(kind: ClipboardItemKind, contentHash: String, copiedAt: Date, previewLabel: String) {
+    private init(kind: ClipboardItemKind, contentHash: String, copiedAt: Date, previewLines: [String]) {
         self.kind = kind
         self.contentHash = contentHash
         self.copiedAt = copiedAt
-        self.previewLabel = previewLabel
+        self.previewLines = previewLines
+        self.previewLabel = previewLines.joined(separator: " ")
     }
 
-    /// One line for the panel row: the text collapsed to a single line and
-    /// length-capped, or "Image WIDTH×HEIGHT" for images. Built once, up
-    /// front, by the factory methods below — never recomputed on read,
-    /// since the search filter re-evaluates this for every item on every
-    /// keystroke, and a multi-megabyte paste is too expensive to re-scan
-    /// that often.
+    /// The text of the panel row, cut at the line breaks of the copied text
+    /// so a row can mark each break; length-capped. "Image WIDTH×HEIGHT" for
+    /// images. Built once, up front, by the factory methods below, never
+    /// recomputed on read, since the search filter reads `previewLabel` for
+    /// every item on every keystroke, and a multi-megabyte paste is too
+    /// expensive to re-scan that often.
+    let previewLines: [String]
+
+    /// `previewLines` joined into one line with spaces.
     let previewLabel: String
 
     /// True only for text carrying an RTF or HTML flavor. Decides whether
@@ -81,7 +85,7 @@ extension ClipboardItem {
             kind: .text(plain: plain, rtf: rtf, html: html),
             contentHash: ContentHash.of(utf8: plain),
             copiedAt: copiedAt,
-            previewLabel: oneLineLabel(plain)
+            previewLines: previewLines(of: plain)
         )
     }
 
@@ -91,25 +95,25 @@ extension ClipboardItem {
             kind: .image(png: png, pixelSize: pixelSize),
             contentHash: ContentHash.of(png),
             copiedAt: copiedAt,
-            previewLabel: "Image \(Int(pixelSize.width))×\(Int(pixelSize.height))"
+            previewLines: ["Image \(Int(pixelSize.width))×\(Int(pixelSize.height))"]
         )
     }
 
-    /// Takes a bounded prefix of `text` first (cheap even for a huge
-    /// paste), then collapses whitespace/newlines to single spaces and
-    /// trims, then caps the result to `previewLabelMaxLength`. Falls back
-    /// to a placeholder when that collapses to nothing but the source text
-    /// itself was non-empty (e.g. an all-whitespace prefix), so the row
-    /// never shows a blank label for real content.
-    private static func oneLineLabel(_ text: String) -> String {
-        let boundedPrefix = String(text.prefix(previewSourceBudget))
-        let collapsed = boundedPrefix
-            .components(separatedBy: .whitespacesAndNewlines)
+    /// Looks at a bounded prefix of `text` first (cheap even for a huge
+    /// paste), then cuts it at line breaks, collapses whitespace inside each
+    /// line and drops empty lines. The cap counts each break as the one
+    /// space that joins the lines in `previewLabel`. Falls back to a
+    /// placeholder when nothing is left but `text` itself was non-empty, so
+    /// the row never shows a blank label for real content.
+    private static func previewLines(of text: String) -> [String] {
+        let lines = String(text.prefix(previewSourceBudget))
+            .components(separatedBy: .newlines)
+            .map { $0.components(separatedBy: .whitespaces).filter { !$0.isEmpty }.joined(separator: " ") }
             .filter { !$0.isEmpty }
-            .joined(separator: " ")
-        guard !collapsed.isEmpty else {
-            return text.isEmpty ? "" : whitespaceOnlyLabel
+        guard !lines.isEmpty else {
+            return [text.isEmpty ? "" : whitespaceOnlyLabel]
         }
-        return String(collapsed.prefix(previewLabelMaxLength))
+        return lines.joined(separator: "\n").prefix(previewLabelMaxLength)
+            .split(separator: "\n").map(String.init)
     }
 }

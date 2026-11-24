@@ -58,10 +58,13 @@ final class SettingsSidebarController: NSViewController, NSTableViewDataSource, 
             child.translatesAutoresizingMaskIntoConstraints = false
             root.addSubview(child)
         }
+        // An app icon leaves clear space around its artwork (100 of 1024 points), so the
+        // image starts that far left of the search field to line up the visible edges.
+        let iconClearSpace = (Self.brandIconSize * 100 / 1024).rounded()
         NSLayoutConstraint.activate([
-            header.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 16),
-            header.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -16),
-            header.topAnchor.constraint(equalTo: root.topAnchor, constant: 24),
+            header.leadingAnchor.constraint(equalTo: search.leadingAnchor, constant: -iconClearSpace),
+            header.trailingAnchor.constraint(equalTo: search.trailingAnchor),
+            header.topAnchor.constraint(equalTo: root.safeAreaLayoutGuide.topAnchor, constant: 12),
             search.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 12),
             search.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -12),
             search.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 16),
@@ -207,11 +210,13 @@ final class SettingsSidebarController: NSViewController, NSTableViewDataSource, 
         return true
     }
 
+    private static let brandIconSize: CGFloat = 32
+
     private static func brandHeader() -> NSView {
         let icon = NSImageView(image: NSApp.applicationIconImage)
         icon.setAccessibilityElement(false)
-        icon.widthAnchor.constraint(equalToConstant: 32).isActive = true
-        icon.heightAnchor.constraint(equalToConstant: 32).isActive = true
+        icon.widthAnchor.constraint(equalToConstant: brandIconSize).isActive = true
+        icon.heightAnchor.constraint(equalToConstant: brandIconSize).isActive = true
         let name = SettingsLayout.label("Mysli", size: 15)
         name.font = .systemFont(ofSize: 15, weight: .semibold)
         let words = SettingsLayout.stack(spacing: 2)

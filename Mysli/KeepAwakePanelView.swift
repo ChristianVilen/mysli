@@ -42,3 +42,26 @@ final class KeepAwakePanelView: NSView {
         enclosingMenuItem?.menu?.cancelTracking()
     }
 }
+
+#if DEBUG
+import SwiftUI
+
+#Preview("Keep Awake · light", traits: .fixedLayout(width: 220, height: 44)) {
+    keepAwakePreview(.aqua)
+}
+
+#Preview("Keep Awake · dark", traits: .fixedLayout(width: 220, height: 44)) {
+    keepAwakePreview(.darkAqua, selected: KeepAwakeController.presets[1].duration)
+}
+
+@MainActor
+private func keepAwakePreview(_ appearance: NSAppearance.Name, selected: WakeDuration? = nil) -> NSViewController {
+    let view = KeepAwakePanelView(presets: KeepAwakeController.presets)
+    view.showSelection(selected)
+    let background = SettingsBackground()
+    background.appearance = NSAppearance(named: appearance)
+    background.apply(.init(reduceTransparency: true, increaseContrast: false))
+    SettingsLayout.fill(view, in: background)
+    return AppKitPreview.host(background, size: NSSize(width: 220, height: 44))
+}
+#endif
