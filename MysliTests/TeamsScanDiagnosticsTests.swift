@@ -88,12 +88,22 @@ final class TeamsScanDiagnosticsTests: XCTestCase {
         }
     }
 
-    func testNoteIsWrittenOnlyWhenScansRanRemoteLinesExistAndNoneIsNamed() {
+    func testNoteIsWrittenOnlyWhenScansRanRemoteLinesExistAndUnderAQuarterIsNamed() {
         let scanned = summary([.unnamed(.noMeetingWindow)])
         XCTAssertNotNil(scanned.transcriptNote(for: lines(remote: 2)))
+        XCTAssertNotNil(scanned.transcriptNote(for: lines(remote: 5, named: 1)))
         XCTAssertNil(TeamsScanSummary.empty.transcriptNote(for: lines(remote: 2)))
         XCTAssertNil(scanned.transcriptNote(for: lines(remote: 0)))
-        XCTAssertNil(scanned.transcriptNote(for: lines(remote: 2, named: 1)))
+        XCTAssertNil(scanned.transcriptNote(for: lines(remote: 4, named: 1)))
+    }
+
+    func testNoteForFewNamedLinesGivesTheCountAndTheMainProblem() {
+        let note = summary([.named(ada), .unnamed(.noHighlightedTile), .unnamed(.noHighlightedTile),
+                            .unnamed(.noMeetingWindow)]).transcriptNote(for: lines(remote: 5, named: 1))
+        XCTAssertEqual(note, "Teams speaker names were on, but only 1 of 5 remote lines got a name. "
+                       + "In 1 of 4 scans, no Teams window showed meeting controls with Hang up or Leave.")
+        XCTAssertEqual(summary([.named(ada)]).transcriptNote(for: lines(remote: 5, named: 1)),
+                       "Teams speaker names were on, but only 1 of 5 remote lines got a name.")
     }
 
     func testNoteSaysHowOftenTeamsShowedANameWhenNoLineGotOne() {

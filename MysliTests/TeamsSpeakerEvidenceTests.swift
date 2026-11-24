@@ -27,6 +27,58 @@ final class TeamsSpeakerEvidenceTests: XCTestCase {
          sample(100.60, 100.61, 2), sample(100.90, 100.91, 3)]
     }
 
+    private let aino = TeamsScanResult.named(TeamsSpeakerName("Aino")!)
+    private let bo = TeamsScanResult.named(TeamsSpeakerName("Bo")!)
+    private let silence = TeamsScanResult.unnamed(.noHighlightedTile)
+    private let unknown = TeamsScanResult.unnamed(.multipleHighlightedTiles)
+
+    /// Scans every 0.4 s that take 0.085 s each, as in a real call, from 100 s on. In the 10 s
+    /// segment of `tenSeconds`, one scan claims about 0.4 s, which is 4 %.
+    private func steady(_ count: Int = 27, _ result: (Int) -> TeamsScanResult) -> [TeamsSpeakerObservation] {
+        (0..<count).map { index in
+            let start = 100 + Double(index) * 0.4
+            return TeamsSpeakerObservation(began: HostTime(seconds: start), ended: HostTime(seconds: start + 0.085),
+                                           sequence: index, sourceID: "call", result: result(index), nodes: 5)
+        }
+    }
+
+    private func tenSeconds(_ samples: [TeamsSpeakerObservation]) -> String? {
+        name(evidence(samples), 0.2, 10.2)
+    }
+
+    func testSilenceDoesNotCountAgainstAName() {
+        XCTAssertEqual(tenSeconds(steady { $0 == 13 ? silence : aino }), "Aino")
+        XCTAssertEqual(tenSeconds(steady { $0 < 13 ? aino : silence }), "Aino")
+    }
+
+    func testTooMuchUnknownTimeKeepsThem() {
+        XCTAssertEqual(tenSeconds(steady { $0 == 13 ? unknown : aino }), "Aino")
+        XCTAssertNil(tenSeconds(steady { $0 < 13 ? aino : unknown }))
+        XCTAssertNil(tenSeconds(steady(13) { _ in aino }), "Time that no scan claims is unknown")
+    }
+
+    func testTwoCompetingNamesKeepThem() {
+        XCTAssertNil(tenSeconds(steady { $0 < 13 ? aino : bo }))
+    }
+
+    func testOneScanWithAnotherNameDoesNotVetoAClearMajority() {
+        XCTAssertEqual(tenSeconds(steady { $0 == 13 ? bo : aino }), "Aino")
+    }
+
+    func testASecondNameOverItsLimitKeepsThem() {
+        XCTAssertEqual(tenSeconds(steady { (12..<15).contains($0) ? bo : aino }), "Aino")
+        // Aino keeps 80 %, so only the limit for the second name can reject this.
+        XCTAssertNil(tenSeconds(steady { (12..<17).contains($0) ? bo : aino }))
+    }
+
+    func testAMostlySilentSegmentNeedsEnoughNamedTime() {
+        XCTAssertNil(tenSeconds(steady { (12...13).contains($0) ? aino : silence }))
+    }
+
+    func testALongNamedScanSuppliesEvidence() {
+        XCTAssertEqual(name(evidence([sample(100, 100.25, 0)]), 0.01, 0.24), "Aino")
+    }
+
     func testNameRejectsReservedMarkupControlsAndOversizedValues() {
         for raw in ["", "   ", "Me", "them", "Room 1", "room 123", "A\nB", "A\tB", "A\u{0}B",
                     "A\u{2028}B", "A\u{2029}B",
@@ -39,9 +91,9 @@ final class TeamsSpeakerEvidenceTests: XCTestCase {
         XCTAssertEqual(TeamsSpeakerName(String(repeating: "😀", count: 64))?.value.utf8.count, 256)
     }
 
-    func testExactScanDurationAndGapLimitsRemainUsable() {
-        let result = evidence([sample(100, 100.15, 0), sample(100.9, 100.91, 1)])
-        XCTAssertEqual(name(result, 0.16, 0.89), "Aino")
+    func testExactGapLimitRemainsUsable() {
+        let result = evidence([sample(100, 100.125, 0), sample(100.875, 100.9, 1)])
+        XCTAssertEqual(name(result, 0.13, 0.87), "Aino")
     }
 
     func testCombiningMarksCannotHideForbiddenNameDelimiters() {
@@ -58,31 +110,10 @@ final class TeamsSpeakerEvidenceTests: XCTestCase {
         XCTAssertNil(name(evidence(matching), 0.91, 0.95))
     }
 
-    func testCoverageBelowNinetyPercentKeepsThem() {
-        let spans = [sample(100, 100.01, 0), sample(100.455, 100.455, 1)]
-        XCTAssertNil(name(evidence(spans), 0.01, 0.51))
-        XCTAssertEqual(name(evidence(spans), 0.01, 0.50), "Aino")
-    }
-
-    func testConflictOrUncertaintyKeepsThemEvenWithEnoughCoverage() {
-        let dense = (0...100).map { sample(100 + Double($0) * 0.01, 100 + Double($0) * 0.01, $0) }
-        XCTAssertEqual(name(evidence(dense), 0.01, 0.99), "Aino")
-        for replacement in [sample(100.5, 100.5, 50, nil), sample(100.5, 100.5, 50, "Bo"),
-                            sample(100.5, 100.5, 50, source: nil)] {
-            var samples = dense
-            samples[50] = replacement
-            if replacement.speaker?.value == "Bo" {
-                samples[51] = sample(100.51, 100.51, 51, "Bo")
-            }
-            XCTAssertNil(name(evidence(samples), 0.01, 0.99))
-        }
-    }
-
-    func testOneConflictingNamedScanVetoesAnOtherwiseCoveredSegment() {
-        var samples = (0...100).map { sample(100 + Double($0) * 0.01, 100 + Double($0) * 0.01, $0) }
-        samples[50] = sample(100.5, 100.5, 50, "Bo")
-        XCTAssertNil(name(evidence(samples), 0.01, 0.99))
-        XCTAssertEqual(name(evidence(samples), 0.01, 0.49), "Aino")
+    func testTheTimeBetweenScansWithDifferentResultsIsSplitInTheMiddle() {
+        let result = evidence([sample(100, 100.01, 0), sample(100.3, 100.31, 1, "Bo")])
+        XCTAssertEqual(name(result, 0.02, 0.15), "Aino")
+        XCTAssertEqual(name(result, 0.16, 0.29), "Bo")
     }
 
     func testNegativeSequenceNumbersCannotSupplyCoverage() {
@@ -92,8 +123,7 @@ final class TeamsSpeakerEvidenceTests: XCTestCase {
     }
 
     func testSequenceSourceAndRunChangesBreakContinuity() {
-        for second in [sample(100.3, 100.31, 2), sample(100.3, 100.31, 1, source: "other"),
-                       sample(100.3, 100.31, 1, "Bo")] {
+        for second in [sample(100.3, 100.31, 2), sample(100.3, 100.31, 1, source: "other")] {
             XCTAssertNil(name(evidence([matching[0], second]), 0.02, 0.29))
         }
         var history = TeamsSpeakerHistory()
@@ -103,9 +133,8 @@ final class TeamsSpeakerEvidenceTests: XCTestCase {
         XCTAssertEqual(name(evidence(matching)), "Aino")
     }
 
-    func testLongScanLargeGapAndBadTimesCannotSupplyEvidence() {
+    func testLargeGapAndBadTimesCannotSupplyEvidence() {
         for samples in [
-            [sample(100, 100.151, 0), sample(100.3, 100.31, 1)],
             [sample(100, 100.01, 0), sample(100.761, 100.77, 1)],
             [sample(100.01, 100, 0), sample(100.3, 100.31, 1)],
             [sample(.nan, 100.01, 0), sample(100.3, 100.31, 1)],
@@ -143,7 +172,7 @@ final class TeamsSpeakerEvidenceTests: XCTestCase {
         XCTAssertEqual(name(evidence(matching)), "Aino")
     }
 
-    func testUncertainScanCrossingAPauseStillVetoesTheRecordedPart() {
+    func testInvalidScanCrossingAPauseClaimsUnknownTimeInTheRecordedPart() {
         var clock = self.clock
         clock.pause(at: HostTime(seconds: 100.8))
         clock.resume(at: HostTime(seconds: 100.9))

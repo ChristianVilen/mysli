@@ -146,20 +146,29 @@ struct TeamsScanSummary: Equatable, Sendable {
         return "Teams speaker names: \(remote.named) of \(remote.all) remote lines named."
     }
 
-    /// The line that says why no remote line got a name, or nil when it has nothing to say.
+    /// Under this share of named remote lines, transcript.md gets a note.
+    private static let lowNamedShare = 0.25
+
+    /// The line that says why few or no remote lines got a name, or nil when it has nothing to say.
     func transcriptNote(for lines: [TranscriptLine]) -> String? {
         let remote = Self.remote(lines)
-        guard scans > 0, remote.all > 0, remote.named == 0 else { return nil }
-        let why: String
-        if named > 0 {
-            why = "In \(named) of \(scans) scans, Teams showed a name, but no remote line had enough matching evidence."
-        } else {
-            // Nobody speaking also gives noHighlightedTile, so another reason says more.
-            let ranked = rankedReasons
-            guard let top = ranked.first(where: { $0.reason != .noHighlightedTile }) ?? ranked.first else { return nil }
-            why = "In \(top.count) of \(scans) scans, \(top.reason.clause)."
+        guard scans > 0, remote.all > 0,
+              Double(remote.named) < Self.lowNamedShare * Double(remote.all) else { return nil }
+        let problem = mainProblem.map { "In \($0.count) of \(scans) scans, \($0.reason.clause)." }
+        if remote.named > 0 {
+            let note = "Teams speaker names were on, but only \(remote.named) of \(remote.all) remote lines got a name."
+            return problem.map { "\(note) \($0)" } ?? note
         }
-        return "Teams speaker names were on, but no remote line got a name. \(why)"
+        let why = named > 0
+            ? "In \(named) of \(scans) scans, Teams showed a name, but no remote line had enough matching evidence."
+            : problem
+        return why.map { "Teams speaker names were on, but no remote line got a name. \($0)" }
+    }
+
+    /// Nobody speaking also gives noHighlightedTile, so another reason says more.
+    private var mainProblem: (reason: TeamsScanReason, count: Int)? {
+        let ranked = rankedReasons
+        return ranked.first { $0.reason != .noHighlightedTile } ?? ranked.first
     }
 
     private static func remote(_ lines: [TranscriptLine]) -> (all: Int, named: Int) {

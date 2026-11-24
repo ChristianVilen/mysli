@@ -102,7 +102,7 @@ struct LiveTranscript: Equatable {
             }
         }
 
-        /// Remote candidates are ordered and never overlap. A point scan at the row start can veto its name.
+        /// Remote candidates are ordered and never overlap.
         func candidates(changedIn span: ClosedRange<Double>) -> Range<Int> {
             var low = 0
             var high = candidates.count
