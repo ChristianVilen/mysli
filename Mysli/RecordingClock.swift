@@ -28,8 +28,8 @@ struct HostTime: Comparable, Hashable, Sendable {
 /// the last boundary never changes. A copy that is one change old was still right for every
 /// buffer it already cut.
 struct RecordingClock: Equatable, Sendable {
-    /// Silence that each resume leaves in both files. More than `Transcript.merge`'s 2 s join
-    /// gap, so the final transcript never joins speech across a pause.
+    /// Silence that each resume leaves in both files. More than `Transcript.joinGap`, so the
+    /// final transcript never joins speech across a pause.
     static let resumeGap: TimeInterval = 3
 
     /// Recorded time 0 and file position 0.
@@ -81,17 +81,6 @@ struct RecordingClock: Equatable, Sendable {
               let index = runs.firstIndex(where: { $0.contains(start) && $0.contains(end) }) else { return nil }
         return FileInterval(start: filePosition(at: start, inRun: index),
                             end: filePosition(at: end, inRun: index))
-    }
-
-    func keptFileIntervals(from start: HostTime, to end: HostTime) -> [FileInterval] {
-        guard origin.seconds.isFinite, start.seconds.isFinite, end.seconds.isFinite, start <= end else { return [] }
-        return runs.enumerated().compactMap { index, run in
-            let first = max(start, run.start)
-            let last = min(end, run.end ?? end)
-            guard first <= last, run.contains(first) else { return nil }
-            let position = filePosition(at: first, inRun: index)
-            return FileInterval(start: position, end: position + (last - first))
-        }
     }
 
     /// The recorded time of a file position. A position inside a resume gap maps to the pause

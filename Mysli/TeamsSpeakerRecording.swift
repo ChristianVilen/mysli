@@ -59,29 +59,14 @@ final class TeamsSpeakerRecording {
     }
 
     func preview(_ transcript: LiveTranscript, on clock: RecordingClock) -> LivePreview {
-        let newRows = transcript.finalRows.revision != liveRows?.revision
-        if newRows { liveRows = transcript.finalRows }
-        _ = refreshEvidence(clock: clock, resolveAll: newRows)
+        let live = history.evidenceSoFar(clock: clock)
+        var changedFrom = live.changedFrom
+        if transcript.finalRows.revision != liveRows?.revision {
+            liveRows = transcript.finalRows
+            changedFrom = -.infinity
+        }
+        if let changedFrom { liveRows?.resolve(endingAfter: changedFrom, using: live.evidence) }
         return transcript.preview(on: clock, resolvedRows: liveRows?.rows)
-    }
-
-    func evidenceSoFar(clock: RecordingClock) -> TeamsSpeakerEvidence {
-        refreshEvidence(clock: clock, resolveAll: false)
-    }
-
-    private func refreshEvidence(clock: RecordingClock, resolveAll: Bool) -> TeamsSpeakerEvidence {
-        var changed = IndexSet()
-        func invalidate(_ span: ClosedRange<Double>) {
-            if let indices = liveRows?.candidates(changedIn: span) {
-                changed.insert(integersIn: indices)
-            }
-        }
-        if resolveAll { invalidate(-.infinity ... .infinity) }
-        let evidence = history.evidenceSoFar(clock: clock) { span in
-            if !resolveAll { invalidate(span) }
-        }
-        liveRows?.resolve(changed, using: evidence)
-        return evidence
     }
 
     func finish(clock: RecordingClock, endingAt: HostTime) -> TeamsSpeakerEvidence {

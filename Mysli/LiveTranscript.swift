@@ -102,24 +102,12 @@ struct LiveTranscript: Equatable {
             }
         }
 
-        /// Remote candidates are ordered and never overlap.
-        func candidates(changedIn span: ClosedRange<Double>) -> Range<Int> {
-            var low = 0
-            var high = candidates.count
-            while low < high {
-                let middle = low + (high - low) / 2
-                if candidates[middle].speech.segment.end <= span.lowerBound { low = middle + 1 } else { high = middle }
-            }
-            let first = low
-            while low < candidates.count, candidates[low].speech.segment.start <= span.upperBound { low += 1 }
-            return first..<low
-        }
-
-        mutating func resolve(_ indices: IndexSet, using evidence: TeamsSpeakerEvidence) {
-            for index in indices {
-                let candidate = candidates[index]
-                let row = LiveRow.final(candidate.speech, using: evidence)
-                if rows[candidate.row] != row { rows[candidate.row] = row }
+        /// Remote candidates are ordered and never overlap, so the ones that end after `position`
+        /// are the last ones.
+        mutating func resolve(endingAfter position: Double, using evidence: TeamsSpeakerEvidence) {
+            for candidate in candidates.reversed() {
+                guard candidate.speech.segment.end > position else { return }
+                rows[candidate.row] = .final(candidate.speech, using: evidence)
             }
         }
     }
@@ -197,7 +185,7 @@ struct LiveTranscript: Equatable {
                 drafts.append(row)
             }
         }
-        if !drafts.isEmpty { rows.append(contentsOf: drafts.sorted { $0.at < $1.at }) }
+        rows.append(contentsOf: drafts.sorted { $0.at < $1.at })
         return LivePreview(status: status, rows: rows, behind: lag >= Self.behindThreshold ? lag : nil)
     }
 }

@@ -50,23 +50,23 @@ struct TeamsSpeakerHistory {
         return entries.count < capacity
     }
 
-    mutating func evidenceSoFar(clock: RecordingClock, changed: (ClosedRange<Double>) -> Void) -> TeamsSpeakerEvidence {
+    /// `changedFrom` is the file position from which the evidence differs from the last call's.
+    /// Nil when nothing changed, minus infinity after a clock change.
+    mutating func evidenceSoFar(clock: RecordingClock) -> (evidence: TeamsSpeakerEvidence, changedFrom: Double?) {
         // A pause or resume can change the mapping of a scan that straddles its boundary.
         let reset = projectedClock != clock
         if reset {
             projectedClock = clock
             projectedCount = 0
             liveProjection = Projection()
-            changed(-.infinity ... .infinity)
         }
-        guard clock.origin.seconds.isFinite else { return .empty }
-        for entry in entries.dropFirst(projectedCount) {
-            liveProjection.add(entry, clock: clock) { span in
-                if !reset { changed(span) }
-            }
-        }
+        guard clock.origin.seconds.isFinite else { return (.empty, reset ? -Double.infinity : nil) }
+        let known = liveProjection.claims.count
+        for entry in entries.dropFirst(projectedCount) { liveProjection.add(entry, clock: clock) }
         projectedCount = entries.count
-        return liveProjection.evidence(scans: .empty)
+        // New scans only add claims after the old ones.
+        let changedFrom = reset ? -Double.infinity : liveProjection.claims.dropFirst(known).first?.start
+        return (liveProjection.evidence(scans: .empty), changedFrom)
     }
 
     func finish(clock: RecordingClock, endingAt stop: HostTime) -> TeamsSpeakerEvidence {
@@ -86,13 +86,12 @@ struct TeamsSpeakerHistory {
 
     private struct Projection {
         /// What valid scans and the time between continuous scans claim. Ordered, without overlaps.
-        private var claims: [SpeakerSpan] = []
-        /// What invalid scans claim, merged. An invalid scan can be out of order, so these can lie over `claims`.
-        private var uncertain: [SpeakerSpan] = []
+        /// Invalid scans and unknown results claim nothing.
+        private(set) var claims: [SpeakerSpan] = []
         private var previous: Entry?
         private var latestEnd = -Double.infinity
 
-        mutating func add(_ entry: Entry, clock: RecordingClock, changed: (ClosedRange<Double>) -> Void = { _ in }) {
+        mutating func add(_ entry: Entry, clock: RecordingClock) {
             let sample = entry.sample
             guard sample.hasFiniteTimes else {
                 previous = nil
@@ -100,13 +99,8 @@ struct TeamsSpeakerHistory {
             }
             let ordered = sample.began.seconds >= latestEnd
             latestEnd = max(latestEnd, sample.began.seconds, sample.ended.seconds)
-            guard ordered, sample.ended >= sample.began, sample.sequence >= 0, sample.sourceID?.isEmpty == false,
+            guard ordered, sample.sequence >= 0, sample.sourceID?.isEmpty == false,
                   let scan = clock.fileIntervalInOneRun(from: sample.began, to: sample.ended) else {
-                for span in clock.keptFileIntervals(from: min(sample.began, sample.ended),
-                                                    to: max(sample.began, sample.ended)) where span.end > span.start {
-                    addUncertainty(SpeakerSpan(start: span.start, end: span.end, claim: .unknown))
-                    changed(span.start...span.end)
-                }
                 previous = nil
                 return
             }
@@ -120,38 +114,24 @@ struct TeamsSpeakerHistory {
                let gap = clock.fileIntervalInOneRun(from: earlier.sample.ended, to: sample.began) {
                 let earlierClaim = Claim(earlier.sample.result)
                 if earlierClaim == claim {
-                    append(SpeakerSpan(start: gap.start, end: gap.end, claim: claim), changed: changed)
+                    append(gap.start, gap.end, claim)
                 } else {
                     let middle = (gap.start + gap.end) / 2
-                    append(SpeakerSpan(start: gap.start, end: middle, claim: earlierClaim), changed: changed)
-                    append(SpeakerSpan(start: middle, end: gap.end, claim: claim), changed: changed)
+                    append(gap.start, middle, earlierClaim)
+                    append(middle, gap.end, claim)
                 }
             }
-            append(SpeakerSpan(start: scan.start, end: scan.end, claim: claim), changed: changed)
+            append(scan.start, scan.end, claim)
             previous = entry
         }
 
         func evidence(scans: TeamsScanSummary) -> TeamsSpeakerEvidence {
-            TeamsSpeakerEvidence(claims: claims, uncertain: uncertain, scans: scans)
+            TeamsSpeakerEvidence(claims: claims, scans: scans)
         }
 
-        private mutating func append(_ span: SpeakerSpan, changed: (ClosedRange<Double>) -> Void) {
-            guard span.end > span.start else { return }
-            claims.append(span)
-            changed(span.start...span.end)
-        }
-
-        private mutating func addUncertainty(_ span: SpeakerSpan) {
-            let first = uncertain.lastIndex { $0.end < span.start }.map { $0 + 1 } ?? 0
-            var end = first
-            while end < uncertain.count, uncertain[end].start <= span.end { end += 1 }
-            guard first < end else {
-                uncertain.insert(span, at: first)
-                return
-            }
-            let merged = SpeakerSpan(start: min(span.start, uncertain[first].start),
-                                     end: max(span.end, uncertain[end - 1].end), claim: .unknown)
-            uncertain.replaceSubrange(first..<end, with: CollectionOfOne(merged))
+        private mutating func append(_ start: Double, _ end: Double, _ claim: Claim?) {
+            guard let claim, end > start else { return }
+            claims.append(SpeakerSpan(start: start, end: end, claim: claim))
         }
     }
 }
@@ -168,9 +148,8 @@ private enum TeamsNameRule {
 }
 
 struct TeamsSpeakerEvidence: Equatable, Sendable {
-    static let empty = Self(claims: [], uncertain: [], scans: .empty)
+    static let empty = Self(claims: [], scans: .empty)
     fileprivate let claims: [SpeakerSpan]
-    fileprivate let uncertain: [SpeakerSpan]
     let scans: TeamsScanSummary
 
     func name(for segment: TranscriptSegment) -> TeamsSpeakerName? {
@@ -178,61 +157,36 @@ struct TeamsSpeakerEvidence: Equatable, Sendable {
               segment.end > segment.start else { return nil }
         var names: [TeamsSpeakerName: Double] = [:]
         var silence: Double = 0
-        var index = firstEnding(atOrAfter: segment.start, in: claims)
+        var index = firstEnding(atOrAfter: segment.start)
         while index < claims.count, claims[index].start < segment.end {
             let time = min(claims[index].end, segment.end) - max(claims[index].start, segment.start)
             switch claims[index].claim {
             case .name(let name): names[name, default: 0] += time
             case .silence: silence += time
-            case .unknown: break
             }
             index += 1
         }
-        var winner: (name: TeamsSpeakerName, time: Double)?
-        var second: Double = 0
-        for (name, time) in names {
-            if time > winner?.time ?? 0 {
-                second = winner?.time ?? 0
-                winner = (name, time)
-            } else {
-                second = max(second, time)
-            }
-        }
-        guard let winner else { return nil }
+        let ranked = names.sorted { $0.value > $1.value }
+        guard let winner = ranked.first else { return nil }
+        let second = ranked.dropFirst().first?.value ?? 0
 
         let length = segment.end - segment.start
         let named = names.values.reduce(0, +)
         // All time that no name and no silence claims is unknown, also time that no scan claims.
-        let unknown = length - named - silence + doubleCounted(in: segment)
+        let unknown = length - named - silence
         let judged = named + unknown
-        guard winner.time >= TeamsNameRule.winningShare * judged,
+        guard winner.value >= TeamsNameRule.winningShare * judged,
               second <= TeamsNameRule.secondNameShare * judged,
-              winner.time >= TeamsNameRule.minimumNamedShare * length else { return nil }
-        return winner.name
+              winner.value >= TeamsNameRule.minimumNamedShare * length else { return nil }
+        return winner.key
     }
 
-    /// Time in the segment where an invalid scan lies over a claim. It counts again, as unknown,
-    /// which only makes the rule more careful.
-    private func doubleCounted(in segment: TranscriptSegment) -> Double {
-        var claim = firstEnding(atOrAfter: segment.start, in: claims)
-        var bad = firstEnding(atOrAfter: segment.start, in: uncertain)
-        var time: Double = 0
-        while claim < claims.count, bad < uncertain.count,
-              claims[claim].start < segment.end, uncertain[bad].start < segment.end {
-            let start = max(segment.start, claims[claim].start, uncertain[bad].start)
-            let end = min(segment.end, claims[claim].end, uncertain[bad].end)
-            time += max(0, end - start)
-            if claims[claim].end < uncertain[bad].end { claim += 1 } else { bad += 1 }
-        }
-        return time
-    }
-
-    private func firstEnding(atOrAfter time: Double, in spans: [SpeakerSpan]) -> Int {
+    private func firstEnding(atOrAfter time: Double) -> Int {
         var low = 0
-        var high = spans.count
+        var high = claims.count
         while low < high {
             let middle = low + (high - low) / 2
-            if spans[middle].end < time { low = middle + 1 } else { high = middle }
+            if claims[middle].end < time { low = middle + 1 } else { high = middle }
         }
         return low
     }
@@ -241,14 +195,14 @@ struct TeamsSpeakerEvidence: Equatable, Sendable {
 fileprivate enum Claim: Equatable, Sendable {
     case name(TeamsSpeakerName)
     case silence
-    case unknown
 
-    init(_ result: TeamsScanResult) {
+    /// Nil for a result that leaves the speaker unknown.
+    init?(_ result: TeamsScanResult) {
         switch result {
         case .named(let name): self = .name(name)
         // Each short stop between sentences gives this result.
         case .unnamed(.noHighlightedTile): self = .silence
-        case .unnamed: self = .unknown
+        case .unnamed: return nil
         }
     }
 }

@@ -172,13 +172,10 @@ final class TeamsSpeakerEvidenceTests: XCTestCase {
         XCTAssertEqual(name(evidence(matching)), "Aino")
     }
 
-    func testInvalidScanCrossingAPauseClaimsUnknownTimeInTheRecordedPart() {
-        var clock = self.clock
-        clock.pause(at: HostTime(seconds: 100.8))
-        clock.resume(at: HostTime(seconds: 100.9))
-        let samples = Array(matching.prefix(3)) + [sample(100.2, 100.85, 3, nil)]
-        XCTAssertNil(name(evidence(samples, clock: clock), 0.02, 0.59))
-        XCTAssertEqual(name(evidence(Array(matching.prefix(3)), clock: clock), 0.02, 0.59), "Aino")
+    func testAnOutOfOrderScanSuppliesNoEvidenceAndKeepsEarlierNames() {
+        let result = evidence(Array(matching.prefix(2)) + [sample(100.05, 100.6, 2, "Bo")])
+        XCTAssertNil(name(result, 0.32, 0.59))
+        XCTAssertEqual(name(result, 0.02, 0.29), "Aino")
     }
 
     func testUnknownZeroReversedAndOverlappingSegmentsKeepThem() {

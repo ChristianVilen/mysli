@@ -17,17 +17,6 @@ final class RecordingClockTests: XCTestCase {
         XCTAssertNil(clock.fileIntervalInOneRun(from:HostTime(seconds: 100.5), to: HostTime(seconds: 111.5)))
     }
 
-    func testClippedFileIntervalsKeepPiecesOnBothSidesOfAPause() {
-        var clock = RecordingClock(origin: HostTime(seconds: 100))
-        clock.pause(at: HostTime(seconds: 101))
-        clock.resume(at: HostTime(seconds: 111))
-
-        XCTAssertEqual(clock.keptFileIntervals(from:HostTime(seconds: 100.5), to: HostTime(seconds: 111.5)),
-                       [.init(start: 0.5, end: 1), .init(start: 4, end: 4.5)])
-        XCTAssertEqual(clock.keptFileIntervals(from:HostTime(seconds: 101), to: HostTime(seconds: 111)),
-                       [.init(start: 4, end: 4)])
-    }
-
     func testPointObservationsUseHalfOpenRecordingRuns() {
         var clock = RecordingClock(origin: HostTime(seconds: 100))
         clock.pause(at: HostTime(seconds: 101))
@@ -36,38 +25,20 @@ final class RecordingClockTests: XCTestCase {
         for (time, position) in [(100.0, 0.0), (100.5, 0.5), (111.0, 4.0)] {
             let point = HostTime(seconds: time)
             XCTAssertEqual(clock.fileIntervalInOneRun(from:point, to: point), .init(start: position, end: position))
-            XCTAssertEqual(clock.keptFileIntervals(from:point, to: point), [.init(start: position, end: position)])
         }
         for time in [99.0, 101, 105] {
             let point = HostTime(seconds: time)
             XCTAssertNil(clock.fileIntervalInOneRun(from:point, to: point))
-            XCTAssertEqual(clock.keptFileIntervals(from:point, to: point), [])
         }
-    }
-
-    func testClippingHandlesMultiplePausesAndAnOpenPause() {
-        var clock = RecordingClock(origin: HostTime(seconds: 100))
-        clock.pause(at: HostTime(seconds: 101))
-        clock.resume(at: HostTime(seconds: 111))
-        clock.pause(at: HostTime(seconds: 112))
-        clock.resume(at: HostTime(seconds: 122))
-        clock.pause(at: HostTime(seconds: 123))
-
-        XCTAssertEqual(clock.keptFileIntervals(from:HostTime(seconds: 99), to: HostTime(seconds: 130)),
-                       [.init(start: 0, end: 1), .init(start: 4, end: 5), .init(start: 8, end: 9)])
-        XCTAssertEqual(clock.keptFileIntervals(from:HostTime(seconds: 123), to: HostTime(seconds: 130)), [])
-        XCTAssertNil(clock.fileIntervalInOneRun(from:HostTime(seconds: 122), to: HostTime(seconds: 123)))
     }
 
     func testFileIntervalsRejectReversedAndNonfiniteInputs() {
         let clock = RecordingClock(origin: HostTime(seconds: 100))
         for (start, end) in [(102.0, 101.0), (.nan, 101), (100, .nan), (-.infinity, 101), (100, .infinity)] {
             XCTAssertNil(clock.fileIntervalInOneRun(from:HostTime(seconds: start), to: HostTime(seconds: end)))
-            XCTAssertEqual(clock.keptFileIntervals(from:HostTime(seconds: start), to: HostTime(seconds: end)), [])
         }
         let invalid = RecordingClock(origin: HostTime(seconds: .nan))
         XCTAssertNil(invalid.fileIntervalInOneRun(from:HostTime(seconds: 100), to: HostTime(seconds: 101)))
-        XCTAssertEqual(invalid.keptFileIntervals(from:HostTime(seconds: 100), to: HostTime(seconds: 101)), [])
     }
 
     func testRecordedTimeGrowsFromTheOriginAndLeavesOutAClosedPause() {

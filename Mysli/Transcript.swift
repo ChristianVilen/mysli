@@ -50,7 +50,9 @@ enum Transcript {
         }
     }
 
-    /// Joins consecutive segments from the same speaker when they are less than two seconds apart.
+    static let joinGap: TimeInterval = 2
+
+    /// Joins consecutive segments from the same speaker when they are less than `joinGap` apart.
     static func merge(_ tracks: [MeetingTrack: [TranscriptSegment]], rooms: RoomLabels,
                       speakers: TeamsSpeakerEvidence = .empty) -> [TranscriptLine] {
         var lines: [TranscriptLine] = []
@@ -59,7 +61,7 @@ enum Transcript {
             let segment = speech.segment
             let speaker = speech.speaker(using: speakers)
             let text = segment.text.trimmingCharacters(in: .whitespacesAndNewlines)
-            if let last = lines.last, last.speaker == speaker, segment.start - lastEnd < 2 {
+            if let last = lines.last, last.speaker == speaker, segment.start - lastEnd < joinGap {
                 lines[lines.count - 1] = TranscriptLine(speaker: speaker, start: last.start, text: last.text + " " + text)
             } else {
                 lines.append(TranscriptLine(speaker: speaker, start: segment.start, text: text))
