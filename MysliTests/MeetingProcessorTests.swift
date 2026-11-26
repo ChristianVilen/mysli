@@ -423,6 +423,32 @@ final class MeetingProcessorTests: MeetingProcessorTestCase {
         }
     }
 
+    func testEachTrackGoesToTheSessionWithItsEarlyTextWhichGoesAwayWithTheTranscript() async throws {
+        let meeting = try makeMeeting()
+        let early = EarlyTranscript(source: EarlyTranscriptSource(transcriber: "Whisper", language: "en"), covered: 960_000,
+                                    segments: [TranscriptSegment(start: 4, end: 5, text: "Sounds good")])
+        try meeting.saveEarlyTranscript(early, for: .microphone)
+
+        let outcome = await process(meeting)
+
+        XCTAssertEqual(outcome, .done(summary: meeting.url(for: .summary)))
+        XCTAssertEqual(whisper.transcribed, ["me.caf", "them.caf"])
+        XCTAssertEqual(whisper.earlyTranscripts, ["me.caf": early])
+        XCTAssertNil(meeting.earlyTranscript(.microphone))
+    }
+
+    func testEarlyTextDoesNotStopTheAppleFallback() async throws {
+        let meeting = try makeMeeting()
+        whisper.failure = (.load, MeetingStepError("The model files are damaged."))
+        try meeting.saveEarlyTranscript(EarlyTranscript(source: EarlyTranscriptSource(transcriber: "Whisper", language: "en"),
+                                                        covered: 960_000, segments: []), for: .microphone)
+
+        let outcome = await process(meeting)
+
+        XCTAssertEqual(outcome, .done(summary: meeting.url(for: .summary)))
+        XCTAssertEqual(apple.transcribed, ["me.caf", "them.caf"])
+    }
+
     func testCancellingDuringTheWhisperDownloadNeitherFailsNorFallsBack() async throws {
         let meeting = try makeMeeting()
         let suspended = SuspendedTranscriber(name: "Whisper")

@@ -257,6 +257,14 @@ final class AudioTrackWriter {
                                commonFormat: .pcmFormatInt16, interleaved: true)
     }
 
+    /// Also while a writer has the file open. Measured: until `close()`, the writer leaves the CAF
+    /// data chunk size at -1 and never rewrites the header, so a new reader takes its length from
+    /// the file size, and it reads every frame written so far with the exact sample values. A
+    /// reader that stays open does not see later frames, so read with a new `AVAudioFile` each time.
+    static func frameCount(at url: URL) throws -> Int64 {
+        try AVAudioFile(forReading: url).length
+    }
+
     /// Writes the frames of `sampleBuffer` that `clock` keeps, each at its file position, and
     /// pads gaps with silence, so each resume leaves the clock's gap. Returns each converted
     /// buffer it wrote; a buffer inside a pause returns none.

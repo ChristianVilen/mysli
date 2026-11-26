@@ -92,7 +92,16 @@ final class MeetingRecorder {
         let handle: ActiveRecording
         let liveTask: Task<Void, Never>
         let speakers: TeamsSpeakerRecording?
+        let early: EarlyTranscriptWorker?
         var state: State
+
+        /// Before the lock goes and before the folder goes to the processor: the early worker
+        /// writes into the folder under `lock`.
+        @MainActor
+        func endBackgroundWork() {
+            liveTask.cancel()
+            early?.cancel()
+        }
     }
 
     private let permissions: PermissionsManager
@@ -109,6 +118,8 @@ final class MeetingRecorder {
     private let hostNow: () -> HostTime
     private let closeSavedNoticeLater: @MainActor (@escaping @MainActor () -> Void) -> Void
     private let displayTickInterval: TimeInterval
+    /// Nil: the recording gets no early transcript.
+    private let earlyTranscript: (@MainActor (MeetingFolder, Locale) -> EarlyTranscriptWorker)?
 
     private var state: State = .idle(notice: nil) {
         didSet {
@@ -209,7 +220,8 @@ final class MeetingRecorder {
          now: @escaping () -> Date = { Date() },
          hostNow: @escaping () -> HostTime = HostTime.now,
          closeSavedNoticeLater: @escaping @MainActor (@escaping @MainActor () -> Void) -> Void = MeetingRecorder.afterSixSeconds,
-         displayTickInterval: TimeInterval = 1) {
+         displayTickInterval: TimeInterval = 1,
+         earlyTranscript: (@MainActor (MeetingFolder, Locale) -> EarlyTranscriptWorker)? = nil) {
         self.permissions = permissions
         self.root = root
         self.locale = locale
@@ -223,11 +235,15 @@ final class MeetingRecorder {
         self.hostNow = hostNow
         self.closeSavedNoticeLater = closeSavedNoticeLater
         self.displayTickInterval = displayTickInterval
+        self.earlyTranscript = earlyTranscript
     }
 
     isolated deinit {
         displayTimer?.invalidate()
-        if case .active(let meeting) = state { meeting.speakers?.pause() }
+        if case .active(let meeting) = state {
+            meeting.speakers?.pause()
+            meeting.endBackgroundWork()
+        }
     }
 
     /// The recording's audio levels, for the menu's meters. Nil outside a meeting.
@@ -285,12 +301,15 @@ final class MeetingRecorder {
                                                                      accessibilityGranted: permissions.accessibility))
                     let speakers = namesEnabled ? TeamsSpeakerRecording(observer: teamsSpeakerObserver) : nil
                     speakers?.resume(at: hostNow())
-                    let updates = liveTranscriber.updates(locale: locale(), audio: handle.writtenAudio)
+                    let meetingLocale = locale()
+                    let updates = liveTranscriber.updates(locale: meetingLocale, audio: handle.writtenAudio)
                     let liveTask = Task { [weak self] in
                         for await update in updates { self?.applyLive(update, to: meeting) }
                     }
+                    let early = earlyTranscript?(meeting, meetingLocale)
+                    early?.start()
                     state = .active(ActiveMeeting(session: session, folder: meeting, lock: lock, handle: handle,
-                                                  liveTask: liveTask, speakers: speakers,
+                                                  liveTask: liveTask, speakers: speakers, early: early,
                                                   state: ActiveMeeting.State(clock: clock)))
                     return session.id
                 }
@@ -322,7 +341,7 @@ final class MeetingRecorder {
     func stopRecording() {
         guard case .active(let meeting) = state else { return }
         let speakers = meeting.speakers?.finish(clock: meeting.state.clock, endingAt: hostNow()) ?? .empty
-        meeting.liveTask.cancel()
+        meeting.endBackgroundWork()
         // Not `meeting`: it holds the folder lock, which processing needs now.
         let folder = meeting.folder
         state = .idle(notice: .saved(folder))
@@ -340,7 +359,7 @@ final class MeetingRecorder {
     func shutDown() {
         if case .active(let meeting) = state {
             meeting.speakers?.pause()
-            meeting.liveTask.cancel()
+            meeting.endBackgroundWork()
             state = .idle(notice: nil)
             meeting.handle.stop()
             return
@@ -409,7 +428,7 @@ final class MeetingRecorder {
     private func handleInterruption(of meeting: MeetingFolder, reason: String) {
         guard case .active(let active) = state, active.folder == meeting else { return }
         let speakers = active.speakers?.finish(clock: active.state.clock, endingAt: hostNow()) ?? .empty
-        active.liveTask.cancel()
+        active.endBackgroundWork()
         endRecording(meeting, interruptedBecause: reason, speakers: speakers)
     }
 

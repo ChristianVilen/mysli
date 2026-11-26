@@ -89,7 +89,7 @@ With more than one display, Mysli tiles the window on the screen that it overlap
 
 When Stage Manager is on and the screen shows two or more windows, maximize leaves room for the Stage Manager strip on the left and a small gap on the other sides. Half tiling never leaves this room.
 
-Turn **Window tiling** off in Settings, or in the menu, to release the shortcuts.
+Turn **Window tiling** off in Settings to release the shortcuts.
 
 ## Keep Awake
 
@@ -151,6 +151,8 @@ The live draft uses Apple speech recognition, and only for a language whose Appl
 ### Transcript and summary
 
 Mysli transcribes with Whisper (the `large-v3-v20240930_turbo` model, through WhisperKit). If Mysli cannot load the model, or Whisper does not know the language, Apple speech recognition does the work instead. The top of the transcript names the transcriber and gives the reason for a change.
+
+While you record, Whisper already transcribes the finished parts of the call into hidden files in the meeting folder, so after Stop only the last minutes are left. Mysli deletes these files when the transcript is ready. It never downloads the model during a recording.
 
 The **Summary tool** setting selects the AI tool. **Automatic**, the default, tries `agy` first and uses `claude` if `agy` fails. Mysli reads the setting when each queued job starts, and a running job keeps its choice. Claude Code summaries use Sonnet with medium effort.
 

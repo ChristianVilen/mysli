@@ -340,6 +340,12 @@ class FakeLiveTranscriber: LiveTranscribing {
     }
 }
 
+extension TranscriptionSession {
+    func transcribe(_ audio: URL) async throws -> TrackTranscript {
+        try await transcribe(audio, after: nil)
+    }
+}
+
 class FakeTranscriber: Transcribing {
     let name: String
     var byFileName: [String: Result<TrackTranscript, Error>] = [:]
@@ -351,6 +357,8 @@ class FakeTranscriber: Transcribing {
     private(set) var downloads: [String] = []
     private(set) var loads: [String] = []
     private(set) var transcribed: [String] = []
+    /// The early transcript that each track came with, by file name.
+    private(set) var earlyTranscripts: [String: EarlyTranscript] = [:]
 
     init(name: String = "Fake") {
         self.name = name
@@ -382,8 +390,9 @@ class FakeTranscriber: Transcribing {
     private struct Session: TranscriptionSession {
         let transcriber: FakeTranscriber
 
-        func transcribe(_ audio: URL) async throws -> TrackTranscript {
-            try await transcriber.transcribe(audio)
+        func transcribe(_ audio: URL, after early: EarlyTranscript?) async throws -> TrackTranscript {
+            if let early { transcriber.earlyTranscripts[audio.lastPathComponent] = early }
+            return try await transcriber.transcribe(audio)
         }
     }
 }

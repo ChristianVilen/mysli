@@ -55,7 +55,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         permissions: permissions,
         root: { [settings] in settings.meetingsFolder },
         locale: { [settings] in settings.meetingLocale },
-        teamsSpeakerNamesEnabled: { [settings] in settings.teamsSpeakerNamesEnabled }
+        teamsSpeakerNamesEnabled: { [settings] in settings.teamsSpeakerNamesEnabled },
+        earlyTranscript: { [whisperTranscriber] in
+            EarlyTranscriptWorker(meeting: $0, transcriber: whisperTranscriber, locale: $1)
+        }
     )
     private lazy var meetingNotes = MeetingNotesController(
         recorder: meetingRecorder,
@@ -82,12 +85,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         requestUpdate: { [weak self] in self?.meetingNotes.updateNotes($0) }
     )
     private lazy var wordReviewWindow = WordReviewWindowController(controller: wordReview)
-    private lazy var toolActions = ToolActionsMenuSection(
-        screenshotsOn: { [unowned self] in settings.screenshotShortcutsEnabled },
-        clipboardOn: { [unowned self] in settings.clipboardHistoryEnabled },
-        tilingOn: { [unowned self] in settings.windowTilingEnabled })
     private lazy var statusMenu = StatusMenu(sections: [
-        toolActions,
         EnabledMenuSection(keepAwake, isEnabled: { [settings] in settings.keepAwakeEnabled }),
         EnabledMenuSection(meetingNotes, isEnabled: { [settings] in settings.meetingsEnabled }),
         EnabledMenuSection(DictationMenuSection(controller: dictation), isEnabled: { [settings] in settings.dictationEnabled })
@@ -315,12 +313,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             permissions.refresh()
             permissionsChanged()
         }
-        let changeTool: (MysliTool, Bool) -> Void = { [weak self] in self?.tools.setEnabled($0, enabled: $1) }
-        settingsWindow.onToolChanged = changeTool
-        toolActions.onToolChanged = changeTool
-        toolActions.onCaptureArea = { [weak self] in self?.startCapture(.interactive) }
-        toolActions.onCaptureScreen = { [weak self] in self?.startCapture(.fullScreen) }
-        toolActions.onShowClipboardHistory = { [weak self] in self?.toggleClipboardPanel() }
+        settingsWindow.onToolChanged = { [weak self] in self?.tools.setEnabled($0, enabled: $1) }
         settingsWindow.onCalendarRemindersChanged = { [weak self] enabled in
             self?.tools.setCalendarReminders(enabled)
         }

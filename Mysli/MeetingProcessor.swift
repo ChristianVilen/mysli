@@ -189,7 +189,7 @@ struct MeetingProcessor {
         var tracks: [MeetingTrack: TrackTranscript] = [:]
         for track in MeetingTrack.allCases where FileManager.default.fileExists(atPath: meeting.audioURL(track).path) {
             let trackStart = now()
-            let transcript = try await session.transcribe(meeting.audioURL(track))
+            let transcript = try await session.transcribe(meeting.audioURL(track), after: meeting.earlyTranscript(track))
             tracks[track] = transcript
             Log.meeting.notice("Step time: \(String(describing: track), privacy: .public) track of \(Int(transcript.duration)) s transcribed in \(seconds(since: trackStart)) s")
             try Task.checkCancellation()
@@ -273,6 +273,13 @@ struct MeetingProcessor {
 
     private func summarize(_ meeting: MeetingFolder, tool: SummaryTool,
                            summaryInput: (String) -> Void) async throws -> SummaryCompletion {
+        // Here, not right after writing transcript.md: this step runs only once transcript.md exists,
+        // so it also cleans up after a crash between the two writes.
+        do {
+            try meeting.removeEarlyTranscripts()
+        } catch {
+            Log.meeting.error("Could not delete the early text of \(meeting.name, privacy: .public) (code \((error as NSError).code)): \(error.localizedDescription)")
+        }
         let typedNotes = try MeetingTypedNotesFile.read(in: meeting)
         let (content, list) = try correctedContent(in: meeting)
         if Transcript.isSilent(content), typedNotes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {

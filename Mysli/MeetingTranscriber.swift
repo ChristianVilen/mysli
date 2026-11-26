@@ -11,11 +11,24 @@ protocol Transcribing {
 }
 
 protocol TranscriptionSession {
-    func transcribe(_ audio: URL) async throws -> TrackTranscript
+    /// A session uses `early` for the start of the track only when it made it and it fits the file.
+    func transcribe(_ audio: URL, after early: EarlyTranscript?) async throws -> TrackTranscript
 }
 
 protocol SampleTranscriptionSession {
     func transcribe(samples: [Float]) async throws -> String
+}
+
+/// No download: a recording never downloads a model.
+protocol EarlyTranscribing {
+    func needsDownload(for locale: Locale) async throws -> Bool
+    func loadEarly(for locale: Locale) async throws -> any EarlyTranscriptionSession
+}
+
+protocol EarlyTranscriptionSession {
+    /// `early` and every part of the track after it that more audio cannot change, made by this
+    /// session. An `early` that another session made counts as none.
+    func extend(_ early: EarlyTranscript?, of audio: URL) async throws -> EarlyTranscript
 }
 
 struct TranscriberFailure: Equatable, CustomStringConvertible {
@@ -75,7 +88,7 @@ struct SpeechTranscriberAdapter: Transcribing {
         let locale: Locale
 
         @concurrent
-        func transcribe(_ audio: URL) async throws -> TrackTranscript {
+        func transcribe(_ audio: URL, after _: EarlyTranscript?) async throws -> TrackTranscript {
             let file = try AVAudioFile(forReading: audio)
             guard file.length > 0 else { return TrackTranscript(segments: [], duration: 0) }
             let duration = Double(file.length) / file.processingFormat.sampleRate

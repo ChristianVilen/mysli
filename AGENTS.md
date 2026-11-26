@@ -52,7 +52,8 @@ Keep this file short. Add a rule only when an agent would break it without being
 
 - Only `RecordingClock` maps host times to file positions. Never rebuild pause runs or add resume gaps anywhere else.
 - Keep `@concurrent` on long async work. The sample queue and the main actor share state only through short `OSAllocatedUnfairLock` copies, and neither waits for the other.
-- The live transcript never goes to disk. Show meeting text only when the user expands the panel, because macOS cannot hide it from screen sharing.
+- The Apple live transcript never goes to disk. Show meeting text only when the user expands the panel, because macOS cannot hide it from screen sharing.
+- The early Whisper transcripts are a different thing. Only `EarlyTranscriptWorker` writes them, while the recorder holds the folder lock. It never downloads a model, and a failure ends only the early text, never the recording.
 - `MeetingNotesController` owns the `onChange` and `onEnded` callbacks of the recorder. Only `MeetingNotesHosting` moves a notes view between the panel and a window.
 - Typed notes write to `MeetingRecorder.activeMeeting` and stay bound to that folder. Never take the folder from the current Settings.
 - Screenshots enter the notes only by paste or drop. The summary tool never gets the images.
@@ -60,7 +61,7 @@ Keep this file short. Add a rule only when an agent would break it without being
 
 ## Meeting processing
 
-- The stage of a meeting comes only from the files that exist. Never store it. Write every meeting text file atomically, because an existing file counts as a finished step. `meeting.json`, `notes.md`, `.notes.lock`, attachments, the heard copy, and the review files never change the stage.
+- The stage of a meeting comes only from the files that exist. Never store it. Write every meeting text file atomically, because an existing file counts as a finished step. `meeting.json`, `notes.md`, `.notes.lock`, attachments, the heard copy, the early transcripts, and the review files never change the stage.
 - Each meeting folder has one writer at a time. The recorder holds `MeetingFolder.lock()` while it records or pauses, and the processor holds it for each run. A locked folder is skipped.
 - Processing, Retry, Update Notes, and Update summary run one at a time in the queue of `MeetingNotesController`. A quit is never a failure, and nothing is written after a cancellation.
 - These parameters have no default value, so that no caller can forget them: the summary tool, `roomLabeller`, `knownWords`, `wordsToCheck`, and the `teams` argument of `Transcript.markdown`. A forgotten summary tool would send a transcript to a provider that the user turned off.

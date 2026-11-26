@@ -114,12 +114,12 @@ final class WhisperKitTranscriberTests: XCTestCase {
 
     func testThankYouCountsAsSilenceFromEightSecondsOn() {
         let transcript = WhisperKitTranscriber.trackTranscript([
-            TranscriptionSegment(start: 60, end: 61.5, text: " my weekend was pretty good"),
-            TranscriptionSegment(start: 70, end: 78, text: " Thank you!"),
-            TranscriptionSegment(start: 80, end: 87.75, text: " THANK YOU"),
-            TranscriptionSegment(start: 90, end: 100, text: " Thank you so much."),
-            TranscriptionSegment(start: 100, end: 101.25, text: " 42"),
-            TranscriptionSegment(start: 110, end: 111, text: " ..."),
+            TranscriptSegment(start: 60, end: 61.5, text: " my weekend was pretty good"),
+            TranscriptSegment(start: 70, end: 78, text: " Thank you!"),
+            TranscriptSegment(start: 80, end: 87.75, text: " THANK YOU"),
+            TranscriptSegment(start: 90, end: 100, text: " Thank you so much."),
+            TranscriptSegment(start: 100, end: 101.25, text: " 42"),
+            TranscriptSegment(start: 110, end: 111, text: " ..."),
         ], duration: 120.25)
 
         XCTAssertEqual(transcript, TrackTranscript(segments: [
@@ -195,7 +195,7 @@ final class WhisperKitTranscriberTests: XCTestCase {
         let transcript = try await session.transcribe(audio)
 
         XCTAssertEqual(client.loads, [root.path + "/large-v3-v20240930_turbo"])
-        XCTAssertEqual(client.transcriptions, ["them.caf in fi"])
+        XCTAssertEqual(client.transcriptions, ["them.caf 0..<32000 in fi"])
         XCTAssertEqual(transcript, TrackTranscript(segments: [TranscriptSegment(start: 0.5, end: 1.25, text: " Hyvää huomenta")],
                                                    duration: 2))
     }
@@ -229,7 +229,7 @@ final class WhisperKitTranscriberTests: XCTestCase {
         let audio = try makeAudioFile(named: "them.caf", seconds: 61)
         let adapter = WhisperKitLibrary.LoadedModel(whisperKit: model)
 
-        let message = await errorMessage { _ = try await adapter.transcribe(audio, languageCode: "en") }
+        let message = await errorMessage { _ = try await adapter.transcribe(audio, frames: 0..<976_000, languageCode: "en") }
 
         XCTAssertEqual(message, "Chunk failed.")
     }
@@ -239,12 +239,89 @@ final class WhisperKitTranscriberTests: XCTestCase {
         let audio = try makeAudioFile(named: "them.caf", seconds: 122, sample: 3_277)
         let adapter = WhisperKitLibrary.LoadedModel(whisperKit: model)
 
-        let segments = try await adapter.transcribe(audio, languageCode: "en")
+        let segments = try await adapter.transcribe(audio, frames: 0..<1_952_000, languageCode: "en").flatMap(\.segments)
 
         XCTAssertEqual(segments.map(\.start), [0.5, 30.5, 60.5, 90.5, 120.5])
         XCTAssertEqual(segments.map(\.end), [1.5, 31.5, 61.5, 91.5, 121.5])
         XCTAssertEqual(segments.map(\.text), Array(repeating: "Synthetic speech", count: 5))
         XCTAssertEqual(model.batchSizes, [4, 1])
+    }
+
+    func testARangeOfATrackGivesEachChunkWithItsEndAndAbsoluteTrackTimes() async throws {
+        let model = try await ChunkResultWhisperKit(WhisperKitConfig(verbose: false, load: false, download: false))
+        let audio = try makeAudioFile(named: "them.caf", seconds: 110, sample: 3_277)
+        let adapter = WhisperKitLibrary.LoadedModel(whisperKit: model)
+
+        let chunks = try await adapter.transcribe(audio, frames: 644_000..<1_636_000, languageCode: "en")
+
+        XCTAssertEqual(chunks.map(\.end), [1_124_000, 1_604_000, 1_636_000])
+        XCTAssertEqual(chunks.map { $0.segments.map(\.start) }, [[40.75], [70.75], [100.75]])
+        XCTAssertEqual(chunks.map { $0.segments.map(\.end) }, [[41.75], [71.75], [101.75]])
+        XCTAssertEqual(model.sampleCounts, [992_000])
+    }
+
+    /// A whole-file run decodes its last window or less as a chunk, so a range does too.
+    func testARangeOfOneWindowOrLessIsDecodedAsAChunk() async throws {
+        let model = try await ChunkResultWhisperKit(WhisperKitConfig(verbose: false, load: false, download: false))
+        let audio = try makeAudioFile(named: "them.caf", seconds: 40, sample: 3_277)
+        let adapter = WhisperKitLibrary.LoadedModel(whisperKit: model)
+
+        let chunks = try await adapter.transcribe(audio, frames: 160_000..<480_000, languageCode: "en")
+
+        XCTAssertEqual(chunks.map(\.end), [480_000])
+        XCTAssertEqual(chunks.map { $0.segments.map(\.start) }, [[10.5]])
+        XCTAssertEqual(model.batchSizes, [1])
+        XCTAssertEqual(model.windowCalls, 0)
+    }
+
+    /// The model's window is 30 s and the track 240 s, so only chunks that end by 210 s are kept.
+    func testExtendingKeepsTheEarlyTextAndEveryChunkThatEndsOneWindowBeforeTheEnd() async throws {
+        let audio = try makeAudioFile(named: "me.caf", seconds: 240)
+        let session = try await sut.loadEarly(for: english)
+        let whisper = EarlyTranscriptSource(transcriber: sut.name, language: "en")
+
+        client.chunks = [chunk(endingAt: 30, " One"), chunk(endingAt: 210, " Two"), chunk(endingAt: 240, " Three")]
+        let first = try await session.extend(nil, of: audio)
+        client.chunks = [chunk(endingAt: 240, " Three")]
+        let second = try await session.extend(first, of: audio)
+        client.chunks = []
+        let other = EarlyTranscript(source: EarlyTranscriptSource(transcriber: sut.name, language: "fi"),
+                                    covered: 3_360_000, segments: [TranscriptSegment(start: 1, end: 2, text: " Old")])
+        let restarted = try await session.extend(other, of: audio)
+
+        XCTAssertEqual(first, EarlyTranscript(source: whisper, covered: 3_360_000, segments: [
+            TranscriptSegment(start: 29, end: 30, text: " One"), TranscriptSegment(start: 209, end: 210, text: " Two"),
+        ]))
+        XCTAssertEqual(second, first)
+        XCTAssertEqual(restarted, EarlyTranscript(source: whisper, covered: 0, segments: []))
+        XCTAssertEqual(client.transcriptions, ["me.caf 0..<3840000 in en", "me.caf 3360000..<3840000 in en",
+                                               "me.caf 0..<3840000 in en"])
+    }
+
+    func testAnEarlyTranscriptStandsInForTheStartOfATrackOnlyWhenItFits() async throws {
+        let audio = try makeAudioFile(named: "me.caf", seconds: 100)
+        let session = try await sut.load(for: english)
+        client.chunks = [chunk(endingAt: 80, " ."), chunk(endingAt: 100, " Rest")]
+        let early = [TranscriptSegment(start: 4, end: 5, text: " Early")]
+        let rows: [(name: String, source: EarlyTranscriptSource, covered: Int64, texts: [String])] = [
+            ("fits", EarlyTranscriptSource(transcriber: sut.name, language: "en"), 960_000, [" Early", " Rest"]),
+            ("other model", EarlyTranscriptSource(transcriber: "Whisper large-v3", language: "en"), 960_000, [" Rest"]),
+            ("other language", EarlyTranscriptSource(transcriber: sut.name, language: "fi"), 960_000, [" Rest"]),
+            ("covers more than the track", EarlyTranscriptSource(transcriber: sut.name, language: "en"), 1_600_001, [" Rest"]),
+        ]
+        for row in rows {
+            let transcript = try await session.transcribe(
+                audio, after: EarlyTranscript(source: row.source, covered: row.covered, segments: early))
+            XCTAssertEqual(transcript.segments.map(\.text), row.texts, row.name)
+            XCTAssertEqual(transcript.duration, 100, row.name)
+        }
+        XCTAssertEqual(client.transcriptions, ["me.caf 960000..<1600000 in en"] + Array(repeating: "me.caf 0..<1600000 in en", count: 3))
+    }
+
+    /// One segment that ends at `seconds`.
+    private func chunk(endingAt seconds: Int64, _ text: String) -> WhisperChunk {
+        WhisperChunk(end: seconds * 16_000,
+                     segments: [TranscriptionSegment(start: Float(seconds - 1), end: Float(seconds), text: text)])
     }
 }
 
@@ -263,8 +340,9 @@ private actor ControlledWhisperClient: WhisperKitClient {
         return Model()
     }
     private struct Model: WhisperModel {
-        func transcribe(_ audio: URL, languageCode: String) async throws -> [TranscriptionSegment] {
-            [TranscriptionSegment(start: 0, end: 0.5, text: "Shared speech")]
+        var windowSamples: Int { 480_000 }
+        func transcribe(_ audio: URL, frames: Range<Int64>, languageCode: String) async throws -> [WhisperChunk] {
+            [WhisperChunk(end: frames.upperBound, segments: [TranscriptionSegment(start: 0, end: 0.5, text: "Shared speech")])]
         }
         func transcribe(samples: [Float], languageCode: String) async throws -> [TranscriptionSegment] {
             [TranscriptionSegment(start: 0, end: 0.5, text: "Shared speech")]
@@ -275,11 +353,23 @@ private actor ControlledWhisperClient: WhisperKitClient {
 private final class ChunkResultWhisperKit: WhisperKit {
     var failChunks = false
     var batchSizes: [Int] = []
+    /// The samples of each batch, added up.
+    var sampleCounts: [Int] = []
+    /// Calls that decode one window without the chunker.
+    var windowCalls = 0
+
+    override func transcribe(audioArray: [Float], decodeOptions: DecodingOptions? = nil,
+                             callback: TranscriptionCallback? = nil,
+                             segmentCallback: SegmentDiscoveryCallback? = nil) async throws -> [TranscriptionResult] {
+        windowCalls += 1
+        return []
+    }
 
     override func transcribeWithOptions(audioArrays: [[Float]], decodeOptionsArray: [DecodingOptions?] = [nil],
                                          seekOffsets: [Int]? = nil, callback: TranscriptionCallback? = nil)
         async -> [Result<[TranscriptionResult], Error>] {
         batchSizes.append(audioArrays.count)
+        sampleCounts.append(audioArrays.map(\.count).reduce(0, +))
         return audioArrays.enumerated().map { index, _ in
             if failChunks && index == 1 { return .failure(MeetingStepError("Chunk failed.")) }
             return .success([TranscriptionResult(text: "Synthetic speech", segments: [
@@ -292,6 +382,9 @@ private final class ChunkResultWhisperKit: WhisperKit {
 private final class FakeWhisperKitClient: WhisperKitClient {
     var transcribeError: Error?
     var segments: [TranscriptionSegment] = []
+    /// What a range call returns, with ends as frames of the file. Nil: one chunk to the end of
+    /// the range, with `segments`.
+    var chunks: [WhisperChunk]?
     private(set) var downloads: [String] = []
     private(set) var loads: [String] = []
     private(set) var transcriptions: [String] = []
@@ -315,10 +408,12 @@ private final class FakeWhisperKitClient: WhisperKitClient {
             return client.segments
         }
 
-        func transcribe(_ audio: URL, languageCode: String) async throws -> [TranscriptionSegment] {
-            client.transcriptions.append("\(audio.lastPathComponent) in \(languageCode)")
+        var windowSamples: Int { 480_000 }
+
+        func transcribe(_ audio: URL, frames: Range<Int64>, languageCode: String) async throws -> [WhisperChunk] {
+            client.transcriptions.append("\(audio.lastPathComponent) \(frames) in \(languageCode)")
             if let error = client.transcribeError { throw error }
-            return client.segments
+            return client.chunks ?? [WhisperChunk(end: frames.upperBound, segments: client.segments)]
         }
     }
 }
