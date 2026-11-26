@@ -88,14 +88,14 @@ final class MeetingTranscriptDrawer: NSView {
         guard newRows != transcript.rows else { return }
         let oldCount = transcript.rows.count
         let shown = transcriptView.string
-        let replacement = transcript.update(to: newRows, shown: shown)
         let selection = transcriptView.selectedRange()
+        let replacement = transcript.update(to: newRows, shown: shown, selection: selection)
         let scrollOrigin = scrollView.contentView.bounds.origin
         ignoringScroll {
             transcriptView.textStorage?.replaceCharacters(
                 in: NSRange(location: replacement.location, length: (shown as NSString).length - replacement.location),
                 with: replacement.text)
-            transcriptView.setSelectedRange(TranscriptText.selection(selection, keptBefore: replacement.location))
+            transcriptView.setSelectedRange(replacement.selection)
             sizeTranscript()
             if selection.length > 0 { follow.scrolled(lastRowVisible: false) }
             follow.rowsChanged(from: oldCount, to: newRows.count)

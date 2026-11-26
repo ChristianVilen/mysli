@@ -10,6 +10,7 @@ final class TeamsSpeakerRecording {
     private let observer: any TeamsSpeakerObserving
     private let log: (LogMessage) -> Void
     private var history: TeamsSpeakerHistory
+    private var liveRows: LiveTranscript.FinalRows?
     private var tally = TeamsScanTally()
     private var task: Task<Void, Never>?
     private var runID: UUID?
@@ -47,6 +48,7 @@ final class TeamsSpeakerRecording {
                     self.pause()
                     break
                 }
+                if self.tally.countsDue(after: sample) { self.log(self.history.scansSoFar.soFarLine) }
             }
         }
     }
@@ -55,6 +57,17 @@ final class TeamsSpeakerRecording {
         runID = nil
         task?.cancel()
         task = nil
+    }
+
+    func preview(_ transcript: LiveTranscript, on clock: RecordingClock) -> LivePreview {
+        let live = history.evidenceSoFar(clock: clock)
+        var changedFrom = live.changedFrom
+        if transcript.finalRows.revision != liveRows?.revision {
+            liveRows = transcript.finalRows
+            changedFrom = -.infinity
+        }
+        if let changedFrom { liveRows?.resolve(endingAfter: changedFrom, using: live.evidence) }
+        return transcript.preview(on: clock, resolvedRows: liveRows?.rows)
     }
 
     func finish(clock: RecordingClock, endingAt: HostTime) -> TeamsSpeakerEvidence {

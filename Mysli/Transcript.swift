@@ -33,22 +33,35 @@ struct CorrectedTranscript: Equatable, Sendable {
 }
 
 enum Transcript {
-    /// Joins a speaker's segments while the gap between them is under `joinGap`. With nil, each
-    /// segment is a line of its own. With `.voices`, the microphone lines get room labels: see
-    /// `microphoneLines`.
-    static func merge(_ tracks: [MeetingTrack: [TranscriptSegment]], rooms: RoomLabels,
-                      joinGap: TimeInterval? = 2, speakers: TeamsSpeakerEvidence = .empty) -> [TranscriptLine] {
-        let them = withText(tracks[.system] ?? [])
-        // sorted(by:) is stable, so Them, listed first, stays first on an equal start.
-        let spoken = (systemLines(them, speakers: speakers)
-            + microphoneLines(microphoneSpeech(tracks), them: them, rooms: rooms))
-            .sorted { $0.segment.start < $1.segment.start }
+    struct Speech: Equatable {
+        enum Attribution: Equatable {
+            case fixed(Speaker)
+            case teamsCandidate
+        }
 
+        let segment: TranscriptSegment
+        let attribution: Attribution
+
+        func speaker(using evidence: TeamsSpeakerEvidence) -> Speaker {
+            switch attribution {
+            case .fixed(let speaker): return speaker
+            case .teamsCandidate: return evidence.name(for: segment).map(Speaker.teams) ?? .them
+            }
+        }
+    }
+
+    static let joinGap: TimeInterval = 2
+
+    /// Joins consecutive segments from the same speaker when they are less than `joinGap` apart.
+    static func merge(_ tracks: [MeetingTrack: [TranscriptSegment]], rooms: RoomLabels,
+                      speakers: TeamsSpeakerEvidence = .empty) -> [TranscriptLine] {
         var lines: [TranscriptLine] = []
         var lastEnd = -TimeInterval.infinity
-        for (speaker, segment) in spoken {
+        for speech in orderedSpeech(tracks, rooms: rooms) {
+            let segment = speech.segment
+            let speaker = speech.speaker(using: speakers)
             let text = segment.text.trimmingCharacters(in: .whitespacesAndNewlines)
-            if let joinGap, let last = lines.last, last.speaker == speaker, segment.start - lastEnd < joinGap {
+            if let last = lines.last, last.speaker == speaker, segment.start - lastEnd < joinGap {
                 lines[lines.count - 1] = TranscriptLine(speaker: speaker, start: last.start, text: last.text + " " + text)
             } else {
                 lines.append(TranscriptLine(speaker: speaker, start: segment.start, text: text))
@@ -58,16 +71,23 @@ enum Transcript {
         return lines
     }
 
-    private static func systemLines(_ segments: [TranscriptSegment], speakers: TeamsSpeakerEvidence)
-        -> [(speaker: Speaker, segment: TranscriptSegment)] {
+    static func orderedSpeech(_ tracks: [MeetingTrack: [TranscriptSegment]], rooms: RoomLabels) -> [Speech] {
+        let them = withText(tracks[.system] ?? [])
+        let microphone = microphoneLines(microphoneSpeech(tracks), them: them, rooms: rooms)
+            .map { Speech(segment: $0.segment, attribution: .fixed($0.speaker)) }
+        // The sort is stable, so system speech stays first on an equal start.
+        return (systemSpeech(them) + microphone).sorted { $0.segment.start < $1.segment.start }
+    }
+
+    private static func systemSpeech(_ segments: [TranscriptSegment]) -> [Speech] {
         let sorted = segments.sorted { $0.start < $1.start }
         var furthestEnd = -TimeInterval.infinity
         return sorted.enumerated().map { index, segment in
             let overlapsPrevious = segment.start < furthestEnd
             let overlapsNext = index + 1 < sorted.count && sorted[index + 1].start < segment.end
             furthestEnd = max(furthestEnd, segment.end)
-            let name = overlapsPrevious || overlapsNext ? nil : speakers.name(for: segment)
-            return (name.map(Speaker.teams) ?? .them, segment)
+            let attribution: Speech.Attribution = overlapsPrevious || overlapsNext ? .fixed(.them) : .teamsCandidate
+            return Speech(segment: segment, attribution: attribution)
         }
     }
 

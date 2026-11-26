@@ -49,6 +49,18 @@ final class TeamsSpeakerRecordingTests: XCTestCase {
                                 "Teams scan result: named → noHighlightedTile."])
     }
 
+    func testLogsTheCountsOfAllScansSoFarWhenTheyAreDue() async {
+        let source = RecordingSpeakerSource()
+        let recording = makeRecording(source)
+        recording.resume(at: HostTime(seconds: 100))
+        source.yield(100, sequence: 1)
+        source.yield(250, sequence: 2, name: nil)
+        source.yield(400, sequence: 3)
+        await waitUntil { self.logged.count >= 4 }
+
+        XCTAssertEqual(logged.filter { $0.hasPrefix("Teams speaker names so far.") }.count, 1)
+    }
+
     func testFinishLogsTheStopLineOnceAndPauseLogsNone() async {
         let source = RecordingSpeakerSource()
         let recording = makeRecording(source)
@@ -81,6 +93,46 @@ final class TeamsSpeakerRecordingTests: XCTestCase {
         XCTAssertEqual(evidence.name(for: TranscriptSegment(start: 0, end: 1, text: "Hello"))?.value, "Alice")
         await waitUntil { source.terminations == 1 }
         XCTAssertEqual(source.terminations, 1)
+    }
+
+    func testLivePreviewKeepsCollectingAndMatchesTheClockAfterResume() async throws {
+        let source = RecordingSpeakerSource()
+        let recording = makeRecording(source)
+        var clock = RecordingClock(origin: HostTime(seconds: 100))
+        var live = LiveTranscript()
+        for (start, text) in [(0.0, "Hello"), (0.5, "Still here"), (5, "Welcome back")] {
+            live.apply(.result(LiveResult(track: .system, start: start, end: start + 0.5, text: text,
+                                          isFinal: true, finalizedThrough: start + 0.5)),
+                       now: clock.origin, clock: clock)
+        }
+        func speakers() -> [Speaker] {
+            recording.preview(live, on: clock).rows.compactMap {
+                guard case .speech(let speaker, _, _) = $0.content else { return nil }
+                return speaker
+            }
+        }
+        let alice = Speaker.teams(try XCTUnwrap(TeamsSpeakerName("Alice")))
+        let bob = Speaker.teams(try XCTUnwrap(TeamsSpeakerName("Bob")))
+        recording.resume(at: clock.origin)
+        source.yield(100, sequence: 0)
+        source.yield(100.5, sequence: 1)
+        await waitUntil { speakers().first != .them }
+        XCTAssertEqual(speakers(), [alice, .them, .them])
+
+        source.yield(101, sequence: 2)
+        await waitUntil { speakers()[1] != .them }
+        XCTAssertEqual(speakers(), [alice, alice, .them])
+
+        let pause = HostTime(seconds: 102)
+        let resume = HostTime(seconds: 110)
+        clock.pause(at: pause)
+        recording.pause()
+        clock.resume(at: resume)
+        recording.resume(at: resume)
+        source.yield(110, sequence: 0, name: "Bob", run: 1)
+        source.yield(110.5, sequence: 1, name: "Bob", run: 1)
+        await waitUntil { speakers().last != .them }
+        XCTAssertEqual(speakers(), [alice, alice, bob])
     }
 
     func testResumeRejectsBufferedSamplesBeforeItsLowerBoundAndLeavesThePauseGapEmpty() async {

@@ -168,7 +168,9 @@ final class MeetingRecorder {
     /// Built only when a caller needs it. Available even when the controls are hidden.
     var livePreview: LivePreview? {
         guard case .active(let meeting) = state else { return nil }
-        return meeting.state.live.preview(on: meeting.state.clock)
+        let clock = meeting.state.clock
+        let transcript = meeting.state.live
+        return meeting.speakers?.preview(transcript, on: clock) ?? transcript.preview(on: clock)
     }
 
     func noteTime(for folder: MeetingFolder) -> MeetingNoteTime {

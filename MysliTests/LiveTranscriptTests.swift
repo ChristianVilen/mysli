@@ -122,6 +122,25 @@ final class LiveTranscriptTests: XCTestCase {
                               speech(.me, 12, "Yeah."), speech(.me, 14, "Okay.")])
     }
 
+    @MainActor func testTeamsEvidenceNamesASettledSystemRowAndKeepsTheDraftAsThem() throws {
+        let alice = try XCTUnwrap(TeamsSpeakerName("Alice"))
+        let run = UUID()
+        var history = TeamsSpeakerHistory()
+        for (sequence, time) in [101.0, 101.5, 102.0].enumerated() {
+            let at = HostTime(seconds: time)
+            _ = history.append(TeamsSpeakerObservation(began: at, ended: at, sequence: sequence,
+                                                       sourceID: "call", speaker: alice), runID: run)
+        }
+        let speakers = TeamsSpeakerRecording(observer: RecordingSpeakerSource(), history: history)
+        apply(volatile(.system, 1, 2, "Hello"), at: 102)
+
+        XCTAssertEqual(speakers.preview(live, on: clock).rows,
+                       [speech(.them, 1, "Hello", isFinal: false)])
+
+        live.settleTails()
+        XCTAssertEqual(speakers.preview(live, on: clock).rows, [speech(.teams(alice), 1, "Hello")])
+    }
+
     func testVolatileTailsThatStartTogetherShowThemFirst() {
         apply(volatile(.microphone, 4, 5, "Right"), volatile(.system, 4, 6, "So the plan"))
 

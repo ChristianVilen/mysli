@@ -32,10 +32,10 @@ final class SettingsPermissionsView: NSStackView {
         spacing = 16
         SettingsLayout.add(SettingsLayout.page(title: "Permissions", subtitle: "Allow access for the features you use. Status updates while this page is open."), to: self)
         SettingsLayout.add(permissionList, to: self)
-        SettingsLayout.add(SettingsLayout.note("Turn on more tools to see their permissions."), to: self)
+        SettingsLayout.add(SettingsNote("Turn on more tools to see their permissions."), to: self)
         SettingsLayout.add(shortcutHeading, to: self)
         SettingsLayout.add(shortcutGroup, to: self)
-        SettingsLayout.add(SettingsLayout.note("Meeting audio stays on this Mac. To create a summary, Mysli sends the transcript and any selected background file to your chosen AI tool."), to: self)
+        SettingsLayout.add(SettingsNote("Meeting audio stays on this Mac. To create a summary, Mysli sends the transcript and any selected background file to your chosen AI tool."), to: self)
         keyboardSettings.bezelStyle = .rounded
         keyboardSettings.target = self
         keyboardSettings.action = #selector(openKeyboardSettings)
