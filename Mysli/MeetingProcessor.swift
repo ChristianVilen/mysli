@@ -182,11 +182,16 @@ struct MeetingProcessor {
     /// fails the step with no fallback, so both tracks come from one transcriber.
     private func transcribeTracks(_ meeting: MeetingFolder, progress: (MeetingProgress) -> Void)
         async throws -> (tracks: [MeetingTrack: TrackTranscript], transcriber: String, failures: [TranscriberFailure]) {
+        let loadStart = now()
         let (session, transcriber, failures) = try await startTranscriber(progress: progress)
+        Log.meeting.notice("Step time: transcriber ready after \(seconds(since: loadStart)) s")
         try Task.checkCancellation()
         var tracks: [MeetingTrack: TrackTranscript] = [:]
         for track in MeetingTrack.allCases where FileManager.default.fileExists(atPath: meeting.audioURL(track).path) {
-            tracks[track] = try await session.transcribe(meeting.audioURL(track))
+            let trackStart = now()
+            let transcript = try await session.transcribe(meeting.audioURL(track))
+            tracks[track] = transcript
+            Log.meeting.notice("Step time: \(String(describing: track), privacy: .public) track of \(Int(transcript.duration)) s transcribed in \(seconds(since: trackStart)) s")
             try Task.checkCancellation()
         }
         return (tracks, transcriber, failures)
@@ -207,6 +212,8 @@ struct MeetingProcessor {
             }
         }
         try meeting.markRoomLabelsStarted()
+        let labelStart = now()
+        defer { Log.meeting.notice("Step time: room labelling took \(seconds(since: labelStart)) s") }
         let rooms = await withTaskCancellationHandler {
             await roomLabeller.label(meeting.audioURL(.microphone))
         } onCancel: {
@@ -309,8 +316,10 @@ struct MeetingProcessor {
                                   summaryInput: (String) -> Void) async throws -> SummaryResult {
         // The saved text, not `summaryText`: the notes editor compares this snapshot with its own text.
         summaryInput(typedNotes)
+        let summaryStart = now()
         let result = await summarizer.summarize(transcript: content, knownWords: list.relevant(to: content), tool: tool,
                                                 typedNotes: MeetingNoteDocument.summaryText(MeetingNoteDocument.parse(typedNotes)))
+        Log.meeting.notice("Step time: summary tool answered after \(seconds(since: summaryStart)) s")
         try Task.checkCancellation()
         switch result {
         case .written(_, _, let cli, let earlier):
@@ -324,6 +333,8 @@ struct MeetingProcessor {
         }
         return result
     }
+
+    private func seconds(since start: Date) -> Int { Int(now().timeIntervalSince(start).rounded()) }
 
     static func failureText(step: MeetingStep, message: String, at date: Date) -> String {
         let formatter = DateFormatter()
