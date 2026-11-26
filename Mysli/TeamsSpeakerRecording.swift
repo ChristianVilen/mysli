@@ -48,6 +48,7 @@ final class TeamsSpeakerRecording {
                     self.pause()
                     break
                 }
+                if self.tally.countsDue(after: sample) { self.log(self.history.scansSoFar.soFarLine) }
             }
         }
     }

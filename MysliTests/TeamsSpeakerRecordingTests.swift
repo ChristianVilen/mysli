@@ -49,6 +49,18 @@ final class TeamsSpeakerRecordingTests: XCTestCase {
                                 "Teams scan result: named → noHighlightedTile."])
     }
 
+    func testLogsTheCountsOfAllScansSoFarWhenTheyAreDue() async {
+        let source = RecordingSpeakerSource()
+        let recording = makeRecording(source)
+        recording.resume(at: HostTime(seconds: 100))
+        source.yield(100, sequence: 1)
+        source.yield(250, sequence: 2, name: nil)
+        source.yield(400, sequence: 3)
+        await waitUntil { self.logged.count >= 4 }
+
+        XCTAssertEqual(logged.filter { $0.hasPrefix("Teams speaker names so far.") }.count, 1)
+    }
+
     func testFinishLogsTheStopLineOnceAndPauseLogsNone() async {
         let source = RecordingSpeakerSource()
         let recording = makeRecording(source)

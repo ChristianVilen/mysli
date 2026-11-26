@@ -1,7 +1,7 @@
 import Foundation
 
 /// What one scan of the Teams meeting window found.
-enum TeamsScanResult: Equatable, Sendable {
+enum TeamsScanResult: Hashable, Sendable {
     case named(TeamsSpeakerName)
     case unnamed(TeamsScanReason)
 
@@ -30,7 +30,7 @@ enum TeamsScanReason: Error, Hashable, Sendable, PublicLogValue {
     case unsupportedTile
     case selfTile
     case nameRejected
-    case scanLimit
+    case scanLimit(TeamsScanLimit)
     case deadline
     case axError(Int32)
     case unexpectedAXValue
@@ -46,7 +46,7 @@ enum TeamsScanReason: Error, Hashable, Sendable, PublicLogValue {
         case .unsupportedTile: return "unsupportedTile"
         case .selfTile: return "selfTile"
         case .nameRejected: return "nameRejected"
-        case .scanLimit: return "scanLimit"
+        case .scanLimit(let limit): return "scanLimit(\(limit.rawValue))"
         case .deadline: return "deadline"
         case .axError(let code): return "axError(\(code))"
         case .unexpectedAXValue: return "unexpectedAXValue"
@@ -54,6 +54,9 @@ enum TeamsScanReason: Error, Hashable, Sendable, PublicLogValue {
     }
 
     var description: String { code }
+
+    /// No remote speaker has a speaking border.
+    var isSilence: Bool { self == .noHighlightedTile || self == .selfTile }
 
     /// Completes "In N of M scans, …" in transcript.md.
     var clause: String {
@@ -68,7 +71,7 @@ enum TeamsScanReason: Error, Hashable, Sendable, PublicLogValue {
         case .selfTile: return "the highlighted tile was your own video"
         case .nameRejected: return "the name text of the tile was not a usable name"
         case .scanLimit: return "the Teams windows had more elements or text than one scan reads"
-        case .deadline: return "the scan took longer than 150 ms"
+        case .deadline: return "the scan took longer than \(Int((TeamsScanLimit.deadline * 1000).rounded())) ms"
         case .axError(let code): return "an Accessibility call failed with error \(code)"
         case .unexpectedAXValue: return "Teams returned unexpected Accessibility data"
         }
@@ -117,23 +120,32 @@ struct TeamsScanSummary: Equatable, Sendable {
         largestNodeCount = observations.map(\.nodes).max() ?? 0
     }
 
+    private var rankedReasons: [(reason: TeamsScanReason, count: Int)] {
+        Self.ranked(reasons.map { (reason: $0.key, count: $0.value) })
+    }
+
     /// Most frequent first, then the table order, then the code, so two AX errors with equal counts
     /// do not come out in dictionary order, which changes between launches.
-    private var rankedReasons: [(reason: TeamsScanReason, count: Int)] {
-        reasons.map { (reason: $0.key, count: $0.value) }.sorted {
+    private static func ranked(_ counts: [(reason: TeamsScanReason, count: Int)])
+        -> [(reason: TeamsScanReason, count: Int)] {
+        counts.sorted {
             if $0.count != $1.count { return $0.count > $1.count }
             if $0.reason.rank != $1.reason.rank { return $0.reason.rank < $1.reason.rank }
             return $0.reason.code < $1.reason.code
         }
     }
 
-    var stopLine: LogMessage {
+    var stopLine: LogMessage { line(after: "Teams speaker names at Stop.") }
+
+    var soFarLine: LogMessage { line(after: "Teams speaker names so far.") }
+
+    private func line(after heading: LogMessage) -> LogMessage {
         let reasons = rankedReasons.isEmpty
             ? "none" : rankedReasons.map { "\($0.reason.code) \($0.count)" }.joined(separator: ", ")
         let median = String(format: "%.3f", medianScanTime)
         let longest = String(format: "%.3f", longestScanTime)
         return """
-            Teams speaker names at Stop. Scans: \(scans), named: \(named). Reasons: \(reasons, privacy: .public). \
+            \(heading) Scans: \(scans), named: \(named). Reasons: \(reasons, privacy: .public). \
             Scan time: median \(median, privacy: .public) s, longest \(longest, privacy: .public) s. \
             Largest node count: \(largestNodeCount).
             """
@@ -165,10 +177,13 @@ struct TeamsScanSummary: Equatable, Sendable {
         return why.map { "Teams speaker names were on, but no remote line got a name. \($0)" }
     }
 
-    /// Nobody speaking also gives noHighlightedTile, so another reason says more.
+    /// Silence is normal when nobody speaks, so another reason says more. Reasons with the same clause, as the kinds
+    /// of scan limit, count as one problem.
     private var mainProblem: (reason: TeamsScanReason, count: Int)? {
-        let ranked = rankedReasons
-        return ranked.first { $0.reason != .noHighlightedTile } ?? ranked.first
+        let problems = Self.ranked(Dictionary(grouping: rankedReasons, by: { $0.reason.clause }).values.map { group in
+            (reason: group[0].reason, count: group.reduce(0) { $0 + $1.count })
+        })
+        return problems.first { !$0.reason.isSilence } ?? problems.first
     }
 
     private static func remote(_ lines: [TranscriptLine]) -> (all: Int, named: Int) {
@@ -181,13 +196,27 @@ struct TeamsScanSummary: Equatable, Sendable {
     }
 }
 
-/// Decides which changes of the scan result go to the log: at most one line every `lineGap`.
+/// Decides which lines about the scans go to the log: a change of the scan result at most once every `lineGap`,
+/// and the counts so far about once every `countGap`.
 struct TeamsScanTally {
     static let lineGap: TimeInterval = 2
+    static let countGap: TimeInterval = 300
 
     private var current: String?
     private var lastLine: (code: String, at: HostTime)?
     private var unloggedChanges = 0
+    private var nextCounts: HostTime?
+
+    /// Measured from the first scan or the last count line, so the first scan after a long pause is due.
+    mutating func countsDue(after scan: TeamsSpeakerObservation) -> Bool {
+        guard let next = nextCounts else {
+            nextCounts = scan.began + Self.countGap
+            return false
+        }
+        guard scan.began >= next else { return false }
+        nextCounts = scan.began + Self.countGap
+        return true
+    }
 
     /// The line to log for this scan, or nil.
     mutating func line(for scan: TeamsSpeakerObservation) -> LogMessage? {

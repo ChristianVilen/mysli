@@ -32,7 +32,7 @@ The parent chose this design under the user's delegation of implementation choic
 
 These are design choices, not measured accuracy thresholds:
 
-- Poll no faster than every 300 ms. A valid scan lasts at most 150 ms.
+- Poll no faster than every 300 ms. A scan stops after 150 ms.
 - Keep at most 36,000 observations. Stop collection at the cap and retain earlier evidence.
 - Positive evidence lies only between the end of one scan and the start of the next. Both scans must name the same participant in the same source and run, with consecutive sequence numbers and a gap no greater than 750 ms.
 - Never extrapolate before the first scan or after the last. Invalid or out-of-order observations break continuity.
@@ -53,9 +53,9 @@ Walk bounded structural metadata first. Read roles, identifiers, DOM classes, ch
 
 Thread's `frwhdur`, `f578s74`, `f4mjgsl`, `f1xul6tz`, `fj20gam`, and `f3ve9t9` are candidate border classes. Require at least two classes to nominate a marker. Do not use `vdi-frame-occlusion`, mute state, or roster order as speech evidence. The candidate must also have video-tile scope: the marker or its immediate same-bounds parent carries `vdi-frame-occlusion`. That token is only a structural hint, never a positive speaking signal. When the marker carries `vdi-frame-occlusion` and its parent is an `AXMenuItem` that contains it, the menu item is the tile. This is a participant beside a shared screen. This deliberately narrow profile can miss other Teams layouts.
 
-The tile must own exactly one name text node within its subtree. In a menu-item tile, the bounds of the item must contain the name. Teams draws the name chip outside its 3 px parent, so the bounds of the other ancestors do not count there. Do not choose a name from a nearby unrelated element. Reject self tiles, ambiguous names, multiple highlighted tiles, forbidden descendants, and unsupported structures. Nested marker elements for the same tile can be deduplicated by their common tile; distinct tiles remain ambiguous even when names match. Before reading a candidate name, reject tiles containing text inputs, caption/chat/document/shared-content metadata, or nested web areas. Do not recursively read all window text to discover tiles.
+The tile must own exactly one name text node within its subtree. In a menu-item tile, the bounds of the item must contain the name. Teams draws the name chip outside its 3 px parent, so the bounds of the other ancestors do not count there. Do not choose a name from a nearby unrelated element. Reject self tiles, ambiguous names, multiple highlighted tiles, forbidden descendants, and unsupported structures. Nested marker elements for the same tile can be deduplicated by their common tile; distinct tiles with the same name give that name, and distinct tiles with different results remain ambiguous. Before reading a candidate name, reject tiles containing text inputs, caption/chat/document/shared-content metadata, or nested web areas. Do not recursively read all window text to discover tiles.
 
-The bounded metadata traversal is the one place that decides ancestry. For each node it records the ownership facts it inherits from its ancestors (the shared bounds, whether the ancestor roles allow root ownership, self metadata, and the qualified toolbar) and its subtree range. Meeting-control and tile decisions use only these qualified references. The root, toolbar-interior, and tile-interior rules stay different on purpose. Marker tiles are counted before a tile is validated, so an invalid second marker still makes the result ambiguous.
+The bounded metadata traversal is the one place that decides ancestry. For each node it records the ownership facts it inherits from its ancestors (the shared bounds, whether the ancestor roles allow root ownership, self metadata, and the qualified toolbar) and its subtree range. Meeting-control and tile decisions use only these qualified references. The root, toolbar-interior, and tile-interior rules stay different on purpose. Marker tiles are counted before a tile is validated, so an invalid second marker beside a named tile still makes the result ambiguous.
 
 Bound scans to 512 nodes, depth 32, 40 children per node, eight windows, and a 150 ms soft deadline. Set each AX message timeout to at most 50 ms or the remaining budget. Exceeding a limit or an unexpected AX failure invalidates the whole observation. Unsupported optional attributes and absent optional values are missing metadata, not transport failures; missing required evidence cannot produce a name. Read only candidate labels, each with a 256-byte content cap. AX can return more bytes than the output cap, so do not claim a hard IPC memory bound. No raw tree, label text, name, or single observation goes to a log or to disk. Logs get only the codes and counts that Diagnostics lists.
 
@@ -80,12 +80,12 @@ On 2026-10-30 a review found that every failed scan returned `.uncertain` withou
 | `unsupportedTile` | the highlighted tile did not have the supported structure |
 | `selfTile` | the highlighted tile was your own video |
 | `nameRejected` | the name text of the tile was not a usable name |
-| `scanLimit` | the Teams windows had more elements or text than one scan reads |
+| `scanLimit(kind)` | the Teams windows had more elements or text than one scan reads |
 | `deadline` | the scan took longer than 150 ms |
 | `axError(code)` | an Accessibility call failed with error <code> |
 | `unexpectedAXValue` | Teams returned unexpected Accessibility data |
 
-The native reader reports the 8-window and 40-child limits as `scanLimit`, not as a shape error. A label over 256 bytes is also `scanLimit`, except the name text, which is `nameRejected`. A name "You" or one that ends in "(you)" is `selfTile`. A node that appears twice in one window is `unexpectedAXValue`. A cancelled scan is `deadline`. `noHighlightedTile` is also the normal result while nobody speaks.
+The kind of a `scanLimit` is `windows`, `nodes`, `depth`, `children`, or `text`. The native reader reports the 8-window and 40-child limits as `scanLimit`, not as a shape error. A label over 256 bytes is `scanLimit(text)`, except the name text, which is `nameRejected`. A name "You" or one that ends in "(you)" marks your own tile. When more than one tile has a speaking border, the scan ignores your own tiles. Tiles that remain with the same result, for example the same name, give that result. No tile that remains gives `selfTile`, and different results give `multipleHighlightedTiles`. A node that appears twice in one window is `unexpectedAXValue`. A cancelled scan is `deadline`. `noHighlightedTile` is also the normal result while nobody speaks.
 
 ### Log lines
 
@@ -97,6 +97,7 @@ The native reader reports the 8-window and 40-child limits as `scanLimit`, not a
 - The result of the first scan of a recording.
 - When the result code changes from one scan to the next: the old code and the new code. At most one line goes out every 2 s. When the limit held changes back, the first scan after the 2 s writes one line with the current code and the number of changes since the last line.
 - When collection stops at the 36,000-observation cap.
+- About every 5 minutes of scans: the same counts as at Stop, for the scans so far.
 - At Stop or interruption: the number of scans, the number of scans with a name, the count for each reason code, the median and the longest scan time, and the largest node count.
 - After the merge: "N of M remote lines named".
 
@@ -109,7 +110,7 @@ A line holds only codes, counts, durations, and AX error codes. It never holds a
 `transcript.md` gets one diagnostic line when all three are true: the summary has at least one scan, the transcript has at least one "Them" line, and no line got a Teams name. The line goes after the byline and any failure lines and before the legend, like the room-label failure line, so `contentForSummary` removes it. It starts with "Teams speaker names were on, but no remote line got a name." The second sentence is one of these:
 
 - If at least one scan was `named`: "In 120 of 412 scans, Teams showed a name, but no remote line had enough matching evidence."
-- If no scan was `named`: "In 380 of 412 scans, <clause of the most common reason>." `noHighlightedTile` counts only when no other reason occurred. When two reasons have the same count, the one that comes first in the table wins.
+- If no scan was `named`: "In 380 of 412 scans, <clause of the most common reason>." `noHighlightedTile` and `selfTile` count only when no other reason occurred. The kinds of `scanLimit` count as one reason. When two reasons have the same count, the one that comes first in the table wins.
 
 ## Summary ownership and privacy
 

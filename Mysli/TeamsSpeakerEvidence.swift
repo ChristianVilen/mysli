@@ -50,6 +50,10 @@ struct TeamsSpeakerHistory {
         return entries.count < capacity
     }
 
+    private var timedScans: [TeamsSpeakerObservation] { entries.map(\.sample).filter(\.hasFiniteTimes) }
+
+    var scansSoFar: TeamsScanSummary { TeamsScanSummary(timedScans) }
+
     /// `changedFrom` is the file position from which the evidence differs from the last call's.
     /// Nil when nothing changed, minus infinity after a clock change.
     mutating func evidenceSoFar(clock: RecordingClock) -> (evidence: TeamsSpeakerEvidence, changedFrom: Double?) {
@@ -71,17 +75,13 @@ struct TeamsSpeakerHistory {
 
     func finish(clock: RecordingClock, endingAt stop: HostTime) -> TeamsSpeakerEvidence {
         guard stop.seconds.isFinite, clock.origin.seconds.isFinite else { return .empty }
+        func beforeStop(_ sample: TeamsSpeakerObservation) -> Bool { sample.began <= stop && sample.ended <= stop }
         var projection = Projection()
-        var scans: [TeamsSpeakerObservation] = []
-        for entry in entries {
-            let sample = entry.sample
-            if sample.hasFiniteTimes {
-                guard sample.began <= stop, sample.ended <= stop else { continue }
-                scans.append(sample)
-            }
+        // A scan without finite times claims nothing, but it ends the run of continuous scans.
+        for entry in entries where !entry.sample.hasFiniteTimes || beforeStop(entry.sample) {
             projection.add(entry, clock: clock)
         }
-        return projection.evidence(scans: TeamsScanSummary(scans))
+        return projection.evidence(scans: TeamsScanSummary(timedScans.filter(beforeStop)))
     }
 
     private struct Projection {
@@ -200,8 +200,9 @@ fileprivate enum Claim: Equatable, Sendable {
     init?(_ result: TeamsScanResult) {
         switch result {
         case .named(let name): self = .name(name)
-        // Each short stop between sentences gives this result.
-        case .unnamed(.noHighlightedTile): self = .silence
+        // Each short stop between sentences gives silence, and a segment from the Mac audio track is remote speech,
+        // so the user's own speaking border says nothing against a remote name.
+        case .unnamed(let reason) where reason.isSilence: self = .silence
         case .unnamed: return nil
         }
     }

@@ -53,11 +53,17 @@ final class TeamsScanDiagnosticsTests: XCTestCase {
             scan(0, .named(ada), took: 0.010, nodes: 40),
             scan(1, .unnamed(.axError(-25204)), took: 0.150, nodes: 498),
             scan(2, .unnamed(.noMeetingWindow), took: 0.020, nodes: 12),
-            scan(3, .unnamed(.noMeetingWindow), took: 0.030, nodes: 12)
+            scan(3, .unnamed(.noMeetingWindow), took: 0.030, nodes: 12),
+            scan(4, .unnamed(.scanLimit(.nodes)), took: 0.040, nodes: 12)
         ])
         XCTAssertEqual(summary.stopLine.text,
-                       "Teams speaker names at Stop. Scans: 4, named: 1. Reasons: noMeetingWindow 2, axError(-25204) 1. "
-                       + "Scan time: median 0.025 s, longest 0.150 s. Largest node count: 498.")
+                       "Teams speaker names at Stop. Scans: 5, named: 1. "
+                       + "Reasons: noMeetingWindow 2, scanLimit(nodes) 1, axError(-25204) 1. "
+                       + "Scan time: median 0.030 s, longest 0.150 s. Largest node count: 498.")
+        XCTAssertEqual(summary.soFarLine.text,
+                       "Teams speaker names so far. Scans: 5, named: 1. "
+                       + "Reasons: noMeetingWindow 2, scanLimit(nodes) 1, axError(-25204) 1. "
+                       + "Scan time: median 0.030 s, longest 0.150 s. Largest node count: 498.")
         XCTAssertEqual(TeamsScanSummary.empty.stopLine.text,
                        "Teams speaker names at Stop. Scans: 0, named: 0. Reasons: none. "
                        + "Scan time: median 0.000 s, longest 0.000 s. Largest node count: 0.")
@@ -88,6 +94,15 @@ final class TeamsScanDiagnosticsTests: XCTestCase {
         }
     }
 
+    func testCountsAreDueAboutEveryFiveMinutesOfScans() {
+        var tally = TeamsScanTally()
+        let steps: [(Double, Bool)] = [(0, false), (299.9, false), (300, true), (300.4, false), (599.9, false),
+                                       (600, true), (1500, true), (1799.9, false), (1800, true)]
+        for (time, due) in steps {
+            XCTAssertEqual(tally.countsDue(after: scan(time, .named(ada))), due, "at \(time) s")
+        }
+    }
+
     func testNoteIsWrittenOnlyWhenScansRanRemoteLinesExistAndUnderAQuarterIsNamed() {
         let scanned = summary([.unnamed(.noMeetingWindow)])
         XCTAssertNotNil(scanned.transcriptNote(for: lines(remote: 2)))
@@ -113,21 +128,33 @@ final class TeamsScanDiagnosticsTests: XCTestCase {
                        + "In 1 of 4 scans, Teams showed a name, but no remote line had enough matching evidence.")
     }
 
-    func testNoteNamesTheMostCommonReasonBeforeTheNormalSilentResult() {
-        let note = summary([.unnamed(.noHighlightedTile), .unnamed(.noHighlightedTile), .unnamed(.noMeetingWindow)])
-            .transcriptNote(for: lines(remote: 1))
-        XCTAssertEqual(note, "Teams speaker names were on, but no remote line got a name. "
-                       + "In 1 of 3 scans, no Teams window showed meeting controls with Hang up or Leave.")
+    func testNoteNamesTheMostCommonReasonBeforeTheNormalSilentResults() {
+        for silence in [TeamsScanReason.noHighlightedTile, .selfTile] {
+            let note = summary([.unnamed(silence), .unnamed(silence), .unnamed(.noMeetingWindow)])
+                .transcriptNote(for: lines(remote: 1))
+            XCTAssertEqual(note, "Teams speaker names were on, but no remote line got a name. "
+                           + "In 1 of 3 scans, no Teams window showed meeting controls with Hang up or Leave.", silence.code)
+        }
         XCTAssertEqual(summary([.unnamed(.noHighlightedTile)]).transcriptNote(for: lines(remote: 1)),
                        "Teams speaker names were on, but no remote line got a name. "
                        + "In 1 of 1 scans, no video tile had a speaking border.")
     }
 
     func testEqualCountsGoToTheReasonThatComesFirstInTheTable() {
-        let note = summary([.unnamed(.deadline), .unnamed(.scanLimit), .unnamed(.deadline), .unnamed(.scanLimit)])
+        let note = summary([.unnamed(.deadline), .unnamed(.scanLimit(.nodes)), .unnamed(.deadline),
+                            .unnamed(.scanLimit(.nodes))])
             .transcriptNote(for: lines(remote: 1))
         XCTAssertEqual(note, "Teams speaker names were on, but no remote line got a name. "
                        + "In 2 of 4 scans, the Teams windows had more elements or text than one scan reads.")
+    }
+
+    func testNoteCountsAllKindsOfScanLimitAsOneProblem() {
+        let note = summary(Array(repeating: .unnamed(.scanLimit(.nodes)), count: 3)
+                           + Array(repeating: .unnamed(.scanLimit(.children)), count: 2)
+                           + Array(repeating: .unnamed(.noMeetingWindow), count: 4))
+            .transcriptNote(for: lines(remote: 1))
+        XCTAssertEqual(note, "Teams speaker names were on, but no remote line got a name. "
+                       + "In 5 of 9 scans, the Teams windows had more elements or text than one scan reads.")
     }
 
     /// A dictionary's hash seed comes from its storage address, so the summaries all stay alive

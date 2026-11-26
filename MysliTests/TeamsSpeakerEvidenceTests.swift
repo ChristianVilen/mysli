@@ -47,8 +47,10 @@ final class TeamsSpeakerEvidenceTests: XCTestCase {
     }
 
     func testSilenceDoesNotCountAgainstAName() {
-        XCTAssertEqual(tenSeconds(steady { $0 == 13 ? silence : aino }), "Aino")
-        XCTAssertEqual(tenSeconds(steady { $0 < 13 ? aino : silence }), "Aino")
+        for quiet in [silence, TeamsScanResult.unnamed(.selfTile)] {
+            XCTAssertEqual(tenSeconds(steady { $0 == 13 ? quiet : aino }), "Aino", "\(quiet)")
+            XCTAssertEqual(tenSeconds(steady { $0 < 13 ? aino : quiet }), "Aino", "\(quiet)")
+        }
     }
 
     func testTooMuchUnknownTimeKeepsThem() {

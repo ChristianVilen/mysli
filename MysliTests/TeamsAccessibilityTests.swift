@@ -15,27 +15,81 @@ final class TeamsAccessibilityTests: XCTestCase {
     }
 
     func testANegativeCountIsUnexpectedDataAndACountOverTheLimitEndsTheScan() throws {
-        XCTAssertNoThrow(try TeamsAXRules.checkCount(0, limit: 8))
-        XCTAssertNoThrow(try TeamsAXRules.checkCount(8, limit: 8))
-        XCTAssertThrowsError(try TeamsAXRules.checkCount(9, limit: 8)) { error in
-            XCTAssertEqual(error as? TeamsScanReason, .scanLimit)
+        let maximum = TeamsScanLimit.children.maximum
+        XCTAssertNoThrow(try TeamsAXRules.checkCount(0, limit: .children))
+        XCTAssertNoThrow(try TeamsAXRules.checkCount(maximum, limit: .children))
+        XCTAssertThrowsError(try TeamsAXRules.checkCount(maximum + 1, limit: .children)) { error in
+            XCTAssertEqual(error as? TeamsScanReason, .scanLimit(.children))
         }
-        XCTAssertThrowsError(try TeamsAXRules.checkCount(-1, limit: 8)) { error in
+        XCTAssertThrowsError(try TeamsAXRules.checkCount(-1, limit: .children)) { error in
             XCTAssertEqual(error as? TeamsScanReason, .unexpectedAXValue)
         }
     }
 
     func testInvalidSecondMarkerStillMakesTheCandidateAmbiguous() {
-        for metadata in [TeamsAXMetadata(role: "AXUnknown"), TeamsAXMetadata(identifier: "self-video"),
-                         TeamsAXMetadata(identifier: "chat"), TeamsAXMetadata(bounds: .zero)] {
+        for metadata in [TeamsAXMetadata(role: "AXUnknown"), TeamsAXMetadata(identifier: "chat"),
+                         TeamsAXMetadata(bounds: .zero)] {
             let tree = FakeTeamsAX.meeting()
             tree.nodes[0]!.children.append(5)
             var marker = metadata
             marker.classes.formUnion(["vdi-frame-occlusion", "frwhdur", "f578s74"])
             tree.nodes[5] = .init(metadata: marker)
             XCTAssertEqual(TeamsAccessibility(reader: tree).snapshot().result, .unnamed(.multipleHighlightedTiles))
-            XCTAssertEqual(tree.labelReads, [2])
+            XCTAssertEqual(tree.labelReads, [2, 3, 4])
         }
+    }
+
+    /// Tile 3 with the name 4 of `meeting()`, and tile 5 with the name 6 after it.
+    private func twoTiles() -> FakeTeamsAX {
+        let tree = FakeTeamsAX.meeting()
+        tree.nodes[0]!.children.append(5)
+        tree.nodes[5] = tree.nodes[3]
+        tree.nodes[5]!.children = [6]
+        tree.nodes[6] = .init(metadata: TeamsAXMetadata(role: "AXStaticText"), label: "Grace Hopper")
+        return tree
+    }
+
+    func testTheUsersOwnTileDropsOutBesideAnotherHighlightedTile() {
+        let ways: [(String, (FakeTeamsAX, _ tile: Int, _ name: Int) -> Void)] = [
+            ("self metadata", { tree, tile, _ in tree.nodes[tile]!.metadata.identifier = "self-video" }),
+            ("tile label", { tree, tile, _ in tree.nodes[tile]!.label = "Myself video, muted" }),
+            ("You", { tree, _, name in tree.nodes[name]!.label = "You" }),
+            ("(you)", { tree, _, name in tree.nodes[name]!.label = "Ada Lovelace (you)" })
+        ]
+        for (way, makeOwn) in ways {
+            let ownFirst = twoTiles()
+            makeOwn(ownFirst, 3, 4)
+            XCTAssertEqual(TeamsAccessibility(reader: ownFirst).snapshot().result.speaker?.value, "Grace Hopper", way)
+            let ownLast = twoTiles()
+            makeOwn(ownLast, 5, 6)
+            XCTAssertEqual(TeamsAccessibility(reader: ownLast).snapshot().result.speaker?.value, "Ada Lovelace", way)
+        }
+    }
+
+    func testTheTilesLeftBesideTheUsersOwnDecideTheResult() {
+        let onlyOwn = twoTiles()
+        onlyOwn.nodes[3]!.metadata.identifier = "self-video"
+        onlyOwn.nodes[6]!.label = "You"
+        XCTAssertEqual(TeamsAccessibility(reader: onlyOwn).snapshot().result, .unnamed(.selfTile))
+
+        let unsupported = twoTiles()
+        unsupported.nodes[3]!.metadata.identifier = "self-video"
+        unsupported.nodes[5]!.children = [6, 7]
+        unsupported.nodes[7] = unsupported.nodes[6]
+        XCTAssertEqual(TeamsAccessibility(reader: unsupported).snapshot().result, .unnamed(.unsupportedTile))
+
+        let rejected = twoTiles()
+        rejected.nodes[3]!.metadata.identifier = "self-video"
+        rejected.nodes[6]!.label = "Them"
+        XCTAssertEqual(TeamsAccessibility(reader: rejected).snapshot().result, .unnamed(.nameRejected))
+
+        let twoOthers = twoTiles()
+        twoOthers.nodes[3]!.metadata.identifier = "self-video"
+        twoOthers.nodes[0]!.children.append(7)
+        twoOthers.nodes[7] = twoOthers.nodes[5]
+        twoOthers.nodes[7]!.children = [8]
+        twoOthers.nodes[8] = .init(metadata: TeamsAXMetadata(role: "AXStaticText"), label: "Alan Turing")
+        XCTAssertEqual(TeamsAccessibility(reader: twoOthers).snapshot().result, .unnamed(.multipleHighlightedTiles))
     }
 
     func testToolbarInteriorGroupsDoNotNeedBoundsOrRejectSelfButTileGroupsDo() {
@@ -116,14 +170,10 @@ final class TeamsAccessibilityTests: XCTestCase {
         XCTAssertEqual(TeamsAccessibility(reader: tree).snapshot().result, .unnamed(.noHighlightedTile))
     }
 
-    func testAmbiguousTilesNeverReadAnyName() {
-        let tree = FakeTeamsAX.meeting()
-        tree.nodes[0]!.children.append(5)
-        tree.nodes[5] = tree.nodes[3]
-        tree.nodes[5]!.children = [6]
-        tree.nodes[6] = tree.nodes[4]
-        XCTAssertEqual(TeamsAccessibility(reader: tree).snapshot().result, .unnamed(.multipleHighlightedTiles))
-        XCTAssertEqual(tree.labelReads, [2])
+    func testTwoHighlightedTilesWithTheSameNameGiveThatName() {
+        let tree = twoTiles()
+        tree.nodes[6]!.label = "Ada Lovelace"
+        XCTAssertEqual(TeamsAccessibility(reader: tree).snapshot().result.speaker?.value, "Ada Lovelace")
     }
 
     func testCandidateRejectsForbiddenDescendantsWithoutReadingTheirText() {
@@ -245,7 +295,7 @@ final class TeamsAccessibilityTests: XCTestCase {
 
     func testSeparateCallingControlsRequireTheirOwnNameBeforeReadingButtons() {
         for (label, reason) in [(nil, TeamsScanReason.noMeetingWindow), ("Other tools", .noMeetingWindow),
-                                (String(repeating: "x", count: 257), .scanLimit)] {
+                                (String(repeating: "x", count: 257), .scanLimit(.text))] {
             let tree = FakeTeamsAX.callWithSeparateControls()
             tree.nodes[5]!.label = label
             XCTAssertEqual(TeamsAccessibility(reader: tree).snapshot().result, .unnamed(reason))
@@ -323,12 +373,12 @@ final class TeamsAccessibilityTests: XCTestCase {
         XCTAssertEqual(TeamsAccessibility(reader: tree).snapshot().result, .unnamed(.nameRejected))
         tree.nodes[4]!.label = "Ada Lovelace"
         tree.nodes[2]!.label = String(repeating: "x", count: 257)
-        XCTAssertEqual(TeamsAccessibility(reader: tree).snapshot().result, .unnamed(.scanLimit))
+        XCTAssertEqual(TeamsAccessibility(reader: tree).snapshot().result, .unnamed(.scanLimit(.text)))
         tree.nodes[2]!.label = nil
         XCTAssertEqual(TeamsAccessibility(reader: tree).snapshot().result, .unnamed(.noMeetingWindow))
         tree.nodes[2]!.label = "Hang up"
         tree.nodes[3]!.label = String(repeating: "x", count: 257)
-        XCTAssertEqual(TeamsAccessibility(reader: tree).snapshot().result, .unnamed(.scanLimit))
+        XCTAssertEqual(TeamsAccessibility(reader: tree).snapshot().result, .unnamed(.scanLimit(.text)))
     }
 
     func testUnknownAncestorScopeAndInvisibleWindowCannotSupplyATile() {
@@ -354,14 +404,14 @@ final class TeamsAccessibilityTests: XCTestCase {
     func testWindowChildDepthNodeAndDeadlineLimitsInvalidateWholeSnapshot() {
         let windows = FakeTeamsAX.meeting()
         windows.roots = Array(repeating: 0, count: 9)
-        XCTAssertEqual(TeamsAccessibility(reader: windows).snapshot().result, .unnamed(.scanLimit))
+        XCTAssertEqual(TeamsAccessibility(reader: windows).snapshot().result, .unnamed(.scanLimit(.windows)))
         let children = FakeTeamsAX.meeting()
         children.nodes[0]!.children = Array(repeating: 1, count: 41)
-        XCTAssertEqual(TeamsAccessibility(reader: children).snapshot().result, .unnamed(.scanLimit))
+        XCTAssertEqual(TeamsAccessibility(reader: children).snapshot().result, .unnamed(.scanLimit(.children)))
         let depth = FakeTeamsAX.meeting()
         depth.nodes[0]!.children += [10]
         for node in 10...42 { depth.nodes[node] = .init(children: node == 42 ? [] : [node + 1]) }
-        XCTAssertEqual(TeamsAccessibility(reader: depth).snapshot().result, .unnamed(.scanLimit))
+        XCTAssertEqual(TeamsAccessibility(reader: depth).snapshot().result, .unnamed(.scanLimit(.depth)))
         let nodes = FakeTeamsAX.meeting()
         nodes.nodes[0]!.children += Array(10..<23)
         for parent in 10..<23 {
@@ -370,7 +420,7 @@ final class TeamsAccessibilityTests: XCTestCase {
             for node in ids { nodes.nodes[node] = .init() }
         }
         let limited = TeamsAccessibility(reader: nodes).snapshot()
-        XCTAssertEqual(limited.result, .unnamed(.scanLimit))
+        XCTAssertEqual(limited.result, .unnamed(.scanLimit(.nodes)))
         XCTAssertEqual(limited.nodes, 512)
         XCTAssertEqual(nodes.metadataReads.count, 512)
         let slow = FakeTeamsAX.meeting()
