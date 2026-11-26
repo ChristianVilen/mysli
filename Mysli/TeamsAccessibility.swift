@@ -26,12 +26,14 @@ func makeNativeTeamsSnapshotSource() -> any TeamsSnapshotReading {
 enum TeamsScanLimit: String, Sendable {
     case windows, nodes, depth, children, text
 
-    static let deadline: TimeInterval = 0.15
+    /// In a real call on 2026-11-25 the longest scan took 0.155 s.
+    static let deadline: TimeInterval = 0.25
 
     var maximum: Int {
         switch self {
         case .windows: 8
-        case .nodes: 512
+        // The meeting window of a real call on 2026-11-25 grew past 512 nodes.
+        case .nodes: 2048
         // The participant strip beside a shared screen reaches depth 27.
         case .depth: 32
         case .children: 40
@@ -57,6 +59,47 @@ enum TeamsAXRules {
     static func checkCount(_ count: Int, limit: TeamsScanLimit) throws {
         guard count >= 0 else { throw TeamsScanReason.unexpectedAXValue }
         guard count <= limit.maximum else { throw TeamsScanReason.scanLimit(limit) }
+    }
+
+    /// The attributes that `metadata(from:)` reads, in the order of its values.
+    static let metadataAttributes = [kAXRoleAttribute, kAXIdentifierAttribute, "AXDOMClassList", kAXPositionAttribute,
+                                     kAXSizeAttribute, kAXEnabledAttribute, "AXHidden"]
+
+    /// `values` come from `AXUIElementCopyMultipleAttributeValues` for `metadataAttributes`. `visible` leaves out
+    /// whether a window is minimized.
+    static func metadata(from values: [CFTypeRef]) throws -> TeamsAXMetadata {
+        guard values.count == metadataAttributes.count else { throw TeamsScanReason.unexpectedAXValue }
+        var present: [String: CFTypeRef] = [:]
+        for (attribute, raw) in zip(metadataAttributes, values) { present[attribute] = try value(raw) }
+        guard let classes = TeamsAXMetadata.domClasses(present["AXDOMClassList"]) else {
+            throw TeamsScanReason.unexpectedAXValue
+        }
+        var point = CGPoint.zero
+        var dimensions = CGSize.zero
+        if let position = present[kAXPositionAttribute] {
+            guard CFGetTypeID(position) == AXValueGetTypeID(),
+                  AXValueGetValue(position as! AXValue, .cgPoint, &point) else { throw TeamsScanReason.unexpectedAXValue }
+        }
+        if let size = present[kAXSizeAttribute] {
+            guard CFGetTypeID(size) == AXValueGetTypeID(),
+                  AXValueGetValue(size as! AXValue, .cgSize, &dimensions) else { throw TeamsScanReason.unexpectedAXValue }
+        }
+        return TeamsAXMetadata(role: try string(present[kAXRoleAttribute]) ?? "",
+                               identifier: try string(present[kAXIdentifierAttribute]) ?? "",
+                               classes: classes, bounds: CGRect(origin: point, size: dimensions),
+                               enabled: try boolean(present[kAXEnabledAttribute]) ?? false,
+                               visible: !(try boolean(present["AXHidden"]) ?? false))
+    }
+
+    /// The multiple-value call gives CFNull or an error value in place of an attribute without a value.
+    private static func value(_ raw: CFTypeRef) throws -> CFTypeRef? {
+        if CFGetTypeID(raw) == CFNullGetTypeID() { return nil }
+        guard CFGetTypeID(raw) == AXValueGetTypeID(), AXValueGetType(raw as! AXValue) == .axError else { return raw }
+        var error = AXError.success
+        guard AXValueGetValue(raw as! AXValue, .axError, &error), try !hasValue(error) else {
+            throw TeamsScanReason.unexpectedAXValue
+        }
+        return nil
     }
 
     static func string(_ raw: CFTypeRef?) throws -> String? {
@@ -96,28 +139,17 @@ private final class NativeTeamsAX: TeamsAXReading {
 
     func metadata(_ node: Node, timeout: TimeInterval) throws -> TeamsAXMetadata {
         let deadline = ProcessInfo.processInfo.systemUptime + timeout
-        let role = try string(node.element, kAXRoleAttribute, deadline: deadline) ?? ""
-        let identifier = try string(node.element, kAXIdentifierAttribute, deadline: deadline) ?? ""
-        let rawClasses = try value(node.element, "AXDOMClassList", deadline: deadline)
-        guard let classes = TeamsAXMetadata.domClasses(rawClasses) else { throw TeamsScanReason.unexpectedAXValue }
-        let position = try value(node.element, kAXPositionAttribute, deadline: deadline)
-        let size = try value(node.element, kAXSizeAttribute, deadline: deadline)
-        var point = CGPoint.zero
-        var dimensions = CGSize.zero
-        if let position {
-            guard CFGetTypeID(position) == AXValueGetTypeID(),
-                  AXValueGetValue(position as! AXValue, .cgPoint, &point) else { throw TeamsScanReason.unexpectedAXValue }
+        try prepare(node.element, deadline: deadline)
+        var raw: CFArray?
+        let status = AXUIElementCopyMultipleAttributeValues(node.element, TeamsAXRules.metadataAttributes as CFArray,
+                                                            AXCopyMultipleAttributeOptions(), &raw)
+        guard status == .success else { throw TeamsScanReason.axError(status.rawValue) }
+        guard let raw else { throw TeamsScanReason.unexpectedAXValue }
+        var metadata = try TeamsAXRules.metadata(from: raw as [AnyObject])
+        if metadata.role == kAXWindowRole, try boolean(node.element, kAXMinimizedAttribute, deadline: deadline) == true {
+            metadata.visible = false
         }
-        if let size {
-            guard CFGetTypeID(size) == AXValueGetTypeID(),
-                  AXValueGetValue(size as! AXValue, .cgSize, &dimensions) else { throw TeamsScanReason.unexpectedAXValue }
-        }
-        let enabled = try boolean(node.element, kAXEnabledAttribute, deadline: deadline) ?? false
-        let hidden = try boolean(node.element, "AXHidden", deadline: deadline) ?? false
-        let minimized = role == kAXWindowRole ? try boolean(node.element, kAXMinimizedAttribute, deadline: deadline) ?? false : false
-        return TeamsAXMetadata(role: role, identifier: identifier, classes: classes,
-                               bounds: CGRect(origin: point, size: dimensions), enabled: enabled,
-                               visible: !hidden && !minimized)
+        return metadata
     }
 
     func children(_ node: Node, timeout: TimeInterval) throws -> [Node] {

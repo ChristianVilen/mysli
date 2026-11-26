@@ -26,6 +26,56 @@ final class TeamsAccessibilityTests: XCTestCase {
         }
     }
 
+    private static func axError(_ error: AXError) -> CFTypeRef {
+        var error = error
+        return AXValueCreate(.axError, &error)!
+    }
+
+    private static var metadataValues: [CFTypeRef] {
+        var point = CGPoint(x: 10, y: 20)
+        var size = CGSize(width: 30, height: 40)
+        return ["AXButton" as CFString, "hangup-button" as CFString, ["frwhdur", "f578s74"] as CFArray,
+                AXValueCreate(.cgPoint, &point)!, AXValueCreate(.cgSize, &size)!, kCFBooleanTrue!, kCFBooleanTrue!]
+    }
+
+    func testMetadataComesFromTheValuesOfOneCallAndMissingValuesGetDefaults() throws {
+        XCTAssertEqual(try TeamsAXRules.metadata(from: Self.metadataValues),
+                       TeamsAXMetadata(role: "AXButton", identifier: "hangup-button", classes: ["frwhdur", "f578s74"],
+                                       bounds: CGRect(x: 10, y: 20, width: 30, height: 40), enabled: true, visible: false))
+        let missing = [Self.axError(.noValue), Self.axError(.attributeUnsupported), kCFNull!]
+        XCTAssertEqual(try TeamsAXRules.metadata(from: (0..<7).map { missing[$0 % 3] }),
+                       TeamsAXMetadata(role: "", identifier: "", classes: [], bounds: .zero, enabled: false, visible: true))
+    }
+
+    private static func metadataValues(with value: CFTypeRef, for attribute: String) -> [CFTypeRef] {
+        var values = metadataValues
+        values[TeamsAXRules.metadataAttributes.firstIndex(of: attribute)!] = value
+        return values
+    }
+
+    func testAMetadataValueWithAnotherErrorOrTheWrongTypeEndsTheScan() {
+        let failed = Self.metadataValues(with: Self.axError(.cannotComplete), for: kAXSizeAttribute)
+        XCTAssertThrowsError(try TeamsAXRules.metadata(from: failed)) { error in
+            XCTAssertEqual(error as? TeamsScanReason, .axError(AXError.cannotComplete.rawValue))
+        }
+        var point = CGPoint.zero
+        let wrong: [(String, CFTypeRef)] = [
+            (kAXRoleAttribute, 42 as CFNumber), (kAXIdentifierAttribute, kCFBooleanTrue!),
+            ("AXDOMClassList", 42 as CFNumber), (kAXPositionAttribute, "0, 0" as CFString),
+            (kAXSizeAttribute, AXValueCreate(.cgPoint, &point)!), (kAXEnabledAttribute, 1 as CFNumber),
+            ("AXHidden", "false" as CFString), ("AXHidden", Self.axError(.success))
+        ]
+        for (attribute, value) in wrong {
+            let values = Self.metadataValues(with: value, for: attribute)
+            XCTAssertThrowsError(try TeamsAXRules.metadata(from: values), attribute) { error in
+                XCTAssertEqual(error as? TeamsScanReason, .unexpectedAXValue)
+            }
+        }
+        XCTAssertThrowsError(try TeamsAXRules.metadata(from: Array(Self.metadataValues.dropLast()))) { error in
+            XCTAssertEqual(error as? TeamsScanReason, .unexpectedAXValue)
+        }
+    }
+
     func testInvalidSecondMarkerStillMakesTheCandidateAmbiguous() {
         for metadata in [TeamsAXMetadata(role: "AXUnknown"), TeamsAXMetadata(identifier: "chat"),
                          TeamsAXMetadata(bounds: .zero)] {
@@ -413,16 +463,19 @@ final class TeamsAccessibilityTests: XCTestCase {
         for node in 10...42 { depth.nodes[node] = .init(children: node == 42 ? [] : [node + 1]) }
         XCTAssertEqual(TeamsAccessibility(reader: depth).snapshot().result, .unnamed(.scanLimit(.depth)))
         let nodes = FakeTeamsAX.meeting()
-        nodes.nodes[0]!.children += Array(10..<23)
-        for parent in 10..<23 {
+        nodes.nodes[0]!.children += Array(10..<48)
+        for parent in 10..<48 {
             let ids = Array((parent * 100)..<(parent * 100 + 40))
             nodes.nodes[parent] = .init(children: ids)
-            for node in ids { nodes.nodes[node] = .init() }
+            for node in ids {
+                nodes.nodes[node] = .init(children: [node * 100])
+                nodes.nodes[node * 100] = .init()
+            }
         }
         let limited = TeamsAccessibility(reader: nodes).snapshot()
         XCTAssertEqual(limited.result, .unnamed(.scanLimit(.nodes)))
-        XCTAssertEqual(limited.nodes, 512)
-        XCTAssertEqual(nodes.metadataReads.count, 512)
+        XCTAssertEqual(limited.nodes, 2048)
+        XCTAssertEqual(nodes.metadataReads.count, 2048)
         let slow = FakeTeamsAX.meeting()
         var time = 0.0
         slow.onRead = { time += 0.03 }

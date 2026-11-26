@@ -32,7 +32,7 @@ The parent chose this design under the user's delegation of implementation choic
 
 These are design choices, not measured accuracy thresholds:
 
-- Poll no faster than every 300 ms. A scan stops after 150 ms.
+- Poll no faster than every 300 ms. A scan stops after 250 ms.
 - Keep at most 36,000 observations. Stop collection at the cap and retain earlier evidence.
 - Positive evidence lies only between the end of one scan and the start of the next. Both scans must name the same participant in the same source and run, with consecutive sequence numbers and a gap no greater than 750 ms.
 - Never extrapolate before the first scan or after the last. Invalid or out-of-order observations break continuity.
@@ -57,7 +57,7 @@ The tile must own exactly one name text node within its subtree. In a menu-item 
 
 The bounded metadata traversal is the one place that decides ancestry. For each node it records the ownership facts it inherits from its ancestors (the shared bounds, whether the ancestor roles allow root ownership, self metadata, and the qualified toolbar) and its subtree range. Meeting-control and tile decisions use only these qualified references. The root, toolbar-interior, and tile-interior rules stay different on purpose. Marker tiles are counted before a tile is validated, so an invalid second marker beside a named tile still makes the result ambiguous.
 
-Bound scans to 512 nodes, depth 32, 40 children per node, eight windows, and a 150 ms soft deadline. Set each AX message timeout to at most 50 ms or the remaining budget. Exceeding a limit or an unexpected AX failure invalidates the whole observation. Unsupported optional attributes and absent optional values are missing metadata, not transport failures; missing required evidence cannot produce a name. Read only candidate labels, each with a 256-byte content cap. AX can return more bytes than the output cap, so do not claim a hard IPC memory bound. No raw tree, label text, name, or single observation goes to a log or to disk. Logs get only the codes and counts that Diagnostics lists.
+Bound scans to 2048 nodes, depth 32, 40 children per node, eight windows, and a 250 ms soft deadline. The limits were 512 nodes and 150 ms until a real call on 2026-11-25 went over 512 nodes for 22 minutes. Read the metadata of a node with one AX call. Set each AX message timeout to at most 50 ms or the remaining budget. Exceeding a limit or an unexpected AX failure invalidates the whole observation. Unsupported optional attributes and absent optional values are missing metadata, not transport failures; missing required evidence cannot produce a name. Read only candidate labels, each with a 256-byte content cap. AX can return more bytes than the output cap, so do not claim a hard IPC memory bound. No raw tree, label text, name, or single observation goes to a log or to disk. Logs get only the codes and counts that Diagnostics lists.
 
 On 2026-11-16 the menu-item profile named a remote speaker in a real call beside a shared screen ([measurement](../research/2026-11-09-teams-ax-tree.md#our-measurement-in-a-real-call-on-2026-11-16)). The gallery tile relationship is still an unverified assumption. It can yield only `Them`, or misread a persistent last-speaker highlight. The feature is experimental and opt-in. Fake tests cannot validate Teams' actual UI semantics. Keep the diagnostic available for a later call.
 
@@ -81,7 +81,7 @@ On 2026-10-30 a review found that every failed scan returned `.uncertain` withou
 | `selfTile` | the highlighted tile was your own video |
 | `nameRejected` | the name text of the tile was not a usable name |
 | `scanLimit(kind)` | the Teams windows had more elements or text than one scan reads |
-| `deadline` | the scan took longer than 150 ms |
+| `deadline` | the scan took longer than 250 ms |
 | `axError(code)` | an Accessibility call failed with error <code> |
 | `unexpectedAXValue` | Teams returned unexpected Accessibility data |
 
